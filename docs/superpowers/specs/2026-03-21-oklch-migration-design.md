@@ -15,7 +15,13 @@ Pure math module, zero dependencies. Hot path critical.
 - `srgbToOklch(r, g, b): OKLCH` — utility for color authoring
 - `oklchToCss(L, C, H, alpha?): string` — `"oklch(0.55 0.23 264)"` or `"oklch(0.55 0.23 264 / 0.7)"`
 
-**Internal pipeline:** OKLCH → OKLab (polar→cartesian) → Linear RGB (3x3 matrix via LMS) → sRGB (gamma) → clamp [0,255]
+**Internal pipeline (Björn Ottosson formulation):**
+1. OKLCH → OKLab: `a = C * cos(H)`, `b = C * sin(H)`
+2. OKLab → LMS³: inverse M2 matrix (3x3)
+3. LMS³ → LMS: `lms = cbrt(lms3)` (cube root each component)
+4. LMS → Linear RGB: inverse M1 matrix (3x3)
+5. Linear RGB → sRGB: gamma encode (`x <= 0.0031308 ? 12.92*x : 1.055*x^(1/2.4) - 0.055`)
+6. Clamp [0, 255] and round
 
 **Gamut strategy:** Clamp at sRGB boundary. Palettes designed with C ≤ 0.2 to stay in gamut. Themes use native CSS `oklch()` — browser handles gamut mapping per spec.
 
@@ -30,6 +36,8 @@ export type ColorPalette = (t: number) => OKLCH;
 ```
 
 `RGB` type kept — used at device boundary only.
+
+**Breaking change:** `ColorPalette` return type changes from `RGB` to `OKLCH`. The `palettes` export must be made internal (removed from `domain/index.ts` barrel). Only `getColor()` remains the public API for palette consumers — it continues to return `RGB`.
 
 ### Rewritten: `domain/palettes.ts`
 
@@ -83,12 +91,19 @@ accentGlow: 'oklch(0.55 0.22 264 / 0.4)',
 
 `ThemeColors` interface unchanged (still `string` values).
 
+### Also modified: inline color values
+
+Two hardcoded colors outside `themes.ts` must be migrated:
+
+- `ui/ControlsPanel.tsx` line 40: `boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'` → `oklch(0 0 0 / 0.3)`
+- `ui/controls/ActionsSection.tsx` line 26: `color: 'white'` → `oklch(1 0 0)`
+
 ## What does NOT change
 
 - `renderer.ts` — still receives `RGB` from `getColor()`, writes to `ImageData`
 - `infrastructure/` layer — no changes
 - `application/` layer — no changes
-- UI components — consume CSS custom properties as before
+- UI components — consume CSS custom properties as before (except the 2 inline fixes above)
 - `getColor()` signature — still `(result, paletteName): RGB`
 
 ## Data flow
