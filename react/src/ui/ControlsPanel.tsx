@@ -11,7 +11,8 @@ import {
   getPaletteLabel,
   getFractalTypeNames,
   getFractalConfig,
-  JULIA_PRESETS
+  JULIA_PRESETS,
+  DEFAULT_JULIA_PARAMS
 } from '../domain';
 import { getThemeLabel, getThemeNames } from './themes';
 import { glassBaseStyle, dividerStyle, labelStyle, selectStyle } from './styles';
@@ -69,8 +70,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   const config = getFractalConfig(fractalType);
 
   const formatJuliaCoords = () => {
-    const re = juliaParams.juliaRe ?? -0.7;
-    const im = juliaParams.juliaIm ?? 0.27;
+    const re = juliaParams.juliaRe ?? DEFAULT_JULIA_PARAMS.juliaRe!;
+    const im = juliaParams.juliaIm ?? DEFAULT_JULIA_PARAMS.juliaIm!;
     const sign = im >= 0 ? '+' : '';
     return `c = ${re.toFixed(4)} ${sign} ${im.toFixed(4)}i`;
   };
