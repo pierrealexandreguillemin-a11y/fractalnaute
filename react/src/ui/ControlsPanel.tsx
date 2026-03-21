@@ -12,7 +12,8 @@ import {
   getFractalTypeNames,
   getFractalConfig,
   JULIA_PRESETS,
-  DEFAULT_JULIA_PARAMS
+  DEFAULT_JULIA_PARAMS,
+  formatComplexCoords
 } from '../domain';
 import { getThemeLabel, getThemeNames } from './themes';
 import { glassBaseStyle, dividerStyle, labelStyle, selectStyle } from './styles';
@@ -69,12 +70,10 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const config = getFractalConfig(fractalType);
 
-  const formatJuliaCoords = () => {
-    const re = juliaParams.juliaRe ?? DEFAULT_JULIA_PARAMS.juliaRe!;
-    const im = juliaParams.juliaIm ?? DEFAULT_JULIA_PARAMS.juliaIm!;
-    const sign = im >= 0 ? '+' : '';
-    return `c = ${re.toFixed(4)} ${sign} ${im.toFixed(4)}i`;
-  };
+  const juliaLabel = formatComplexCoords(
+    juliaParams.juliaRe ?? DEFAULT_JULIA_PARAMS.juliaRe!,
+    juliaParams.juliaIm ?? DEFAULT_JULIA_PARAMS.juliaIm!
+  );
 
   if (isCollapsed) {
     return (
@@ -210,7 +209,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                 color: 'var(--fractal-accent-primary)',
                 marginTop: '4px'
               }}>
-                {formatJuliaCoords()}
+                {juliaLabel}
               </div>
             </div>
           )}
