@@ -37,7 +37,6 @@ export function useRenderer({
   onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
-  const isFirstRender = useRef(true);
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -75,21 +74,11 @@ export function useRenderer({
     downloadCanvas(canvas, fractalType);
   }, [canvasRef, fractalType]);
 
-  // Initial setup
+  // Render on mount and on any state change
   useEffect(() => {
     handleResize();
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      requestAnimationFrame(render);
-    }
+    render();
   }, [handleResize, render]);
-
-  // Re-render on changes
-  useEffect(() => {
-    if (!isFirstRender.current) {
-      render();
-    }
-  }, [fractalType, viewport, maxIterations, palette, params, render]);
 
   // Window resize
   useEffect(() => {
