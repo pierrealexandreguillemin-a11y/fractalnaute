@@ -1,22 +1,17 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * UI LAYER - Controls Panel Component
+ * Thin assembler composing focused sub-sections
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import React, { useState } from 'react';
 import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
-import {
-  getPaletteNames,
-  getPaletteLabel,
-  getFractalTypeNames,
-  getFractalConfig,
-  JULIA_PRESETS,
-  DEFAULT_JULIA_PARAMS,
-  formatComplexCoords
-} from '../domain';
-import { getThemeLabel, getThemeNames } from './themes';
-import { glassBaseStyle, dividerStyle, labelStyle, selectStyle } from './styles';
+import { glassBaseStyle, dividerStyle } from './styles';
+import { FractalTypeSection } from './controls/FractalTypeSection';
+import { JuliaSection } from './controls/JuliaSection';
+import { AppearanceSection } from './controls/AppearanceSection';
+import { ActionsSection } from './controls/ActionsSection';
 
 interface ControlsPanelProps {
   fractalType: FractalType;
@@ -35,7 +30,7 @@ interface ControlsPanelProps {
   onExport: () => void;
 }
 
-const glassPanel: React.CSSProperties = {
+const panelStyle: React.CSSProperties = {
   ...glassBaseStyle,
   position: 'absolute',
   top: '16px',
@@ -50,6 +45,20 @@ const glassPanel: React.CSSProperties = {
   zIndex: 100
 };
 
+const collapsedButtonStyle: React.CSSProperties = {
+  ...glassBaseStyle,
+  position: 'absolute',
+  top: '16px',
+  right: '16px',
+  width: '44px',
+  height: '44px',
+  color: 'var(--fractal-text-primary)',
+  fontSize: '20px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
 
 export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   fractalType,
@@ -68,31 +77,12 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   onExport
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const config = getFractalConfig(fractalType);
-
-  const juliaLabel = formatComplexCoords(
-    juliaParams.juliaRe ?? DEFAULT_JULIA_PARAMS.juliaRe!,
-    juliaParams.juliaIm ?? DEFAULT_JULIA_PARAMS.juliaIm!
-  );
 
   if (isCollapsed) {
     return (
       <button
         onClick={() => setIsCollapsed(false)}
-        style={{
-          ...glassBaseStyle,
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          width: '44px',
-          height: '44px',
-          color: 'var(--fractal-text-primary)',
-          fontSize: '20px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        style={collapsedButtonStyle}
         title="Afficher les contrôles"
       >
         ⚙️
@@ -101,7 +91,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   }
 
   return (
-    <div style={glassPanel}>
+    <div style={panelStyle}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -136,196 +126,34 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
         </button>
       </div>
 
-      {/* Fractal Type */}
-      <div style={{ marginBottom: '14px' }}>
-        <label style={labelStyle}>Type de fractale</label>
-        <select
-          value={fractalType}
-          onChange={(e) => onFractalTypeChange(e.target.value as FractalType)}
-          style={selectStyle}
-        >
-          {getFractalTypeNames().map((type) => (
-            <option key={type} value={type}>
-              {getFractalConfig(type).name}
-            </option>
-          ))}
-        </select>
-        <div style={{
-          fontSize: '11px',
-          color: 'var(--fractal-text-secondary)',
-          padding: '8px',
-          background: 'var(--fractal-bg-secondary)',
-          borderRadius: '6px',
-          marginTop: '4px',
-          lineHeight: 1.4
-        }}>
-          <span style={{
-            fontFamily: "'SF Mono', 'Fira Code', monospace",
-            color: 'var(--fractal-accent-primary)',
-            fontSize: '12px'
-          }}>
-            {config.formula}
-          </span>
-          <br />
-          {config.description}
-        </div>
-      </div>
+      <FractalTypeSection
+        fractalType={fractalType}
+        onFractalTypeChange={onFractalTypeChange}
+      />
 
-      {/* Julia Options */}
       {fractalType === 'julia' && (
-        <div style={{ marginBottom: '14px' }}>
-          <label style={labelStyle}>Paramètre Julia (c)</label>
-          <button
-            onClick={onPickJulia}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              background: 'var(--fractal-bg-secondary)',
-              border: '1px solid var(--fractal-border-color)',
-              borderRadius: '8px',
-              color: 'var(--fractal-text-primary)',
-              fontSize: '12px',
-              cursor: 'pointer',
-              marginBottom: '8px'
-            }}
-          >
-            🎯 Choisir sur Mandelbrot
-          </button>
-          
-          {isPickingJulia && (
-            <div style={{
-              padding: '8px 12px',
-              background: 'var(--fractal-accent-glow)',
-              border: '1px solid var(--fractal-accent-primary)',
-              borderRadius: '8px',
-              fontSize: '11px',
-              textAlign: 'center',
-              animation: 'fractal-pulse 1.5s ease-in-out infinite'
-            }}>
-              Cliquez sur Mandelbrot pour choisir c
-              <div style={{
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                fontSize: '10px',
-                color: 'var(--fractal-accent-primary)',
-                marginTop: '4px'
-              }}>
-                {juliaLabel}
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginTop: '8px' }}>
-            <label style={labelStyle}>Presets Julia</label>
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  const [re, im] = e.target.value.split(',').map(Number);
-                  onJuliaParamsChange({ juliaRe: re, juliaIm: im });
-                }
-              }}
-              style={selectStyle}
-              defaultValue=""
-            >
-              <option value="">Personnalisé</option>
-              {JULIA_PRESETS.map((preset) => (
-                <option key={preset.name} value={`${preset.re},${preset.im}`}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <JuliaSection
+          juliaParams={juliaParams}
+          isPickingJulia={isPickingJulia}
+          onJuliaParamsChange={onJuliaParamsChange}
+          onPickJulia={onPickJulia}
+        />
       )}
 
-      {/* Divider */}
       <div style={dividerStyle} />
 
-      {/* Theme */}
-      <div style={{ marginBottom: '14px' }}>
-        <label style={labelStyle}>Thème</label>
-        <select
-          value={theme}
-          onChange={(e) => onThemeChange(e.target.value as ThemeName)}
-          style={selectStyle}
-        >
-          {getThemeNames().map((t) => (
-            <option key={t} value={t}>{getThemeLabel(t)}</option>
-          ))}
-        </select>
-      </div>
+      <AppearanceSection
+        theme={theme}
+        palette={palette}
+        maxIterations={maxIterations}
+        onThemeChange={onThemeChange}
+        onPaletteChange={onPaletteChange}
+        onIterationsChange={onIterationsChange}
+      />
 
-      {/* Palette */}
-      <div style={{ marginBottom: '14px' }}>
-        <label style={labelStyle}>Palette de couleurs</label>
-        <select
-          value={palette}
-          onChange={(e) => onPaletteChange(e.target.value as PaletteName)}
-          style={selectStyle}
-        >
-          {getPaletteNames().map((p) => (
-            <option key={p} value={p}>{getPaletteLabel(p)}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Iterations */}
-      <div style={{ marginBottom: '14px' }}>
-        <label style={labelStyle}>Itérations max: {maxIterations}</label>
-        <input
-          type="range"
-          min="50"
-          max="1000"
-          value={maxIterations}
-          onChange={(e) => onIterationsChange(parseInt(e.target.value, 10))}
-          style={{
-            width: '100%',
-            height: '4px',
-            background: 'var(--fractal-bg-secondary)',
-            borderRadius: '2px',
-            outline: 'none',
-            cursor: 'pointer'
-          }}
-        />
-      </div>
-
-      {/* Divider */}
       <div style={dividerStyle} />
 
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button
-          onClick={onReset}
-          style={{
-            flex: 1,
-            padding: '8px 16px',
-            background: 'linear-gradient(135deg, var(--fractal-accent-primary), var(--fractal-accent-secondary))',
-            border: 'none',
-            borderRadius: '8px',
-            color: 'white',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          🔄 Reset
-        </button>
-        <button
-          onClick={onExport}
-          style={{
-            flex: 1,
-            padding: '8px 16px',
-            background: 'var(--fractal-bg-secondary)',
-            border: '1px solid var(--fractal-border-color)',
-            borderRadius: '8px',
-            color: 'var(--fractal-text-primary)',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          📷 Export
-        </button>
-      </div>
+      <ActionsSection onReset={onReset} onExport={onExport} />
     </div>
   );
 };
