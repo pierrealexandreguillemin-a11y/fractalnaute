@@ -1,7 +1,7 @@
 import React from 'react';
 import type { FractalParams } from '../../domain';
 import { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, formatComplexCoords } from '../../domain';
-import { labelStyle, selectStyle } from '../styles';
+import { labelStyle, selectStyle, monoFontFamily, buttonStyle } from '../styles';
 
 interface JuliaSectionProps {
   juliaParams: FractalParams;
@@ -26,17 +26,7 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
       <label style={labelStyle}>Paramètre Julia (c)</label>
       <button
         onClick={onPickJulia}
-        style={{
-          width: '100%',
-          padding: '8px 12px',
-          background: 'var(--fractal-bg-secondary)',
-          border: '1px solid var(--fractal-border-color)',
-          borderRadius: '8px',
-          color: 'var(--fractal-text-primary)',
-          fontSize: '12px',
-          cursor: 'pointer',
-          marginBottom: '8px'
-        }}
+        style={{ ...buttonStyle, width: '100%', marginBottom: '8px' }}
       >
         🎯 Choisir sur Mandelbrot
       </button>
@@ -53,7 +43,7 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
         }}>
           Cliquez sur Mandelbrot pour choisir c
           <div style={{
-            fontFamily: "'SF Mono', 'Fira Code', monospace",
+            fontFamily: monoFontFamily,
             fontSize: '10px',
             color: 'var(--fractal-accent-primary)',
             marginTop: '4px'

@@ -8,10 +8,7 @@
 import React, { useState } from 'react';
 import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
 import { glassBaseStyle, dividerStyle } from './styles';
-import { FractalTypeSection } from './controls/FractalTypeSection';
-import { JuliaSection } from './controls/JuliaSection';
-import { AppearanceSection } from './controls/AppearanceSection';
-import { ActionsSection } from './controls/ActionsSection';
+import { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
 
 interface ControlsPanelProps {
   fractalType: FractalType;

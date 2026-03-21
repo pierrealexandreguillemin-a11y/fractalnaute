@@ -1,7 +1,7 @@
 import React from 'react';
 import type { FractalType } from '../../domain';
 import { getFractalTypeNames, getFractalLabel, getFractalConfig } from '../../domain';
-import { labelStyle, selectStyle } from '../styles';
+import { labelStyle, selectStyle, monoFontFamily, infoBoxStyle } from '../styles';
 
 interface FractalTypeSectionProps {
   fractalType: FractalType;
@@ -28,17 +28,9 @@ export const FractalTypeSection: React.FC<FractalTypeSectionProps> = ({
           </option>
         ))}
       </select>
-      <div style={{
-        fontSize: '11px',
-        color: 'var(--fractal-text-secondary)',
-        padding: '8px',
-        background: 'var(--fractal-bg-secondary)',
-        borderRadius: '6px',
-        marginTop: '4px',
-        lineHeight: 1.4
-      }}>
+      <div style={{ ...infoBoxStyle, marginTop: '4px' }}>
         <span style={{
-          fontFamily: "'SF Mono', 'Fira Code', monospace",
+          fontFamily: monoFontFamily,
           color: 'var(--fractal-accent-primary)',
           fontSize: '12px'
         }}>

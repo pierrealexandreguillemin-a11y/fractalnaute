@@ -1,4 +1,5 @@
 import React from 'react';
+import { buttonStyle } from '../styles';
 
 interface ActionsSectionProps {
   onReset: () => void;
@@ -25,17 +26,7 @@ export const ActionsSection: React.FC<ActionsSectionProps> = ({ onReset, onExpor
     </button>
     <button
       onClick={onExport}
-      style={{
-        flex: 1,
-        padding: '8px 16px',
-        background: 'var(--fractal-bg-secondary)',
-        border: '1px solid var(--fractal-border-color)',
-        borderRadius: '8px',
-        color: 'var(--fractal-text-primary)',
-        fontSize: '12px',
-        fontWeight: 600,
-        cursor: 'pointer'
-      }}
+      style={{ ...buttonStyle, flex: 1, padding: '8px 16px', fontWeight: 600 }}
     >
       📷 Export
     </button>

@@ -6,7 +6,7 @@
 
 import React from 'react';
 import type { RenderStats } from '../domain';
-import { glassBaseStyle } from './styles';
+import { glassBaseStyle, monoFontFamily } from './styles';
 
 interface InfoPanelProps {
   stats: RenderStats;
@@ -21,7 +21,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ stats }) => (
       left: '16px',
       padding: '8px 16px',
       fontSize: '11px',
-      fontFamily: "'SF Mono', 'Fira Code', monospace",
+      fontFamily: monoFontFamily,
       color: 'var(--fractal-text-secondary)',
     }}
   >

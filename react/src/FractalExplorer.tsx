@@ -162,7 +162,7 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
           ref={canvasRef}
           style={{
             display: 'block',
-            cursor: state.isPickingJulia ? 'crosshair' : 'crosshair',
+            cursor: 'crosshair',
             imageRendering: 'pixelated'
           }}
         />
