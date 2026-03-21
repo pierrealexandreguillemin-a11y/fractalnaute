@@ -53,7 +53,7 @@ export function renderFractal(
       for (let x = 0; x < width; x++) {
         const c = screenToComplex(x, y, width, height, viewport);
         const result = calculator(c.re, c.im, maxIterations, mergedParams);
-        const [r, g, b] = getColor(result, maxIterations, palette);
+        const [r, g, b] = getColor(result, palette);
 
         const idx = (y * width + x) * 4;
         data[idx] = r;

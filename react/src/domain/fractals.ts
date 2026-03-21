@@ -157,15 +157,3 @@ export const calculateMultibrot: FractalCalculator = (cRe, cIm, maxIter, params)
   };
 };
 
-/**
- * Registry of all fractal calculators
- */
-export const fractalCalculators = {
-  mandelbrot: calculateMandelbrot,
-  julia: calculateJulia,
-  burningship: calculateBurningShip,
-  tricorn: calculateTricorn,
-  multibrot3: calculateMultibrot,
-  multibrot4: calculateMultibrot,
-  multibrot5: calculateMultibrot
-};

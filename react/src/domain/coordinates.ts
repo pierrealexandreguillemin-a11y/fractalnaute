@@ -87,6 +87,7 @@ export function formatComplexCoords(
   im: number,
   precision: number = 4
 ): string {
-  const sign = im >= 0 ? '+' : '';
-  return `c = ${re.toFixed(precision)} ${sign} ${im.toFixed(precision)}i`;
+  const absIm = Math.abs(im);
+  const sign = im >= 0 ? '+' : '-';
+  return `c = ${re.toFixed(precision)} ${sign} ${absIm.toFixed(precision)}i`;
 }

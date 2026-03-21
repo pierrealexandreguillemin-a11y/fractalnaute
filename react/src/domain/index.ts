@@ -10,15 +10,12 @@ export type {
   FractalResult,
   Viewport,
   RGB,
-  ColorPalette,
   FractalType,
   PaletteName,
   ThemeName,
   FractalParams,
-  FractalCalculator,
   FractalTypeConfig,
   JuliaPreset,
-  FractalConfig,
   RenderStats
 } from './types';
 
@@ -30,8 +27,7 @@ export {
   calculateJulia,
   calculateBurningShip,
   calculateTricorn,
-  calculateMultibrot,
-  fractalCalculators
+  calculateMultibrot
 } from './fractals';
 
 // Fractal type configurations
@@ -54,7 +50,6 @@ export {
 // Coordinate transforms
 export {
   screenToComplex,
-  complexToScreen,
   zoomViewport,
   panViewport,
   getZoomLevel,
