@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
-import { glassBaseStyle, dividerStyle } from './styles';
+import { glassBaseStyle, dividerStyle, radius, zIndex } from './styles';
 import { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
 
 interface ControlsPanelProps {
@@ -32,14 +32,14 @@ const panelStyle: React.CSSProperties = {
   position: 'absolute',
   top: '16px',
   right: '16px',
-  borderRadius: '16px',
+  borderRadius: radius['2xl'],
   padding: '16px',
   minWidth: '260px',
   maxHeight: 'calc(100vh - 32px)',
   overflowY: 'auto',
   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
   color: 'var(--fractal-text-primary)',
-  zIndex: 100
+  zIndex: zIndex.controls
 };
 
 const collapsedButtonStyle: React.CSSProperties = {
@@ -113,7 +113,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             padding: '4px 8px',
             background: 'var(--fractal-bg-secondary)',
             border: '1px solid var(--fractal-border-color)',
-            borderRadius: '6px',
+            borderRadius: radius.md,
             color: 'var(--fractal-text-primary)',
             fontSize: '14px',
             cursor: 'pointer'

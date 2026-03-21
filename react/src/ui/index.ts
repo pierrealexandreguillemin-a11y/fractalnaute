@@ -14,7 +14,7 @@ export { LoadingOverlay } from './LoadingOverlay';
 export { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
 
 // Styles
-export { glassBaseStyle, dividerStyle, labelStyle, selectStyle, monoFontFamily, buttonStyle, infoBoxStyle } from './styles';
+export { glassBaseStyle, dividerStyle, labelStyle, selectStyle, monoFontFamily, buttonStyle, infoBoxStyle, radius, zIndex } from './styles';
 
 // Themes
 export {

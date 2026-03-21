@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { buttonStyle } from '../styles';
+import { buttonStyle, radius } from '../styles';
 
 interface ActionsSectionProps {
   onReset: () => void;
@@ -22,7 +22,7 @@ export const ActionsSection: React.FC<ActionsSectionProps> = ({ onReset, onExpor
         padding: '8px 16px',
         background: 'linear-gradient(135deg, var(--fractal-accent-primary), var(--fractal-accent-secondary))',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: radius.lg,
         color: 'white',
         fontSize: '12px',
         fontWeight: 600,

@@ -6,14 +6,32 @@
 
 import type { CSSProperties } from 'react';
 
+/** Border radius scale */
+export const radius = {
+  xs: '2px',
+  sm: '4px',
+  md: '6px',
+  lg: '8px',
+  xl: '12px',
+  '2xl': '16px',
+  full: '50%',
+} as const;
+
+/** Z-index scale */
+export const zIndex = {
+  panel: 10,
+  overlay: 50,
+  controls: 100,
+} as const;
+
 /** Base glassmorphism styles shared by all overlay panels */
 export const glassBaseStyle: CSSProperties = {
   background: 'var(--fractal-glass-bg)',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
   border: '1px solid var(--fractal-glass-border)',
-  borderRadius: '12px',
-  zIndex: 10
+  borderRadius: radius.xl,
+  zIndex: zIndex.panel
 };
 
 /** Horizontal divider between panel sections */
@@ -40,7 +58,7 @@ export const selectStyle: CSSProperties = {
   padding: '8px 12px',
   background: 'var(--fractal-bg-secondary)',
   border: '1px solid var(--fractal-border-color)',
-  borderRadius: '8px',
+  borderRadius: radius.lg,
   color: 'var(--fractal-text-primary)',
   fontSize: '13px',
   outline: 'none',
@@ -55,7 +73,7 @@ export const buttonStyle: CSSProperties = {
   padding: '8px 12px',
   background: 'var(--fractal-bg-secondary)',
   border: '1px solid var(--fractal-border-color)',
-  borderRadius: '8px',
+  borderRadius: radius.lg,
   color: 'var(--fractal-text-primary)',
   fontSize: '12px',
   cursor: 'pointer'
@@ -67,6 +85,6 @@ export const infoBoxStyle: CSSProperties = {
   color: 'var(--fractal-text-secondary)',
   padding: '8px',
   background: 'var(--fractal-bg-secondary)',
-  borderRadius: '6px',
+  borderRadius: radius.md,
   lineHeight: 1.4
 };

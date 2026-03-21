@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { radius, zIndex } from './styles';
 
 interface LoadingOverlayProps {
   isVisible: boolean;
@@ -22,7 +23,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isVisible }) => 
       opacity: isVisible ? 1 : 0,
       pointerEvents: isVisible ? 'auto' : 'none',
       transition: 'opacity 300ms ease',
-      zIndex: 50
+      zIndex: zIndex.overlay
     }}
   >
     <div
@@ -31,7 +32,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isVisible }) => 
         height: '48px',
         border: '3px solid var(--fractal-border-color)',
         borderTopColor: 'var(--fractal-accent-primary)',
-        borderRadius: '50%',
+        borderRadius: radius.full,
         animation: 'fractal-spin 0.8s linear infinite'
       }}
     />

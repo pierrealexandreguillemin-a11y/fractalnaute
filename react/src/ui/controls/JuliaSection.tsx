@@ -8,7 +8,7 @@
 import React from 'react';
 import type { FractalParams } from '../../domain';
 import { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, formatComplexCoords } from '../../domain';
-import { labelStyle, selectStyle, monoFontFamily, buttonStyle } from '../styles';
+import { labelStyle, selectStyle, monoFontFamily, buttonStyle, radius } from '../styles';
 
 interface JuliaSectionProps {
   juliaParams: FractalParams;
@@ -43,7 +43,7 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
           padding: '8px 12px',
           background: 'var(--fractal-accent-glow)',
           border: '1px solid var(--fractal-accent-primary)',
-          borderRadius: '8px',
+          borderRadius: radius.lg,
           fontSize: '11px',
           textAlign: 'center',
           animation: 'fractal-pulse 1.5s ease-in-out infinite'
