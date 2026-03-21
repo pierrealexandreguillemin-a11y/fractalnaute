@@ -1,111 +1,137 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * DOMAIN LAYER - Color Palettes
- * Pure functions for color generation
+ * OKLCH-based palettes with perceptually uniform interpolation
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import type { RGB, ColorPalette, PaletteName, FractalResult } from './types';
+import type { RGB, OKLCH, ColorPalette, PaletteName, FractalResult } from './types';
+import { oklchToRgb } from './color';
 
-/** Classic Bernstein polynomial palette */
-const classicPalette: ColorPalette = (t) => [
-  Math.floor(9 * (1 - t) * t * t * t * 255),
-  Math.floor(15 * (1 - t) * (1 - t) * t * t * 255),
-  Math.floor(8.5 * (1 - t) * (1 - t) * (1 - t) * t * 255)
-];
+// ─── Interpolation engine ────────────────────────────────────────────────
 
-/** Fire: black → red → yellow → white */
-const firePalette: ColorPalette = (t) => [
-  Math.floor(Math.min(255, t * 3 * 255)),
-  Math.floor(Math.max(0, Math.min(255, (t - 0.33) * 3 * 255))),
-  Math.floor(Math.max(0, Math.min(255, (t - 0.66) * 3 * 255)))
-];
+interface OklchStop {
+  pos: number;  // position in [0, 1]
+  L: number;
+  C: number;
+  H: number;
+}
 
-/** Ice: cool blue tones */
-const icePalette: ColorPalette = (t) => [
-  Math.floor(t * 150),
-  Math.floor(t * 200 + 55),
-  Math.floor(t * 50 + 205)
-];
+/**
+ * Interpolate between OKLCH stops.
+ * Hue uses shortest-arc interpolation.
+ */
+function interpolateOklch(stops: OklchStop[], t: number): OKLCH {
+  // Clamp
+  if (t <= stops[0].pos) return { L: stops[0].L, C: stops[0].C, H: stops[0].H };
+  const last = stops[stops.length - 1];
+  if (t >= last.pos) return { L: last.L, C: last.C, H: last.H };
 
-/** Neon: cycling RGB sine waves */
-const neonPalette: ColorPalette = (t) => {
-  const phase = t * Math.PI * 2;
-  return [
-    Math.floor((Math.sin(phase) * 0.5 + 0.5) * 255),
-    Math.floor((Math.sin(phase + 2.094) * 0.5 + 0.5) * 255),
-    Math.floor((Math.sin(phase + 4.189) * 0.5 + 0.5) * 255)
-  ];
-};
+  // Find enclosing stops
+  let i = 0;
+  while (i < stops.length - 1 && stops[i + 1].pos < t) i++;
+  const a = stops[i];
+  const b = stops[i + 1];
 
-/** Grayscale */
-const grayscalePalette: ColorPalette = (t) => {
-  const v = Math.floor(t * 255);
-  return [v, v, v];
-};
+  // Normalized position between the two stops
+  const f = (t - a.pos) / (b.pos - a.pos);
 
-/** Psychedelic: rapid color cycling */
-const psychedelicPalette: ColorPalette = (t) => [
-  Math.floor((Math.sin(t * 20) * 0.5 + 0.5) * 255),
-  Math.floor((Math.sin(t * 20 + 2) * 0.5 + 0.5) * 255),
-  Math.floor((Math.sin(t * 20 + 4) * 0.5 + 0.5) * 255)
-];
+  // Hue: shortest arc
+  let dh = b.H - a.H;
+  if (dh > 180) dh -= 360;
+  if (dh < -180) dh += 360;
 
-/** Sunset: warm oranges to cool purples */
-const sunsetPalette: ColorPalette = (t) => {
-  if (t < 0.5) {
-    const tt = t * 2;
-    return [255, Math.floor(tt * 150 + 50), Math.floor(tt * 100)];
-  }
-  const tt = (t - 0.5) * 2;
-  return [
-    Math.floor(255 - tt * 100),
-    Math.floor(200 - tt * 150),
-    Math.floor(100 + tt * 155)
-  ];
-};
+  return {
+    L: a.L + (b.L - a.L) * f,
+    C: a.C + (b.C - a.C) * f,
+    H: ((a.H + dh * f) + 360) % 360
+  };
+}
 
-/** Miami: neon pink, cyan, and purple */
-const miamiPalette: ColorPalette = (t) => {
-  const pink: RGB = [255, 107, 157];
-  const cyan: RGB = [0, 212, 255];
-  const purple: RGB = [168, 85, 247];
+/** Create a palette from OKLCH stops */
+function fromStops(stops: OklchStop[]): ColorPalette {
+  return (t) => interpolateOklch(stops, t);
+}
 
-  if (t < 0.33) {
-    const tt = t * 3;
-    return [
-      Math.floor(pink[0] + (cyan[0] - pink[0]) * tt),
-      Math.floor(pink[1] + (cyan[1] - pink[1]) * tt),
-      Math.floor(pink[2] + (cyan[2] - pink[2]) * tt)
-    ];
-  } else if (t < 0.66) {
-    const tt = (t - 0.33) * 3;
-    return [
-      Math.floor(cyan[0] + (purple[0] - cyan[0]) * tt),
-      Math.floor(cyan[1] + (purple[1] - cyan[1]) * tt),
-      Math.floor(cyan[2] + (purple[2] - cyan[2]) * tt)
-    ];
-  }
-  const tt = (t - 0.66) * 3;
-  return [
-    Math.floor(purple[0] + (pink[0] - purple[0]) * tt),
-    Math.floor(purple[1] + (pink[1] - purple[1]) * tt),
-    Math.floor(purple[2] + (pink[2] - purple[2]) * tt)
-  ];
-};
+// ─── Palette definitions ─────────────────────────────────────────────────
 
-/** Electric: vibrant electric colors */
-const electricPalette: ColorPalette = (t) => {
-  const phase = t * Math.PI * 4;
-  return [
-    Math.floor((Math.sin(phase) * 0.5 + 0.5) * 100 + 155),
-    Math.floor((Math.cos(phase * 0.7) * 0.5 + 0.5) * 255),
-    Math.floor(255 - t * 100)
-  ];
-};
+/** Classic: dark blue → teal → gold → dark (Bernstein-inspired curve) */
+const classicPalette = fromStops([
+  { pos: 0.0,  L: 0.05, C: 0.05, H: 265 },  // near-black blue
+  { pos: 0.15, L: 0.30, C: 0.12, H: 265 },  // deep blue
+  { pos: 0.33, L: 0.50, C: 0.14, H: 220 },  // blue
+  { pos: 0.50, L: 0.65, C: 0.15, H: 180 },  // teal
+  { pos: 0.67, L: 0.75, C: 0.15, H: 90  },  // green-gold
+  { pos: 0.85, L: 0.80, C: 0.16, H: 70  },  // gold
+  { pos: 1.0,  L: 0.10, C: 0.05, H: 50  },  // dark
+]);
 
-/** All palettes */
-export const palettes: Record<PaletteName, ColorPalette> = {
+/** Fire: black → red → orange → yellow → white */
+const firePalette = fromStops([
+  { pos: 0.0,  L: 0.00, C: 0.00, H: 30  },  // black
+  { pos: 0.25, L: 0.40, C: 0.18, H: 30  },  // dark red
+  { pos: 0.50, L: 0.60, C: 0.20, H: 40  },  // orange-red
+  { pos: 0.75, L: 0.85, C: 0.18, H: 90  },  // yellow
+  { pos: 1.0,  L: 1.00, C: 0.00, H: 90  },  // white
+]);
+
+/** Ice: cool blues, low chroma */
+const icePalette = fromStops([
+  { pos: 0.0,  L: 0.30, C: 0.02, H: 250 },  // dark blue-grey
+  { pos: 0.33, L: 0.55, C: 0.08, H: 245 },  // medium blue
+  { pos: 0.67, L: 0.75, C: 0.10, H: 230 },  // light blue
+  { pos: 1.0,  L: 0.92, C: 0.05, H: 240 },  // ice white-blue
+]);
+
+/** Neon: full hue rotation, high chroma */
+const neonPalette: ColorPalette = (t) => ({
+  L: 0.65,
+  C: 0.18,
+  H: (t * 360) % 360
+});
+
+/** Grayscale: achromatic L ramp */
+const grayscalePalette: ColorPalette = (t) => ({
+  L: t,
+  C: 0,
+  H: 0
+});
+
+/** Psychedelic: rapid hue cycling, high chroma */
+const psychedelicPalette: ColorPalette = (t) => ({
+  L: 0.65 + Math.sin(t * 10) * 0.10,
+  C: 0.15,
+  H: (t * 360 * 3) % 360
+});
+
+/** Sunset: warm orange → cool purple */
+const sunsetPalette = fromStops([
+  { pos: 0.0,  L: 0.65, C: 0.18, H: 50  },  // warm orange
+  { pos: 0.25, L: 0.70, C: 0.16, H: 40  },  // gold
+  { pos: 0.50, L: 0.60, C: 0.15, H: 15  },  // salmon
+  { pos: 0.75, L: 0.45, C: 0.14, H: 330 },  // magenta
+  { pos: 1.0,  L: 0.35, C: 0.12, H: 290 },  // purple
+]);
+
+/** Miami: neon pink → cyan → purple */
+const miamiPalette = fromStops([
+  { pos: 0.0,  L: 0.65, C: 0.20, H: 350 },  // pink
+  { pos: 0.33, L: 0.80, C: 0.14, H: 200 },  // cyan
+  { pos: 0.67, L: 0.55, C: 0.20, H: 300 },  // purple
+  { pos: 1.0,  L: 0.65, C: 0.20, H: 350 },  // pink (loop)
+]);
+
+/** Electric: double hue rotation, high chroma, high lightness */
+const electricPalette: ColorPalette = (t) => ({
+  L: 0.75 - t * 0.15,
+  C: 0.16,
+  H: (t * 720) % 360
+});
+
+// ─── Registry ────────────────────────────────────────────────────────────
+
+/** All palettes — internal, not exported via barrel */
+const palettes: Record<PaletteName, ColorPalette> = {
   classic: classicPalette,
   fire: firePalette,
   ice: icePalette,
@@ -117,8 +143,11 @@ export const palettes: Record<PaletteName, ColorPalette> = {
   electric: electricPalette
 };
 
+// ─── Public API ──────────────────────────────────────────────────────────
+
 /**
- * Get color for a fractal calculation result
+ * Get color for a fractal calculation result.
+ * Palette works in OKLCH, conversion to sRGB at device boundary.
  */
 export function getColor(
   result: FractalResult,
@@ -130,7 +159,8 @@ export function getColor(
 
   const palette = palettes[paletteName] ?? palettes.classic;
   const t = (result.smoothValue % 256) / 256;
-  return palette(t);
+  const oklch = palette(t);
+  return oklchToRgb(oklch.L, oklch.C, oklch.H);
 }
 
 /**
