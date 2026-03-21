@@ -116,6 +116,7 @@ const sunsetPalette = fromStops([
 /** Miami: neon pink → cyan → purple */
 const miamiPalette = fromStops([
   { pos: 0.0,  L: 0.65, C: 0.20, H: 350 },  // pink
+  { pos: 0.17, L: 0.75, C: 0.17, H: 60  },  // warm yellow (force long arc through warm)
   { pos: 0.33, L: 0.80, C: 0.14, H: 200 },  // cyan
   { pos: 0.67, L: 0.55, C: 0.20, H: 300 },  // purple
   { pos: 1.0,  L: 0.65, C: 0.20, H: 350 },  // pink (loop)

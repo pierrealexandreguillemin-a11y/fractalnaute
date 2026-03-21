@@ -30,6 +30,11 @@ const M2_0 = 0.2104542553; const M2_1 =  0.7936177850; const M2_2 = -0.004072046
 const M2_3 = 1.9779984951; const M2_4 = -2.4285922050; const M2_5 =  0.4505937099;
 const M2_6 = 0.0259040371; const M2_7 =  0.7827717662; const M2_8 = -0.8086757660;
 
+// ─── Internal: trig constants ────────────────────────────────────────────
+
+const DEG_TO_RAD = Math.PI / 180;
+const RAD_TO_DEG = 180 / Math.PI;
+
 // ─── Internal: gamma ─────────────────────────────────────────────────────
 
 /** Linear RGB → sRGB gamma encode */
@@ -59,7 +64,7 @@ function clampByte(x: number): number {
  */
 export function oklchToRgb(L: number, C: number, H: number): RGB {
   // 1. OKLCH → OKLab (polar → cartesian)
-  const hRad = H * Math.PI / 180;
+  const hRad = H * DEG_TO_RAD;
   const a = C * Math.cos(hRad);
   const b = C * Math.sin(hRad);
 
@@ -113,7 +118,7 @@ export function srgbToOklch(r: number, g: number, b: number): OKLCH {
 
   // 5. OKLab → OKLCH (cartesian → polar)
   const C = Math.sqrt(a_ * a_ + b_ * b_);
-  const H = C < 1e-8 ? 0 : ((Math.atan2(b_, a_) * 180 / Math.PI) + 360) % 360;
+  const H = C < 1e-8 ? 0 : ((Math.atan2(b_, a_) * RAD_TO_DEG) + 360) % 360;
 
   return { L: L_, C, H };
 }
