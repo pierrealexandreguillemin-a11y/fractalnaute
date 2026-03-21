@@ -28,8 +28,15 @@ export interface Viewport {
 /** RGB color tuple */
 export type RGB = [r: number, g: number, b: number];
 
-/** Color palette function signature */
-export type ColorPalette = (t: number) => RGB;
+/** OKLCH color — perceptually uniform, source of truth */
+export interface OKLCH {
+  L: number;  // Lightness [0, 1]
+  C: number;  // Chroma [0, ~0.4]
+  H: number;  // Hue [0, 360) degrees
+}
+
+/** Color palette function — works in OKLCH space */
+export type ColorPalette = (t: number) => OKLCH;
 
 /** Available fractal types */
 export type FractalType =

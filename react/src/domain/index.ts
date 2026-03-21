@@ -10,6 +10,7 @@ export type {
   FractalResult,
   Viewport,
   RGB,
+  OKLCH,
   FractalType,
   PaletteName,
   ThemeName,
@@ -41,11 +42,13 @@ export {
 
 // Color palettes
 export {
-  palettes,
   getColor,
   getPaletteNames,
   getPaletteLabel
 } from './palettes';
+
+// Color conversions
+export { oklchToRgb, srgbToOklch, oklchToCss } from './color';
 
 // Coordinate transforms
 export {

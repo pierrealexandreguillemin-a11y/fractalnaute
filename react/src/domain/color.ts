@@ -6,14 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import type { RGB } from './types';
-
-/** OKLCH color — will be moved to types.ts in Task 2 */
-export interface OKLCH {
-  L: number;
-  C: number;
-  H: number;
-}
+import type { RGB, OKLCH } from './types';
 
 // ─── Internal: Ottosson matrices ─────────────────────────────────────────
 

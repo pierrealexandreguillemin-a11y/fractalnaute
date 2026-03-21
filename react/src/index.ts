@@ -17,6 +17,7 @@ export type {
   FractalResult,
   Viewport,
   RGB,
+  OKLCH,
   FractalType,
   PaletteName,
   ThemeName,
@@ -35,13 +36,15 @@ export {
   fractalTypes,
   getFractalConfig,
   getFractalLabel,
-  palettes,
   getColor,
   getPaletteNames,
   getPaletteLabel,
   screenToComplex,
   formatComplexCoords,
-  JULIA_PRESETS
+  JULIA_PRESETS,
+  oklchToRgb,
+  srgbToOklch,
+  oklchToCss
 } from './domain';
 
 // Application layer exports
