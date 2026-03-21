@@ -1,3 +1,10 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UI LAYER - Appearance Section
+ * Theme, palette, and iterations controls
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import React from 'react';
 import type { ThemeName, PaletteName } from '../../domain';
 import { getPaletteNames, getPaletteLabel } from '../../domain';

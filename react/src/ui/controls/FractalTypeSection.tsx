@@ -1,3 +1,10 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UI LAYER - Fractal Type Section
+ * Selector and info display for fractal type
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import React from 'react';
 import type { FractalType } from '../../domain';
 import { getFractalTypeNames, getFractalLabel, getFractalConfig } from '../../domain';

@@ -99,5 +99,5 @@ export function useRenderer({
     };
   }, []);
 
-  return { render, exportImage, handleResize };
+  return { exportImage };
 }

@@ -1,3 +1,10 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UI LAYER - Julia Section
+ * Julia parameter picker and presets
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import React from 'react';
 import type { FractalParams } from '../../domain';
 import { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, formatComplexCoords } from '../../domain';

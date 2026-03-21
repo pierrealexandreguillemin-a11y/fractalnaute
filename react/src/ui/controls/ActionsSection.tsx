@@ -1,3 +1,10 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UI LAYER - Actions Section
+ * Reset and export action buttons
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import React from 'react';
 import { buttonStyle } from '../styles';
 
