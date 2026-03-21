@@ -6,24 +6,20 @@
 
 import React from 'react';
 import { Kbd } from './Kbd';
+import { glassBaseStyle } from './styles';
 
 export const HelpTooltip: React.FC = () => (
   <div
     style={{
+      ...glassBaseStyle,
       position: 'absolute',
       bottom: '16px',
       right: '16px',
-      background: 'var(--fractal-glass-bg)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid var(--fractal-glass-border)',
-      borderRadius: '12px',
       padding: '8px 16px',
       fontSize: '11px',
       color: 'var(--fractal-text-secondary)',
       opacity: 0.7,
       transition: 'opacity 150ms ease',
-      zIndex: 10
     }}
     onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
     onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}

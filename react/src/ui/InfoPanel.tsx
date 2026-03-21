@@ -6,6 +6,7 @@
 
 import React from 'react';
 import type { RenderStats } from '../domain';
+import { glassBaseStyle } from './styles';
 
 interface InfoPanelProps {
   stats: RenderStats;
@@ -14,19 +15,14 @@ interface InfoPanelProps {
 export const InfoPanel: React.FC<InfoPanelProps> = ({ stats }) => (
   <div
     style={{
+      ...glassBaseStyle,
       position: 'absolute',
       bottom: '16px',
       left: '16px',
-      background: 'var(--fractal-glass-bg)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid var(--fractal-glass-border)',
-      borderRadius: '12px',
       padding: '8px 16px',
       fontSize: '11px',
       fontFamily: "'SF Mono', 'Fira Code', monospace",
       color: 'var(--fractal-text-secondary)',
-      zIndex: 10
     }}
   >
     <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
