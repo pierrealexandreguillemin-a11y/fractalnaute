@@ -37,7 +37,7 @@ const panelStyle: React.CSSProperties = {
   minWidth: '260px',
   maxHeight: 'calc(100vh - 32px)',
   overflowY: 'auto',
-  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  boxShadow: '0 8px 32px oklch(0 0 0 / 0.3)',
   color: 'var(--fractal-text-primary)',
   zIndex: zIndex.controls
 };

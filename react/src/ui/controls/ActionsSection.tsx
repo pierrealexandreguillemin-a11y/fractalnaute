@@ -23,7 +23,7 @@ export const ActionsSection: React.FC<ActionsSectionProps> = ({ onReset, onExpor
         background: 'linear-gradient(135deg, var(--fractal-accent-primary), var(--fractal-accent-secondary))',
         border: 'none',
         borderRadius: radius.lg,
-        color: 'white',
+        color: 'oklch(1 0 0)',
         fontSize: '12px',
         fontWeight: 600,
         cursor: 'pointer'
