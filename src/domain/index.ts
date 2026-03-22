@@ -31,6 +31,8 @@ export {
   finalizeInterior
 } from './coloringAccumulator';
 
+export { mapToColorParam, computeNormalLightness, COLORING_MODE_LABELS } from './coloringModes';
+
 // Fractal calculators
 export {
   calculateMandelbrot,

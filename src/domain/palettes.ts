@@ -6,7 +6,9 @@
  */
 
 import type { RGB, OKLCH, ColorPalette, PaletteName, FractalResult } from './types';
+import type { ColoringMode } from './types';
 import { oklchToRgb } from './color';
+import { mapToColorParam, computeNormalLightness, mapInteriorToParam } from './coloringModes';
 
 // ─── Interpolation engine ────────────────────────────────────────────────
 
@@ -185,18 +187,29 @@ export function getColor(
 
 /**
  * Get color using a pre-resolved palette (hot path variant).
- * Avoids per-pixel string lookup — use in render loops.
+ * Supports coloring modes and interior coloring.
  */
 export function getColorFast(
   result: FractalResult,
-  palette: ColorPalette
+  palette: ColorPalette,
+  coloringMode: ColoringMode = 'classic',
+  interiorColoring: boolean = false
 ): RGB {
   if (!result.escaped) {
-    return [0, 0, 0];
+    if (!interiorColoring) return [0, 0, 0];
+    const t = mapInteriorToParam(result);
+    const oklch = palette(t);
+    return oklchToRgb(oklch.L * 0.4, oklch.C * 0.4, oklch.H);
   }
 
-  const t = (result.smoothValue % 256) / 256;
+  const t = mapToColorParam(result, coloringMode);
   const oklch = palette(t);
+
+  if (coloringMode === 'normalMap') {
+    const lightness = computeNormalLightness(result, -0.7854);
+    return oklchToRgb(Math.min(oklch.L * lightness, 1), oklch.C, oklch.H);
+  }
+
   return oklchToRgb(oklch.L, oklch.C, oklch.H);
 }
 
