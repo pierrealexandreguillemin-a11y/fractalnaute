@@ -91,15 +91,9 @@ grep -r @tradeoff src/
 - Multibrot direct multiplication (×5 for z³)
 - resolvePalette (per-pixel lookup eliminated)
 - DEG_TO_RAD constant extraction
+- Web Workers v1: pool (hardwareConcurrency-1), SAB, band decomposition, Atomics cancel, renderId anti-stale, ImageData cache, buildMergedParams, destroyed guard, single-thread fallback
 
-### Next: Web Workers (v1)
-- Worker pool (N = hardwareConcurrency) with SharedArrayBuffer
-- Band decomposition + progressive rendering (band-by-band)
-- Cancel via Atomics flag
-- Zero intermediate allocations (Workers write RGBA directly to SAB)
-- Memory safety: pool in useRef, single SAB reused, cleanup on unmount
-
-### Future: Progressive rendering (v2)
+### Next: Progressive rendering (v2)
 - Low-resolution preview first, then refine to full resolution
 - Instant visual feedback on zoom/pan
 
