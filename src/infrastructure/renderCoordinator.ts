@@ -10,6 +10,7 @@ import type {
   FractalType, PaletteName, FractalParams, Viewport
 } from '../domain/types';
 import type { WorkerPool } from './workerPool';
+import type { ExposedStrip } from './viewportTransform';
 
 export interface CoordinatorRenderOptions {
   canvas: HTMLCanvasElement;
@@ -191,5 +192,93 @@ export function renderWithPool(
     session.cancelled = true;
     pool.cancel();
     activeCleanup?.();
+  };
+}
+
+/**
+ * Render only exposed strips (after pan pixel-shift).
+ * Dispatches each strip's Y-range as a full-width band to a worker.
+ * Over-renders X dimension vs. strip boundaries, but strips are typically
+ * <10% of canvas, so the overhead is negligible vs. protocol complexity.
+ *
+ * @precondition Caller must call pool.cancel() + pool.resetCancel() before invoking.
+ * Returns a cancel function.
+ */
+export function renderStripsWithPool(
+  options: CoordinatorRenderOptions,
+  strips: ExposedStrip[]
+): () => void {
+  const {
+    canvas, pool, viewport, fractalType,
+    maxIterations, palette, params,
+    onProgress, onComplete
+  } = options;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx || strips.length === 0) return () => {};
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const renderId = nextRenderId++;
+
+  const { buffer, view } = pool.getPixelBuffer(width, height);
+  const imageData = getOrCreateImageData(ctx, width, height);
+  const startTime = performance.now();
+
+  let completedStrips = 0;
+  let cancelled = false;
+  const handlers: { worker: Worker; handler: (e: MessageEvent) => void }[] = [];
+
+  for (let i = 0; i < strips.length; i++) {
+    const strip = strips[i]!;
+    const workerIdx = i % pool.size;
+    const worker = pool.workers[workerIdx]!;
+
+    const handler = (e: MessageEvent) => {
+      if (cancelled) return;
+      if (e.data.type !== 'band-done') return;
+      if (e.data.renderId !== renderId) return;
+
+      const bStart = e.data.startY * width * 4;
+      const bEnd = e.data.endY * width * 4;
+      imageData.data.set(view.subarray(bStart, bEnd), bStart);
+      ctx.putImageData(
+        imageData, 0, 0,
+        0, e.data.startY, width, e.data.endY - e.data.startY
+      );
+
+      completedStrips++;
+      if (completedStrips === strips.length) {
+        cleanup();
+        onProgress?.(1);
+        onComplete?.(performance.now() - startTime);
+      }
+    };
+
+    worker.addEventListener('message', handler);
+    handlers.push({ worker, handler });
+
+    worker.postMessage({
+      band: { startY: strip.startY, endY: strip.endY },
+      renderId,
+      stride: 1,
+      width, height, viewport, fractalType,
+      maxIterations, palette, params,
+      pixelBuffer: buffer,
+      cancelFlag: pool.cancelFlag
+    });
+  }
+
+  function cleanup(): void {
+    for (const { worker, handler } of handlers) {
+      worker.removeEventListener('message', handler);
+    }
+    handlers.length = 0;
+  }
+
+  return () => {
+    cancelled = true;
+    pool.cancel();
+    cleanup();
   };
 }
