@@ -42,7 +42,7 @@ const PanelHeader: React.FC<{ onCollapse: () => void }> = ({ onCollapse }) => (
     <button
       onClick={onCollapse}
       aria-label="Réduire le panneau"
-      className="px-2 py-1 bg-secondary border border-border rounded-md text-sm text-foreground cursor-pointer"
+      className="px-2 py-1 bg-transparent border border-glass-border rounded-md text-sm text-foreground cursor-pointer hover:bg-glass-bg"
     >
       X
     </button>

@@ -41,7 +41,7 @@ export const FractalTypeSection: React.FC<FractalTypeSectionProps> = ({
           ))}
         </SelectContent>
       </Select>
-      <div className="mt-1 text-[11px] text-muted-foreground p-2 bg-secondary rounded-md leading-snug">
+      <div className="mt-1 text-[11px] text-muted-foreground p-2 bg-transparent border border-glass-border rounded-md leading-snug">
         <span className="font-mono text-primary text-xs">{config.formula}</span>
         <br />
         {config.description}
