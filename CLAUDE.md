@@ -18,10 +18,10 @@ npm run typecheck       # tsc --noEmit (strict, noUncheckedIndexedAccess)
 
 ```
 app/                    → UI entry (Next.js App Router, 'use client')
-src/ui/                 → Composants UI (inline styles, migration shadcn en cours)
+src/ui/                 → Composants UI (Tailwind + shadcn)
 src/components/ui/      → Composants shadcn/ui (Radix + Tailwind)
 src/application/        → Hooks React (state, canvas events)
-src/infrastructure/     → Renderer canvas, canvas utils
+src/infrastructure/     → Renderer canvas, canvas utils, Web Workers
 src/domain/             → Logique pure (fractals, palettes OKLCH, color math)
 ```
 
@@ -82,6 +82,39 @@ grep -r @tradeoff src/
 ### Fichiers standalone
 
 `standalone/fractal-explorer.html` est un prototype independant, PAS un miroir de la version React. Source de verite = `src/`.
+
+## Performance Roadmap
+
+### Done
+- putImageData partial (dirty rect)
+- Precalcul screenToComplex (8M allocs eliminated)
+- Multibrot direct multiplication (×5 for z³)
+- resolvePalette (per-pixel lookup eliminated)
+- DEG_TO_RAD constant extraction
+
+### Next: Web Workers (v1)
+- Worker pool (N = hardwareConcurrency) with SharedArrayBuffer
+- Band decomposition + progressive rendering (band-by-band)
+- Cancel via Atomics flag
+- Zero intermediate allocations (Workers write RGBA directly to SAB)
+- Memory safety: pool in useRef, single SAB reused, cleanup on unmount
+
+### Future: Progressive rendering (v2)
+- Low-resolution preview first, then refine to full resolution
+- Instant visual feedback on zoom/pan
+
+### Future: Tile caching (v3)
+- Only re-render tiles affected by viewport change
+- Cache computed tiles, reuse on pan
+
+### Future: Adaptive iteration
+- Early bailout for trivial points (far from set boundary)
+- Reduces iteration count for ~60% of pixels
+
+### Future: GPU (WebGL/WebGPU)
+- Fragment shader for embarrassingly parallel pixel computation
+- ×100+ gain over CPU Workers
+- Precision limited to float32 (zoom cap ~10⁷)
 
 ## Deploy
 
