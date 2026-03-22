@@ -135,13 +135,16 @@ export const calculateMultibrot: FractalCalculator = (cRe, cIm, maxIter, params)
   let zRe = 0, zIm = 0, iter = 0;
   
   while (zRe * zRe + zIm * zIm <= 4 && iter < maxIter) {
-    // z^n using polar form: r^n * e^(i*n*theta)
-    const r = Math.sqrt(zRe * zRe + zIm * zIm);
-    const theta = Math.atan2(zIm, zRe);
-    const rn = Math.pow(r, n);
-    
-    zRe = rn * Math.cos(n * theta) + cRe;
-    zIm = rn * Math.sin(n * theta) + cIm;
+    // z^n by direct complex multiplication (avoids 5 transcendental calls per iteration)
+    let pRe = zRe, pIm = zIm;
+    for (let k = 1; k < n; k++) {
+      const tmpRe = pRe * zRe - pIm * zIm;
+      const tmpIm = pRe * zIm + pIm * zRe;
+      pRe = tmpRe;
+      pIm = tmpIm;
+    }
+    zRe = pRe + cRe;
+    zIm = pIm + cIm;
     iter++;
   }
   
