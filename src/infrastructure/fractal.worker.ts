@@ -13,6 +13,7 @@ import type {
 
 interface WorkerInput {
   band: { startY: number; endY: number };
+  renderId: number;
   width: number;
   height: number;
   viewport: Viewport;
@@ -25,7 +26,7 @@ interface WorkerInput {
 }
 
 self.onmessage = (e: MessageEvent<WorkerInput>) => {
-  const { band, pixelBuffer, cancelFlag, ...renderParams } = e.data;
+  const { band, renderId, pixelBuffer, cancelFlag, ...renderParams } = e.data;
 
   const pixels = new Uint8ClampedArray(pixelBuffer);
   const cancel = new Int32Array(cancelFlag);
@@ -39,6 +40,7 @@ self.onmessage = (e: MessageEvent<WorkerInput>) => {
   if (completed) {
     self.postMessage({
       type: 'band-done',
+      renderId,
       startY: band.startY,
       endY: band.endY
     });

@@ -23,6 +23,9 @@ export interface CoordinatorRenderOptions {
   onComplete?: (renderTime: number) => void;
 }
 
+/** Monotonic render ID — prevents stale band-done messages from old renders */
+let nextRenderId = 0;
+
 /**
  * Distribute bands to workers and handle progressive canvas updates.
  * Returns a cancel function.
@@ -41,24 +44,24 @@ export function renderWithPool(
 
   const width = canvas.width;
   const height = canvas.height;
+  const renderId = nextRenderId++;
 
-  // Cancel any in-progress render + reset flag
+  // Cancel any in-progress render, then reset for new one
   pool.cancel();
   pool.resetCancel();
 
-  // Get or create pixel buffer
+  // Get or create pixel buffer (SAB-backed)
   const { buffer, view } = pool.getPixelBuffer(width, height);
 
-  // Create ImageData backed by the SAB view.
-  // TypeScript's ImageDataArray type requires ArrayBuffer (not SharedArrayBuffer),
-  // but all modern browsers accept SAB-backed Uint8ClampedArray at runtime.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const imageData = new ImageData(view as any as Uint8ClampedArray<ArrayBuffer>, width, height);
+  // ImageData cannot wrap a SAB-backed Uint8ClampedArray (browser security restriction).
+  // We create a plain ImageData and copy band regions from the SAB view on each completion.
+  const imageData = ctx.createImageData(width, height);
 
   const startTime = performance.now();
   const bandHeight = Math.ceil(height / pool.size);
   let completedBands = 0;
   let totalBands = 0;
+  let cancelled = false;
 
   // Set up message handlers for this render
   const handlers: ((e: MessageEvent) => void)[] = [];
@@ -70,10 +73,15 @@ export function renderWithPool(
     totalBands++;
 
     const handler = (e: MessageEvent) => {
+      if (cancelled) return;
       if (e.data.type !== 'band-done') return;
-      if (e.data.startY !== startY) return; // Not our band
+      if (e.data.renderId !== renderId) return;
 
-      // Progressive: paint this band immediately
+      // Copy band pixels from SAB view into plain ImageData, then paint
+      const bStart = e.data.startY * width * 4;
+      const bEnd = e.data.endY * width * 4;
+      imageData.data.set(view.subarray(bStart, bEnd), bStart);
+
       ctx.putImageData(
         imageData, 0, 0,
         0, e.data.startY, width, e.data.endY - e.data.startY
@@ -83,7 +91,6 @@ export function renderWithPool(
       onProgress?.(completedBands / totalBands);
 
       if (completedBands === totalBands) {
-        // Clean up handlers
         cleanup();
         onComplete?.(performance.now() - startTime);
       }
@@ -95,6 +102,7 @@ export function renderWithPool(
     // Dispatch band to worker
     pool.workers[i]!.postMessage({
       band: { startY, endY },
+      renderId,
       width, height, viewport, fractalType,
       maxIterations, palette, params,
       pixelBuffer: buffer,
@@ -111,6 +119,7 @@ export function renderWithPool(
 
   // Return cancel function
   return () => {
+    cancelled = true;
     pool.cancel();
     cleanup();
   };
