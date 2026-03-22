@@ -11,7 +11,7 @@ import { screenToComplex } from '../domain';
 import type { FractalActions } from './useFractalState';
 
 interface UseCanvasEventsOptions {
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   viewport: Viewport;
   fractalType: FractalType;
   isPickingJulia: boolean;
@@ -115,14 +115,16 @@ export function useCanvasEvents({
 
   // Touch events
   const handleTouchStart = useCallback((e: TouchEvent) => {
-    if (e.touches.length === 1) {
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    if (e.touches.length === 1 && t0) {
       isDragging.current = true;
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2) {
+      lastPos.current = { x: t0.clientX, y: t0.clientY };
+    } else if (e.touches.length === 2 && t0 && t1) {
       isDragging.current = false;
       touchDistance.current = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
+        t0.clientX - t1.clientX,
+        t0.clientY - t1.clientY
       );
     }
   }, [viewport]);
@@ -130,24 +132,26 @@ export function useCanvasEvents({
   const handleTouchMove = useCallback((e: TouchEvent) => {
     e.preventDefault();
 
-    if (e.touches.length === 1 && isDragging.current) {
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    if (e.touches.length === 1 && isDragging.current && t0) {
       const { width, height, rect } = getCanvasDimensions();
       if (!rect) return;
 
       const aspectRatio = width / height;
-      const deltaX = (e.touches[0].clientX - lastPos.current.x) / rect.width * viewport.scale * aspectRatio;
-      const deltaY = (e.touches[0].clientY - lastPos.current.y) / rect.height * viewport.scale;
+      const deltaX = (t0.clientX - lastPos.current.x) / rect.width * viewport.scale * aspectRatio;
+      const deltaY = (t0.clientY - lastPos.current.y) / rect.height * viewport.scale;
 
       actions.pan(-deltaX, -deltaY);
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2) {
+      lastPos.current = { x: t0.clientX, y: t0.clientY };
+    } else if (e.touches.length === 2 && t0 && t1) {
       const distance = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
+        t0.clientX - t1.clientX,
+        t0.clientY - t1.clientY
       );
-      
-      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      const centerX = (t0.clientX + t1.clientX) / 2;
+      const centerY = (t0.clientY + t1.clientY) / 2;
       
       const { width, height } = getCanvasDimensions();
       const pos = clientToCanvas(centerX, centerY);

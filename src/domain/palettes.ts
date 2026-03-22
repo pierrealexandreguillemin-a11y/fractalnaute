@@ -22,16 +22,24 @@ interface OklchStop {
  * Hue uses shortest-arc interpolation.
  */
 function interpolateOklch(stops: OklchStop[], t: number): OKLCH {
-  // Clamp
-  if (t <= stops[0].pos) return { L: stops[0].L, C: stops[0].C, H: stops[0].H };
+  const first = stops[0];
   const last = stops[stops.length - 1];
+
+  // Guard: degenerate palette
+  if (!first || !last) return { L: 0, C: 0, H: 0 };
+
+  // Clamp
+  if (t <= first.pos) return { L: first.L, C: first.C, H: first.H };
   if (t >= last.pos) return { L: last.L, C: last.C, H: last.H };
 
   // Find enclosing stops
   let i = 0;
-  while (i < stops.length - 1 && stops[i + 1].pos < t) i++;
+  while (i < stops.length - 1 && (stops[i + 1]?.pos ?? Infinity) < t) i++;
   const a = stops[i];
   const b = stops[i + 1];
+
+  // Guard: missing stops (shouldn't happen given clamping above)
+  if (!a || !b) return { L: last.L, C: last.C, H: last.H };
 
   // Normalized position between the two stops
   const f = (t - a.pos) / (b.pos - a.pos);

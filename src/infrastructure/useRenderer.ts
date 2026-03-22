@@ -11,8 +11,8 @@ import { renderFractal } from './renderer';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
 
 interface UseRendererOptions {
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  containerRef: React.RefObject<HTMLElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  containerRef: React.RefObject<HTMLElement | null>;
   fractalType: FractalType;
   viewport: Viewport;
   maxIterations: number;
