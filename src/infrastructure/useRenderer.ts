@@ -1,13 +1,14 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * INFRASTRUCTURE LAYER - Render Hook
- * React hook for managing fractal rendering
+ * Manages worker pool lifecycle and triggers rendering
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
 import { renderFractal } from './renderer';
+import { createWorkerPool, type WorkerPool } from './workerPool';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
 
 interface UseRendererOptions {
@@ -23,7 +24,8 @@ interface UseRendererOptions {
 }
 
 /**
- * Custom hook for managing fractal rendering
+ * Custom hook for managing fractal rendering.
+ * Creates a worker pool on mount (if SAB available), destroys on unmount.
  */
 export function useRenderer({
   canvasRef,
@@ -37,6 +39,7 @@ export function useRenderer({
   onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
+  const poolRef = useRef<WorkerPool | null>(null);
 
   // Store callbacks in refs to avoid re-creating render() on every parent render.
   // Without this, onRenderStart → setRendering(true) → re-render → new closure →
@@ -47,6 +50,15 @@ export function useRenderer({
     onRenderStartRef.current = onRenderStart;
     onRenderCompleteRef.current = onRenderComplete;
   }, [onRenderStart, onRenderComplete]);
+
+  // Pool lifecycle: create on mount, destroy on unmount
+  useEffect(() => {
+    poolRef.current = createWorkerPool(); // null if SAB unavailable
+    return () => {
+      poolRef.current?.destroy();
+      poolRef.current = null;
+    };
+  }, []);
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -59,13 +71,10 @@ export function useRenderer({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (cancelRenderRef.current) {
-      cancelRenderRef.current();
-    }
-
+    cancelRenderRef.current?.();
     onRenderStartRef.current?.();
 
-    cancelRenderRef.current = renderFractal(canvas, {
+    cancelRenderRef.current = renderFractal(canvas, poolRef.current, {
       fractalType,
       viewport,
       maxIterations,
@@ -103,9 +112,7 @@ export function useRenderer({
   // Cleanup
   useEffect(() => {
     return () => {
-      if (cancelRenderRef.current) {
-        cancelRenderRef.current();
-      }
+      cancelRenderRef.current?.();
     };
   }, []);
 

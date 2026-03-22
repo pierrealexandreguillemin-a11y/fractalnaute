@@ -1,11 +1,13 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * INFRASTRUCTURE LAYER - Canvas Renderer
- * Single-thread fallback + feature detection for worker pool
+ * INFRASTRUCTURE LAYER - Canvas Renderer (Facade)
+ * Feature-detects SharedArrayBuffer → parallel pool or single-thread fallback
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
+import type { WorkerPool } from './workerPool';
+import { renderWithPool } from './renderCoordinator';
 import { renderBand } from './renderBand';
 
 export interface RenderOptions {
@@ -19,11 +21,32 @@ export interface RenderOptions {
 }
 
 /**
- * Render a fractal to a canvas.
- * Single-thread fallback renderer — chunked via requestAnimationFrame.
- * Returns a cancel function.
+ * Render a fractal to canvas.
+ * If pool is provided, uses parallel workers.
+ * Otherwise, falls back to single-thread chunked rendering.
  */
 export function renderFractal(
+  canvas: HTMLCanvasElement,
+  pool: WorkerPool | null,
+  options: RenderOptions
+): () => void {
+  if (pool) {
+    return renderWithPool({
+      canvas, pool,
+      viewport: options.viewport,
+      fractalType: options.fractalType,
+      maxIterations: options.maxIterations,
+      palette: options.palette,
+      params: options.params,
+      onProgress: options.onProgress,
+      onComplete: options.onComplete
+    });
+  }
+  return renderFallback(canvas, options);
+}
+
+/** Single-thread fallback (chunked requestAnimationFrame) */
+function renderFallback(
   canvas: HTMLCanvasElement,
   options: RenderOptions
 ): () => void {
@@ -34,12 +57,8 @@ export function renderFractal(
     fractalType, viewport, maxIterations,
     palette, params, onProgress, onComplete
   } = options;
-  const width = canvas.width;
-  const height = canvas.height;
-
+  const { width, height } = canvas;
   const imageData = ctx.createImageData(width, height);
-  const data = imageData.data;
-
   const startTime = performance.now();
   let cancelled = false;
   let currentY = 0;
@@ -47,17 +66,15 @@ export function renderFractal(
 
   const renderChunk = () => {
     if (cancelled) return;
-
     const endY = Math.min(currentY + chunkSize, height);
 
-    renderBand(data, {
+    renderBand(imageData.data, {
       startY: currentY, endY, width, height,
       viewport, fractalType, maxIterations, palette, params
     }, () => cancelled);
 
     ctx.putImageData(imageData, 0, 0, 0, currentY, width, endY - currentY);
     currentY = endY;
-
     onProgress?.(currentY / height);
 
     if (currentY < height) {
