@@ -1,12 +1,12 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * INFRASTRUCTURE LAYER - Canvas Renderer
- * Handles all canvas rendering operations
+ * Single-thread fallback + feature detection for worker pool
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
-import { resolvePalette, getColorFast, getFractalConfig } from '../domain';
+import { renderBand } from './renderBand';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -19,7 +19,9 @@ export interface RenderOptions {
 }
 
 /**
- * Render a fractal to a canvas
+ * Render a fractal to a canvas.
+ * Single-thread fallback renderer — chunked via requestAnimationFrame.
+ * Returns a cancel function.
  */
 export function renderFractal(
   canvas: HTMLCanvasElement,
@@ -28,72 +30,43 @@ export function renderFractal(
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
 
-  const { fractalType, viewport, maxIterations, palette, params, onProgress, onComplete } = options;
+  const {
+    fractalType, viewport, maxIterations,
+    palette, params, onProgress, onComplete
+  } = options;
   const width = canvas.width;
   const height = canvas.height;
-  
+
   const imageData = ctx.createImageData(width, height);
   const data = imageData.data;
-  
-  const config = getFractalConfig(fractalType);
-  const calculator = config.calculator;
-  const mergedParams = { ...config.params, ...params };
-  const resolvedPalette = resolvePalette(palette);
 
   const startTime = performance.now();
   let cancelled = false;
   let currentY = 0;
   const chunkSize = 12;
 
-  // Precalculate coordinate mapping (avoids 8M divisions + object allocations)
-  // PERF: inlined screenToComplex() — keep in sync with coordinates.ts:screenToComplex
-  const aspectRatio = width / height;
-  const stepRe = viewport.scale * aspectRatio / width;
-  const stepIm = viewport.scale / height;
-  const originRe = viewport.centerRe - viewport.scale * aspectRatio * 0.5;
-  const originIm = viewport.centerIm - viewport.scale * 0.5;
-
   const renderChunk = () => {
     if (cancelled) return;
 
     const endY = Math.min(currentY + chunkSize, height);
 
-    for (let y = currentY; y < endY; y++) {
-      for (let x = 0; x < width; x++) {
-        const re = originRe + x * stepRe;
-        const im = originIm + y * stepIm;
-        const result = calculator(re, im, maxIterations, mergedParams);
-        const [r, g, b] = getColorFast(result, resolvedPalette);
-
-        const idx = (y * width + x) * 4;
-        data[idx] = r;
-        data[idx + 1] = g;
-        data[idx + 2] = b;
-        data[idx + 3] = 255;
-      }
-    }
+    renderBand(data, {
+      startY: currentY, endY, width, height,
+      viewport, fractalType, maxIterations, palette, params
+    }, () => cancelled);
 
     ctx.putImageData(imageData, 0, 0, 0, currentY, width, endY - currentY);
     currentY = endY;
 
-    if (onProgress) {
-      onProgress(currentY / height);
-    }
+    onProgress?.(currentY / height);
 
     if (currentY < height) {
       requestAnimationFrame(renderChunk);
     } else {
-      const renderTime = performance.now() - startTime;
-      if (onComplete) {
-        onComplete(renderTime);
-      }
+      onComplete?.(performance.now() - startTime);
     }
   };
 
   requestAnimationFrame(renderChunk);
-
-  return () => {
-    cancelled = true;
-  };
+  return () => { cancelled = true; };
 }
-
