@@ -10,9 +10,6 @@ import type { FractalParams } from '../../domain';
 import { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, formatComplexCoords } from '../../domain';
 import { LABEL_CLASS } from './shared';
 import { Button } from '@/components/ui/button';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
 
 interface JuliaSectionProps {
   juliaParams: FractalParams;
@@ -45,7 +42,7 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
         <PickingIndicator juliaLabel={juliaLabel} />
       )}
 
-      <JuliaPresetSelect onJuliaParamsChange={onJuliaParamsChange} />
+      <JuliaPresetChips onJuliaParamsChange={onJuliaParamsChange} />
     </div>
   );
 };
@@ -60,30 +57,24 @@ const PickingIndicator: React.FC<{ juliaLabel: string }> = ({ juliaLabel }) => (
   </div>
 );
 
-/** Julia preset selector */
-const JuliaPresetSelect: React.FC<{
+/** Julia preset chips — direct click instead of dropdown */
+const JuliaPresetChips: React.FC<{
   onJuliaParamsChange: (params: FractalParams) => void;
 }> = ({ onJuliaParamsChange }) => (
   <div className="mt-2">
     <label className={LABEL_CLASS}>
-      Presets Julia
+      Presets
     </label>
-    <Select
-      onValueChange={(v) => {
-        const [re, im] = v.split(',').map(Number);
-        onJuliaParamsChange({ juliaRe: re, juliaIm: im });
-      }}
-    >
-      <SelectTrigger>
-        <SelectValue placeholder="Personnalisé" />
-      </SelectTrigger>
-      <SelectContent>
-        {JULIA_PRESETS.map((preset) => (
-          <SelectItem key={preset.name} value={`${preset.re},${preset.im}`}>
-            {preset.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex flex-wrap gap-1.5">
+      {JULIA_PRESETS.map((preset) => (
+        <button
+          key={preset.name}
+          onClick={() => onJuliaParamsChange({ juliaRe: preset.re, juliaIm: preset.im })}
+          className="px-2 py-1 text-[10px] bg-glass-card border border-glass-border rounded-md text-foreground cursor-pointer hover:bg-glass-bg transition-colors"
+        >
+          {preset.name}
+        </button>
+      ))}
+    </div>
   </div>
 );
