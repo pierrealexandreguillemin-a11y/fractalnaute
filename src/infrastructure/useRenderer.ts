@@ -6,7 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
 import { createWorkerPool, type WorkerPool } from './workerPool';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
@@ -60,17 +60,19 @@ export function useRenderer({
     resizeCanvas(canvas, container);
   }, [canvasRef, containerRef]);
 
+  // Resize canvas synchronously before any render.
+  // Must be useLayoutEffect and declared BEFORE useViewportTransition
+  // so it fires first (React processes layout effects in declaration order).
+  useLayoutEffect(() => {
+    handleResize();
+  }, [handleResize]);
+
   // Viewport transition — CSS transform + debounced render
   const { forceFullRender } = useViewportTransition({
     canvasRef, poolRef,
     fractalType, viewport, maxIterations, palette, params,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
-
-  // Resize canvas on mount
-  useEffect(() => {
-    handleResize();
-  }, [handleResize]);
 
   // Window resize
   useEffect(() => {
