@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+
+echo "=== Pre-push quality gate ==="
+
+echo "[1/4] TypeScript type check..."
+npx tsc --noEmit || exit 1
+
+echo "[2/4] ESLint full project — zero warnings..."
+npx eslint src app --max-warnings 0 || exit 1
+
+echo "[3/4] Production build..."
+npm run build || exit 1
+
+echo "[4/4] npm audit..."
+npm audit --json 2>/dev/null | node -e "
+  let d='';
+  process.stdin.on('data',c=>d+=c);
+  process.stdin.on('end',()=>{
+    try {
+      const m=JSON.parse(d)?.metadata?.vulnerabilities;
+      if(!m||typeof m.critical!=='number'){console.error('npm audit: unexpected format');process.exit(1)}
+      if(m.critical>0){console.error('BLOCKED: '+m.critical+' critical vulnerabilities');process.exit(1)}
+      console.log('0 critical — PASS');
+    } catch(e) {console.error('npm audit parse error');process.exit(1)}
+  });
+" || exit 1
+
+echo "=== All checks passed ==="

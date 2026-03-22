@@ -1,14 +1,16 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===================================================================
  * UI LAYER - Controls Panel Component
  * Thin assembler composing focused sub-sections
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===================================================================
  */
 
 import React, { useState } from 'react';
 import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
-import { glassBaseStyle, dividerStyle, radius, zIndex } from './styles';
+import { glassBaseStyle, dividerStyle, radius, zIndex, BG_SECONDARY, BORDER_SOLID, BORDER_COLOR } from './styles';
 import { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
+
+const TEXT_PRIMARY = 'var(--fractal-text-primary)';
 
 interface ControlsPanelProps {
   fractalType: FractalType;
@@ -38,7 +40,7 @@ const panelStyle: React.CSSProperties = {
   maxHeight: 'calc(100vh - 32px)',
   overflowY: 'auto',
   boxShadow: '0 8px 32px oklch(0 0 0 / 0.3)',
-  color: 'var(--fractal-text-primary)',
+  color: TEXT_PRIMARY,
   zIndex: zIndex.controls
 };
 
@@ -49,13 +51,50 @@ const collapsedButtonStyle: React.CSSProperties = {
   right: '16px',
   width: '44px',
   height: '44px',
-  color: 'var(--fractal-text-primary)',
+  color: TEXT_PRIMARY,
   fontSize: '20px',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
 };
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: '16px',
+  paddingBottom: '8px',
+  borderBottom: `1px solid ${BORDER_COLOR}`
+};
+
+const closeButtonStyle: React.CSSProperties = {
+  padding: '4px 8px',
+  background: BG_SECONDARY,
+  border: BORDER_SOLID,
+  borderRadius: radius.md,
+  color: TEXT_PRIMARY,
+  fontSize: '14px',
+  cursor: 'pointer'
+};
+
+/** Panel header with title and collapse button */
+const PanelHeader: React.FC<{ onCollapse: () => void }> = ({ onCollapse }) => (
+  <div style={headerStyle}>
+    <span style={{
+      fontSize: '14px',
+      fontWeight: 600,
+      letterSpacing: '0.5px',
+      textTransform: 'uppercase',
+      color: 'var(--fractal-text-secondary)'
+    }}>
+      Fractal Explorer
+    </span>
+    <button onClick={onCollapse} style={closeButtonStyle}>
+      X
+    </button>
+  </div>
+);
 
 export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   fractalType,
@@ -80,53 +119,18 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       <button
         onClick={() => setIsCollapsed(false)}
         style={collapsedButtonStyle}
-        title="Afficher les contrôles"
+        title="Afficher les controles"
       >
-        ⚙️
+        *
       </button>
     );
   }
 
   return (
     <div style={panelStyle}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '16px',
-        paddingBottom: '8px',
-        borderBottom: '1px solid var(--fractal-border-color)'
-      }}>
-        <span style={{
-          fontSize: '14px',
-          fontWeight: 600,
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase',
-          color: 'var(--fractal-text-secondary)'
-        }}>
-          🌀 Fractal Explorer
-        </span>
-        <button
-          onClick={() => setIsCollapsed(true)}
-          style={{
-            padding: '4px 8px',
-            background: 'var(--fractal-bg-secondary)',
-            border: '1px solid var(--fractal-border-color)',
-            borderRadius: radius.md,
-            color: 'var(--fractal-text-primary)',
-            fontSize: '14px',
-            cursor: 'pointer'
-          }}
-        >
-          ✕
-        </button>
-      </div>
+      <PanelHeader onCollapse={() => setIsCollapsed(true)} />
 
-      <FractalTypeSection
-        fractalType={fractalType}
-        onFractalTypeChange={onFractalTypeChange}
-      />
+      <FractalTypeSection fractalType={fractalType} onFractalTypeChange={onFractalTypeChange} />
 
       {fractalType === 'julia' && (
         <JuliaSection

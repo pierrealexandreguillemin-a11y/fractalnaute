@@ -9,7 +9,7 @@ import React from 'react';
 import type { ThemeName, PaletteName } from '../../domain';
 import { getPaletteNames, getPaletteLabel } from '../../domain';
 import { getThemeLabel, getThemeNames } from '../themes';
-import { labelStyle, selectStyle, radius } from '../styles';
+import { labelStyle, selectStyle, radius, BG_SECONDARY } from '../styles';
 
 interface AppearanceSectionProps {
   theme: ThemeName;
@@ -66,7 +66,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
         style={{
           width: '100%',
           height: '4px',
-          background: 'var(--fractal-bg-secondary)',
+          background: BG_SECONDARY,
           borderRadius: radius.xs,
           outline: 'none',
           cursor: 'pointer'

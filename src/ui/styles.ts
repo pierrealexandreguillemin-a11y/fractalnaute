@@ -6,6 +6,11 @@
 
 import type { CSSProperties } from 'react';
 
+/** CSS custom property references — avoids string duplication across styles */
+export const BG_SECONDARY = 'var(--fractal-bg-secondary)';
+export const BORDER_COLOR = 'var(--fractal-border-color)';
+export const BORDER_SOLID = `1px solid ${BORDER_COLOR}` as const;
+
 /** Border radius scale */
 export const radius = {
   xs: '2px',
@@ -37,7 +42,7 @@ export const glassBaseStyle: CSSProperties = {
 /** Horizontal divider between panel sections */
 export const dividerStyle: CSSProperties = {
   height: '1px',
-  background: 'var(--fractal-border-color)',
+  background: BORDER_COLOR,
   margin: '12px 0'
 };
 
@@ -56,8 +61,8 @@ export const labelStyle: CSSProperties = {
 export const selectStyle: CSSProperties = {
   width: '100%',
   padding: '8px 12px',
-  background: 'var(--fractal-bg-secondary)',
-  border: '1px solid var(--fractal-border-color)',
+  background: BG_SECONDARY,
+  border: BORDER_SOLID,
   borderRadius: radius.lg,
   color: 'var(--fractal-text-primary)',
   fontSize: '13px',
@@ -71,8 +76,8 @@ export const monoFontFamily = "'SF Mono', 'Fira Code', monospace";
 /** Standard secondary button style */
 export const buttonStyle: CSSProperties = {
   padding: '8px 12px',
-  background: 'var(--fractal-bg-secondary)',
-  border: '1px solid var(--fractal-border-color)',
+  background: BG_SECONDARY,
+  border: BORDER_SOLID,
   borderRadius: radius.lg,
   color: 'var(--fractal-text-primary)',
   fontSize: '12px',
@@ -84,7 +89,7 @@ export const infoBoxStyle: CSSProperties = {
   fontSize: '11px',
   color: 'var(--fractal-text-secondary)',
   padding: '8px',
-  background: 'var(--fractal-bg-secondary)',
+  background: BG_SECONDARY,
   borderRadius: radius.md,
   lineHeight: 1.4
 };

@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import type { FractalResult, FractalParams, FractalCalculator } from './types';
+import type { FractalCalculator } from './types';
 import { DEFAULT_JULIA_PARAMS } from './types';
 
 /**
