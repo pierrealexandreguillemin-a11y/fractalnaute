@@ -19,6 +19,7 @@ export class WorkerPool {
   private pixelView: Uint8ClampedArray | null = null;
   private bufferWidth = 0;
   private bufferHeight = 0;
+  private destroyed = false;
 
   constructor(readonly size: number) {
     this.cancelFlag = new SharedArrayBuffer(4);
@@ -32,11 +33,18 @@ export class WorkerPool {
     }
   }
 
+  get isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
   /** Get or create pixel buffer matching canvas dimensions */
   getPixelBuffer(width: number, height: number): {
     buffer: SharedArrayBuffer;
     view: Uint8ClampedArray;
   } {
+    if (this.destroyed) {
+      throw new Error('WorkerPool has been destroyed');
+    }
     if (
       width !== this.bufferWidth ||
       height !== this.bufferHeight ||
@@ -63,6 +71,8 @@ export class WorkerPool {
 
   /** Terminate all workers and release resources */
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
     this.cancel();
     for (const w of this.workers) {
       w.terminate();
