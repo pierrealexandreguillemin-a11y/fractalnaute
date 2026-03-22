@@ -52,7 +52,6 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
   return (
     <div
       ref={containerRef}
-      data-theme={state.theme}
       className={cn(
         'relative w-full h-full min-h-[400px] flex items-center justify-center overflow-hidden',
         'bg-background text-foreground font-sans',

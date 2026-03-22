@@ -5,7 +5,7 @@
  * ===================================================================
  */
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import type { ThemeName, FractalType } from './domain';
 import { useFractalState, useCanvasEvents } from './application';
 import type { InitialFractalConfig } from './application';
@@ -49,6 +49,11 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
     onRenderStart: () => actions.setRendering(true),
     onRenderComplete: (renderTime: number) => actions.setRendering(false, renderTime)
   });
+
+  // Sync theme to <html> for Radix portals (dropdowns teleport to <body>)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', state.theme);
+  }, [state.theme]);
 
   const handleThemeChange = useCallback((theme: ThemeName) => {
     actions.setTheme(theme);
