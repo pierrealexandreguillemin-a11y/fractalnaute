@@ -43,6 +43,8 @@ export {
 // Color palettes
 export {
   getColor,
+  getColorFast,
+  resolvePalette,
   getPaletteNames,
   getPaletteLabel
 } from './palettes';

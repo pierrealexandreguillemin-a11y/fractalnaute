@@ -10,6 +10,7 @@ import type { Complex, Viewport } from './types';
 /**
  * Convert screen coordinates to complex plane coordinates
  */
+// NOTE: renderer.ts inlines this for perf — keep both in sync
 export function screenToComplex(
   x: number,
   y: number,

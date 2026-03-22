@@ -131,7 +131,9 @@ export const calculateTricorn: FractalCalculator = (cRe, cIm, maxIter) => {
  * n=2 is classic Mandelbrot, higher n gives n-fold rotational symmetry
  */
 export const calculateMultibrot: FractalCalculator = (cRe, cIm, maxIter, params) => {
-  const n = params.power ?? 3;
+  // @tradeoff Integer powers only — direct multiplication replaces polar form.
+  // Non-integer power (e.g. 2.5) silently rounds to nearest integer.
+  const n = Math.round(params.power ?? 3);
   let zRe = 0, zIm = 0, iter = 0;
   
   while (zRe * zRe + zIm * zIm <= 4 && iter < maxIter) {

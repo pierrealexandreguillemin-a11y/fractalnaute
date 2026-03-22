@@ -6,7 +6,7 @@
  */
 
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
-import { getColor, getFractalConfig } from '../domain';
+import { resolvePalette, getColorFast, getFractalConfig } from '../domain';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -38,13 +38,15 @@ export function renderFractal(
   const config = getFractalConfig(fractalType);
   const calculator = config.calculator;
   const mergedParams = { ...config.params, ...params };
-  
+  const resolvedPalette = resolvePalette(palette);
+
   const startTime = performance.now();
   let cancelled = false;
   let currentY = 0;
   const chunkSize = 12;
 
   // Precalculate coordinate mapping (avoids 8M divisions + object allocations)
+  // PERF: inlined screenToComplex() — keep in sync with coordinates.ts:screenToComplex
   const aspectRatio = width / height;
   const stepRe = viewport.scale * aspectRatio / width;
   const stepIm = viewport.scale / height;
@@ -61,7 +63,7 @@ export function renderFractal(
         const re = originRe + x * stepRe;
         const im = originIm + y * stepIm;
         const result = calculator(re, im, maxIterations, mergedParams);
-        const [r, g, b] = getColor(result, palette);
+        const [r, g, b] = getColorFast(result, resolvedPalette);
 
         const idx = (y * width + x) * 4;
         data[idx] = r;

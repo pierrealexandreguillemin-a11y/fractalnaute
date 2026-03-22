@@ -153,6 +153,14 @@ const palettes: Record<PaletteName, ColorPalette> = {
  * Get color for a fractal calculation result.
  * Palette works in OKLCH, conversion to sRGB at device boundary.
  */
+/**
+ * Resolve a palette function by name.
+ * Call once before render loop to avoid per-pixel string lookup.
+ */
+export function resolvePalette(paletteName: PaletteName): ColorPalette {
+  return palettes[paletteName] ?? palettes.classic;
+}
+
 export function getColor(
   result: FractalResult,
   paletteName: PaletteName
@@ -162,6 +170,23 @@ export function getColor(
   }
 
   const palette = palettes[paletteName] ?? palettes.classic;
+  const t = (result.smoothValue % 256) / 256;
+  const oklch = palette(t);
+  return oklchToRgb(oklch.L, oklch.C, oklch.H);
+}
+
+/**
+ * Get color using a pre-resolved palette (hot path variant).
+ * Avoids per-pixel string lookup — use in render loops.
+ */
+export function getColorFast(
+  result: FractalResult,
+  palette: ColorPalette
+): RGB {
+  if (!result.escaped) {
+    return [0, 0, 0];
+  }
+
   const t = (result.smoothValue % 256) / 256;
   const oklch = palette(t);
   return oklchToRgb(oklch.L, oklch.C, oklch.H);
