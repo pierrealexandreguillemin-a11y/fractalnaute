@@ -92,6 +92,7 @@ grep -r @tradeoff src/
 - resolvePalette (per-pixel lookup eliminated)
 - DEG_TO_RAD constant extraction
 - Web Workers v1: pool (hardwareConcurrency-1), SAB, band decomposition, Atomics cancel, renderId anti-stale, ImageData cache, buildMergedParams, destroyed guard, single-thread fallback
+- Adaptive iteration: cardioid/bulb pre-test (Mandelbrot), Brent's periodicity checking (all 5 fractals), epsilon 1e-15. Measured: 3.4x@256iter, 8.6x@1024iter
 
 ### Next: Progressive rendering (v2)
 - Low-resolution preview first, then refine to full resolution
@@ -100,10 +101,6 @@ grep -r @tradeoff src/
 ### Future: Tile caching (v3)
 - Only re-render tiles affected by viewport change
 - Cache computed tiles, reuse on pan
-
-### Future: Adaptive iteration
-- Early bailout for trivial points (far from set boundary)
-- Reduces iteration count for ~60% of pixels
 
 ### Future: GPU (WebGL/WebGPU)
 - Fragment shader for embarrassingly parallel pixel computation
