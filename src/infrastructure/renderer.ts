@@ -8,7 +8,7 @@
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
 import type { WorkerPool } from './workerPool';
 import { renderWithPool } from './renderCoordinator';
-import { renderBand } from './renderBand';
+import { renderBand, buildMergedParams } from './renderBand';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -58,6 +58,7 @@ function renderFallback(
     palette, params, onProgress, onComplete
   } = options;
   const { width, height } = canvas;
+  const mergedParams = buildMergedParams(fractalType, params);
   const imageData = ctx.createImageData(width, height);
   const startTime = performance.now();
   let cancelled = false;
@@ -70,7 +71,7 @@ function renderFallback(
 
     renderBand(imageData.data, {
       startY: currentY, endY, width, height,
-      viewport, fractalType, maxIterations, palette, params
+      viewport, fractalType, maxIterations, palette, params: mergedParams
     }, () => cancelled);
 
     ctx.putImageData(imageData, 0, 0, 0, currentY, width, endY - currentY);

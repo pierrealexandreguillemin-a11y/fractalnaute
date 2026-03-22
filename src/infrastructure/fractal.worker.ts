@@ -6,7 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import { renderBand } from './renderBand';
+import { renderBand, buildMergedParams } from './renderBand';
 import type {
   FractalType, PaletteName, FractalParams, Viewport
 } from '../domain/types';
@@ -31,10 +31,13 @@ self.onmessage = (e: MessageEvent<WorkerInput>) => {
   const pixels = new Uint8ClampedArray(pixelBuffer);
   const cancel = new Int32Array(cancelFlag);
 
+  const mergedParams = buildMergedParams(renderParams.fractalType, renderParams.params);
+
   const completed = renderBand(pixels, {
     startY: band.startY,
     endY: band.endY,
-    ...renderParams
+    ...renderParams,
+    params: mergedParams
   }, () => Atomics.load(cancel, 0) === 1);
 
   if (completed) {

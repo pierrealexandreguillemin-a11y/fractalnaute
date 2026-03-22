@@ -25,10 +25,23 @@ export interface BandRenderParams {
 }
 
 /**
+ * Build merged params once per render — avoids repeated spreads in hot path.
+ * Callers that invoke renderBand multiple times (fallback chunks) should
+ * call this once and pass the result via band.params.
+ */
+export function buildMergedParams(
+  fractalType: FractalType,
+  params: FractalParams
+): FractalParams {
+  const config = getFractalConfig(fractalType);
+  return { ...config.params, ...params };
+}
+
+/**
  * Render a horizontal band of pixels into a Uint8ClampedArray buffer.
  *
  * @param pixels - RGBA buffer (width * height * 4 bytes)
- * @param band - Band parameters
+ * @param band - Band parameters (params should be pre-merged via buildMergedParams)
  * @param shouldCancel - Optional function checked every line; return true to abort
  * @returns true if completed, false if cancelled
  */
@@ -44,7 +57,6 @@ export function renderBand(
 
   const config = getFractalConfig(fractalType);
   const calculator = config.calculator;
-  const mergedParams = { ...config.params, ...params };
   const resolvedPalette = resolvePalette(palette);
 
   // Precalculate coordinate mapping
@@ -61,7 +73,7 @@ export function renderBand(
     for (let x = 0; x < width; x++) {
       const re = originRe + x * stepRe;
       const im = originIm + y * stepIm;
-      const result = calculator(re, im, maxIterations, mergedParams);
+      const result = calculator(re, im, maxIterations, params);
       const [r, g, b] = getColorFast(result, resolvedPalette);
 
       const idx = (y * width + x) * 4;
