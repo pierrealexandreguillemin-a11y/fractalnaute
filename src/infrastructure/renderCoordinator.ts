@@ -11,6 +11,7 @@ import type {
 } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import type { ExposedStrip } from './viewportTransform';
+import { getOrCreateImageData } from './canvasUtils';
 
 export interface CoordinatorRenderOptions {
   canvas: HTMLCanvasElement;
@@ -30,24 +31,6 @@ const PREVIEW_STRIDE = 4;
 /** Monotonic render ID — prevents stale band-done messages from old renders */
 let nextRenderId = 0;
 
-/** Cached ImageData — reused when canvas dimensions haven't changed */
-let cachedImageData: ImageData | null = null;
-let cachedWidth = 0;
-let cachedHeight = 0;
-
-export function getOrCreateImageData(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number
-): ImageData {
-  if (cachedImageData && cachedWidth === width && cachedHeight === height) {
-    return cachedImageData;
-  }
-  cachedImageData = ctx.createImageData(width, height);
-  cachedWidth = width;
-  cachedHeight = height;
-  return cachedImageData;
-}
 
 /** Shared state for a render session (preview + full-res passes) */
 interface RenderSession {

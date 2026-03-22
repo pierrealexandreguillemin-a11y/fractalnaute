@@ -10,7 +10,8 @@ import { useRef, useLayoutEffect, useCallback, useEffect } from 'react';
 import type { Viewport, FractalType, PaletteName, FractalParams } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import { renderFractal } from './renderer';
-import { renderStripsWithPool, getOrCreateImageData } from './renderCoordinator';
+import { renderStripsWithPool } from './renderCoordinator';
+import { getOrCreateImageData } from './canvasUtils';
 import {
   computeCSSTransform, isPanOnly, computePanShift,
   computeExposedStrips, shiftPixelBuffer
@@ -92,16 +93,7 @@ function doRenderPanStrips(
   pool.cancel();
   pool.resetCancel();
 
-  const { view } = pool.getPixelBuffer(canvas.width, canvas.height);
-  shiftPixelBuffer(view, canvas.width, canvas.height, dx, dy);
-
-  // Paint shifted buffer immediately — reuse cached ImageData (no allocation)
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const imageData = getOrCreateImageData(ctx, canvas.width, canvas.height);
-    imageData.data.set(view);
-    ctx.putImageData(imageData, 0, 0);
-  }
+  shiftAndPaint(pool, canvas, dx, dy);
 
   // Update baseline eagerly so CSS feedback stays in sync during rapid input
   prevViewportRef.current = deps.viewport;
@@ -124,6 +116,24 @@ function doRenderPanStrips(
       onRenderCompleteRef.current?.(renderTime);
     }
   }, strips);
+}
+
+/** Shift SAB pixel buffer by (dx, dy) and paint immediately to canvas */
+function shiftAndPaint(
+  pool: WorkerPool,
+  canvas: HTMLCanvasElement,
+  dx: number,
+  dy: number
+): void {
+  const { view } = pool.getPixelBuffer(canvas.width, canvas.height);
+  shiftPixelBuffer(view, canvas.width, canvas.height, dx, dy);
+
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const imageData = getOrCreateImageData(ctx, canvas.width, canvas.height);
+    imageData.data.set(view);
+    ctx.putImageData(imageData, 0, 0);
+  }
 }
 
 function resetTransform(canvas: HTMLCanvasElement): void {

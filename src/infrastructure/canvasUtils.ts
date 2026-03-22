@@ -24,6 +24,28 @@ export function exportCanvas(canvas: HTMLCanvasElement): string {
 }
 
 /**
+ * Cached ImageData — reused when canvas dimensions haven't changed.
+ * Avoids ~1.2MB allocation per render at 1920×1080.
+ */
+let cachedImageData: ImageData | null = null;
+let cachedWidth = 0;
+let cachedHeight = 0;
+
+export function getOrCreateImageData(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number
+): ImageData {
+  if (cachedImageData && cachedWidth === width && cachedHeight === height) {
+    return cachedImageData;
+  }
+  cachedImageData = ctx.createImageData(width, height);
+  cachedWidth = width;
+  cachedHeight = height;
+  return cachedImageData;
+}
+
+/**
  * Download canvas as PNG file
  */
 export function downloadCanvas(canvas: HTMLCanvasElement, label: string): void {
