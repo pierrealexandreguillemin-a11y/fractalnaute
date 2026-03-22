@@ -30,6 +30,7 @@
   /* --- fractal-specific color tokens --- */
   --color-overlay: var(--overlay);
   --color-glass-bg: var(--glass-bg);
+  --color-glass-card: var(--glass-card);
   --color-glass-border: var(--glass-border);
 
   /* --- radius scale --- */
@@ -63,6 +64,7 @@
   --ring: oklch(0.585 0.2041 277.1 / 0.4);
   --border: oklch(1.000 0.0000 89.9 / 0.08);
   --glass-bg: oklch(0.199 0.0299 283.4 / 0.15);
+  --glass-card: oklch(0.199 0.0299 283.4 / 0.25);
   --glass-border: oklch(1.000 0.0000 89.9 / 0.06);
 
   /* shadcn-derived tokens (for shadcn components compatibility) */
@@ -95,6 +97,7 @@
   --ring: oklch(0.723 0.1854 1.8 / 0.5);
   --border: oklch(0.723 0.1854 1.8 / 0.15);
   --glass-bg: oklch(0.276 0.0901 296.3 / 0.15);
+  --glass-card: oklch(0.276 0.0901 296.3 / 0.25);
   --glass-border: oklch(0.723 0.1854 1.8 / 0.1);
 
   --card: oklch(0.276 0.0901 296.3);
@@ -123,6 +126,7 @@
   --ring: oklch(0.734 0.1450 234.6 / 0.4);
   --border: oklch(0.734 0.1450 234.6 / 0.1);
   --glass-bg: oklch(0.300 0.0629 251.4 / 0.15);
+  --glass-card: oklch(0.300 0.0629 251.4 / 0.25);
   --glass-border: oklch(0.734 0.1450 234.6 / 0.08);
 
   --card: oklch(0.300 0.0629 251.4);
@@ -151,6 +155,7 @@
   --ring: oklch(0.563 0.1933 256.2 / 0.25);
   --border: oklch(0.000 0.0000 0.0 / 0.08);
   --glass-bg: oklch(1.000 0.0000 89.9 / 0.15);
+  --glass-card: oklch(1.000 0.0000 89.9 / 0.25);
   --glass-border: oklch(0.000 0.0000 0.0 / 0.04);
 
   --card: oklch(1.000 0.0000 89.9);

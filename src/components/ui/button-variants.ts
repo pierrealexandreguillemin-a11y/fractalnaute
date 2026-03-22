@@ -9,9 +9,9 @@ export const buttonVariants = cva(
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
-          'border border-glass-border bg-transparent hover:bg-glass-bg hover:text-foreground',
+          'border border-glass-border bg-glass-card hover:bg-glass-bg hover:text-foreground',
         secondary:
-          'bg-transparent border border-glass-border text-foreground hover:bg-glass-bg',
+          'bg-glass-card border border-glass-border text-foreground hover:bg-glass-bg',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
       },
