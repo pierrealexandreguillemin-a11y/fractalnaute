@@ -1,15 +1,16 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * INFRASTRUCTURE LAYER - Render Hook
- * Manages worker pool lifecycle and triggers rendering
+ * Manages worker pool lifecycle, canvas resize, and export.
+ * Viewport transitions delegated to useViewportTransition.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
-import { renderFractal } from './renderer';
 import { createWorkerPool, type WorkerPool } from './workerPool';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
+import { useViewportTransition } from './useViewportTransition';
 
 interface UseRendererOptions {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -28,22 +29,14 @@ interface UseRendererOptions {
  * Creates a worker pool on mount (if SAB available), destroys on unmount.
  */
 export function useRenderer({
-  canvasRef,
-  containerRef,
-  fractalType,
-  viewport,
-  maxIterations,
-  palette,
-  params,
-  onRenderStart,
-  onRenderComplete
+  canvasRef, containerRef,
+  fractalType, viewport, maxIterations, palette, params,
+  onRenderStart, onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
   const poolRef = useRef<WorkerPool | null>(null);
 
-  // Store callbacks in refs to avoid re-creating render() on every parent render.
-  // Without this, onRenderStart → setRendering(true) → re-render → new closure →
-  // new render ref → useEffect re-fires → infinite loop.
+  // Store callbacks in refs to avoid re-creating render closures on every parent render.
   const onRenderStartRef = useRef(onRenderStart);
   const onRenderCompleteRef = useRef(onRenderComplete);
   useEffect(() => {
@@ -67,25 +60,27 @@ export function useRenderer({
     resizeCanvas(canvas, container);
   }, [canvasRef, containerRef]);
 
-  const render = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Viewport transition — CSS transform + debounced render
+  const { forceFullRender } = useViewportTransition({
+    canvasRef, poolRef,
+    fractalType, viewport, maxIterations, palette, params,
+    cancelRenderRef, onRenderStartRef, onRenderCompleteRef
+  });
 
-    cancelRenderRef.current?.();
-    onRenderStartRef.current?.();
+  // Resize canvas on mount
+  useEffect(() => {
+    handleResize();
+  }, [handleResize]);
 
-    cancelRenderRef.current = renderFractal(canvas, poolRef.current, {
-      fractalType,
-      viewport,
-      maxIterations,
-      palette,
-      params,
-      onComplete: (renderTime) => {
-        cancelRenderRef.current = null;
-        onRenderCompleteRef.current?.(renderTime);
-      }
-    });
-  }, [canvasRef, fractalType, viewport, maxIterations, palette, params]);
+  // Window resize
+  useEffect(() => {
+    const handleWindowResize = () => {
+      handleResize();
+      forceFullRender();
+    };
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [handleResize, forceFullRender]);
 
   const exportImage = useCallback(() => {
     const canvas = canvasRef.current;
@@ -93,27 +88,10 @@ export function useRenderer({
     downloadCanvas(canvas, fractalType);
   }, [canvasRef, fractalType]);
 
-  // Render on mount and on any state change
+  // Cleanup — capture ref value for safe access in cleanup function
   useEffect(() => {
-    handleResize();
-    render();
-  }, [handleResize, render]);
-
-  // Window resize
-  useEffect(() => {
-    const handleWindowResize = () => {
-      handleResize();
-      render();
-    };
-    window.addEventListener('resize', handleWindowResize);
-    return () => window.removeEventListener('resize', handleWindowResize);
-  }, [handleResize, render]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      cancelRenderRef.current?.();
-    };
+    const ref = cancelRenderRef;
+    return () => { ref.current?.(); };
   }, []);
 
   return { exportImage };
