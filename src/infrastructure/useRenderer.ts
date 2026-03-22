@@ -38,6 +38,16 @@ export function useRenderer({
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
 
+  // Store callbacks in refs to avoid re-creating render() on every parent render.
+  // Without this, onRenderStart → setRendering(true) → re-render → new closure →
+  // new render ref → useEffect re-fires → infinite loop.
+  const onRenderStartRef = useRef(onRenderStart);
+  const onRenderCompleteRef = useRef(onRenderComplete);
+  useEffect(() => {
+    onRenderStartRef.current = onRenderStart;
+    onRenderCompleteRef.current = onRenderComplete;
+  }, [onRenderStart, onRenderComplete]);
+
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -53,7 +63,7 @@ export function useRenderer({
       cancelRenderRef.current();
     }
 
-    onRenderStart?.();
+    onRenderStartRef.current?.();
 
     cancelRenderRef.current = renderFractal(canvas, {
       fractalType,
@@ -63,10 +73,10 @@ export function useRenderer({
       params,
       onComplete: (renderTime) => {
         cancelRenderRef.current = null;
-        onRenderComplete?.(renderTime);
+        onRenderCompleteRef.current?.(renderTime);
       }
     });
-  }, [canvasRef, fractalType, viewport, maxIterations, palette, params, onRenderStart, onRenderComplete]);
+  }, [canvasRef, fractalType, viewport, maxIterations, palette, params]);
 
   const exportImage = useCallback(() => {
     const canvas = canvasRef.current;
