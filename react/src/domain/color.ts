@@ -51,7 +51,10 @@ function gammaDecode(x: number): number {
     : Math.pow((x + 0.055) / 1.055, 2.4);
 }
 
-/** Clamp to [0, 255] and round */
+/** Clamp to [0, 255] and round.
+ * Uses Math.round/max/min for clarity. A bitwise alternative
+ * ((x + 0.5) | 0 with ternary clamp) would save ~9 function calls
+ * per pixel but needs profiling to justify the readability trade-off. */
 function clampByte(x: number): number {
   return Math.round(Math.max(0, Math.min(255, x)));
 }
@@ -84,6 +87,9 @@ export function oklchToRgb(L: number, C: number, H: number): RGB {
   const lb = M1i_6 * l + M1i_7 * m + M1i_8 * s;
 
   // 5-6. Gamma encode + clamp
+  // Note: returns a new [r,g,b] tuple per call (~8M allocations per render).
+  // Acceptable: V8 minor GC handles short-lived small arrays efficiently.
+  // Inlining into ImageData writes would avoid allocation but break encapsulation.
   return [
     clampByte(gammaEncode(lr) * 255),
     clampByte(gammaEncode(lg) * 255),
@@ -125,7 +131,8 @@ export function srgbToOklch(r: number, g: number, b: number): OKLCH {
 
 /**
  * Format OKLCH as CSS string.
- * Used for theme color definitions.
+ * Public API for external consumers building custom themes.
+ * Not used internally — themes.ts has pre-computed oklch() strings.
  */
 export function oklchToCss(L: number, C: number, H: number, alpha?: number): string {
   const lStr = L.toFixed(3);

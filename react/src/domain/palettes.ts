@@ -66,7 +66,10 @@ const classicPalette = fromStops([
   { pos: 1.0,  L: 0.10, C: 0.05, H: 50  },  // dark
 ]);
 
-/** Fire: black → red → orange → yellow → white */
+/** Fire: black → red → orange → yellow → white
+ * Note: pos=0.50 (C=0.20, H=40, L=0.60) produces Linear RGB blue ≈ -0.009,
+ * marginally out of sRGB gamut. Clamp corrects it; visual impact < 0.01.
+ * Accepted trade-off: reducing C to 0.19 would fix it but dulls the orange. */
 const firePalette = fromStops([
   { pos: 0.0,  L: 0.00, C: 0.00, H: 30  },  // black
   { pos: 0.25, L: 0.40, C: 0.18, H: 30  },  // dark red
