@@ -22,6 +22,8 @@ export interface BandRenderParams {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  /** Pixel stride for progressive rendering. 1 = full-res (default), 4 = preview. */
+  stride?: number;
 }
 
 /**
@@ -52,9 +54,11 @@ export function renderBand(
 ): boolean {
   const {
     startY, endY, width, height, viewport,
-    fractalType, maxIterations, palette, params
+    fractalType, maxIterations, palette, params,
+    stride: rawStride
   } = band;
 
+  const stride = rawStride ?? 1;
   const config = getFractalConfig(fractalType);
   const calculator = config.calculator;
   const resolvedPalette = resolvePalette(palette);
@@ -67,20 +71,27 @@ export function renderBand(
   const originRe = viewport.centerRe - viewport.scale * aspectRatio * 0.5;
   const originIm = viewport.centerIm - viewport.scale * 0.5;
 
-  for (let y = startY; y < endY; y++) {
+  for (let y = startY; y < endY; y += stride) {
     if (shouldCancel?.()) return false;
 
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < width; x += stride) {
       const re = originRe + x * stepRe;
       const im = originIm + y * stepIm;
       const result = calculator(re, im, maxIterations, params);
       const [r, g, b] = getColorFast(result, resolvedPalette);
 
-      const idx = (y * width + x) * 4;
-      pixels[idx] = r;
-      pixels[idx + 1] = g;
-      pixels[idx + 2] = b;
-      pixels[idx + 3] = 255;
+      // Fill stride×stride block, clamped to band/canvas boundaries
+      const blockEndY = Math.min(y + stride, endY);
+      const blockEndX = Math.min(x + stride, width);
+      for (let by = y; by < blockEndY; by++) {
+        for (let bx = x; bx < blockEndX; bx++) {
+          const idx = (by * width + bx) * 4;
+          pixels[idx] = r;
+          pixels[idx + 1] = g;
+          pixels[idx + 2] = b;
+          pixels[idx + 3] = 255;
+        }
+      }
     }
   }
 

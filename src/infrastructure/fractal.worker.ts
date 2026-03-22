@@ -14,6 +14,7 @@ import type {
 interface WorkerInput {
   band: { startY: number; endY: number };
   renderId: number;
+  stride: number;
   width: number;
   height: number;
   viewport: Viewport;
@@ -26,7 +27,7 @@ interface WorkerInput {
 }
 
 self.onmessage = (e: MessageEvent<WorkerInput>) => {
-  const { band, renderId, pixelBuffer, cancelFlag, ...renderParams } = e.data;
+  const { band, renderId, stride, pixelBuffer, cancelFlag, ...renderParams } = e.data;
 
   const pixels = new Uint8ClampedArray(pixelBuffer);
   const cancel = new Int32Array(cancelFlag);
@@ -37,7 +38,8 @@ self.onmessage = (e: MessageEvent<WorkerInput>) => {
     startY: band.startY,
     endY: band.endY,
     ...renderParams,
-    params: mergedParams
+    params: mergedParams,
+    stride
   }, () => Atomics.load(cancel, 0) === 1);
 
   if (completed) {
