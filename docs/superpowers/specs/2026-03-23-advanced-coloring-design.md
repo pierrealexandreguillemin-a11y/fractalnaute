@@ -290,3 +290,4 @@ All pass-through — no logic change.
 7. Performance: **zero overhead on Classic mode** (conditional accumulation skipped). Accumulation modes: ~60% overhead acceptable.
 8. No function exceeds 80 lines (ESLint max-lines-per-function)
 9. All calculator early-exit paths return all 7 FractalResult fields (no undefined)
+10. Industry audit: stripe vs DeepMandelbrot (Harkonen), decomposition vs Fractint, DE vs Heiland-Allen, normal map vs Shadertoy references, orbit trap vs standard point-trap, OKLCH uniformity preserved across modes
