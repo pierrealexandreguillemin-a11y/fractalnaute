@@ -37,7 +37,7 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
       <label className={LABEL_CLASS}>
         Paramètre Julia (c)
       </label>
-      <Button onClick={onPickJulia} variant="secondary" className="w-full mb-2">
+      <Button onClick={onPickJulia} variant="outline" className="w-full mb-2">
         🎯 Choisir sur Mandelbrot
       </Button>
 
