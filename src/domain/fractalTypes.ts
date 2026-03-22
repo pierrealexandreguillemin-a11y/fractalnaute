@@ -23,14 +23,14 @@ export const fractalTypes: Record<FractalType, FractalTypeConfig> = {
     formula: 'z → z² + c',
     description: "L'ensemble de Mandelbrot classique",
     calculator: calculateMandelbrot,
-    defaultView: { centerRe: -0.5, centerIm: 0, scale: 3.5 }
+    defaultView: { centerRe: -0.5, centerIm: 0, scale: 2.8 }
   },
   julia: {
     name: 'Julia',
     formula: 'z → z² + c (c fixe)',
     description: 'Ensemble de Julia - cliquez sur Mandelbrot pour choisir c',
     calculator: calculateJulia,
-    defaultView: { centerRe: 0, centerIm: 0, scale: 3.5 },
+    defaultView: { centerRe: 0, centerIm: 0, scale: 2.8 },
     hasJuliaParam: true
   },
   burningship: {
@@ -38,21 +38,21 @@ export const fractalTypes: Record<FractalType, FractalTypeConfig> = {
     formula: 'z → (|Re(z)| + i|Im(z)|)² + c',
     description: 'Le navire en feu - découvert en 1992',
     calculator: calculateBurningShip,
-    defaultView: { centerRe: -0.5, centerIm: -0.5, scale: 3.5 }
+    defaultView: { centerRe: -0.4, centerIm: -0.5, scale: 2.5 }
   },
   tricorn: {
     name: 'Tricorn',
     formula: 'z → conj(z)² + c',
     description: 'Le Tricorn ou Mandelbar - utilise le conjugué complexe',
     calculator: calculateTricorn,
-    defaultView: { centerRe: -0.3, centerIm: 0, scale: 3.5 }
+    defaultView: { centerRe: -0.3, centerIm: 0, scale: 2.8 }
   },
   multibrot3: {
     name: 'Multibrot (z³)',
     formula: 'z → z³ + c',
     description: 'Multibrot de degré 3 - symétrie ternaire',
     calculator: calculateMultibrot,
-    defaultView: { centerRe: 0, centerIm: 0, scale: 3 },
+    defaultView: { centerRe: 0, centerIm: 0, scale: 2.2 },
     params: { power: 3 }
   },
   multibrot4: {
@@ -60,7 +60,7 @@ export const fractalTypes: Record<FractalType, FractalTypeConfig> = {
     formula: 'z → z⁴ + c',
     description: 'Multibrot de degré 4 - symétrie quaternaire',
     calculator: calculateMultibrot,
-    defaultView: { centerRe: 0, centerIm: 0, scale: 2.5 },
+    defaultView: { centerRe: 0, centerIm: 0, scale: 2.0 },
     params: { power: 4 }
   },
   multibrot5: {
@@ -68,7 +68,7 @@ export const fractalTypes: Record<FractalType, FractalTypeConfig> = {
     formula: 'z → z⁵ + c',
     description: 'Multibrot de degré 5 - symétrie pentagonale',
     calculator: calculateMultibrot,
-    defaultView: { centerRe: 0, centerIm: 0, scale: 2.2 },
+    defaultView: { centerRe: 0, centerIm: 0, scale: 1.8 },
     params: { power: 5 }
   }
 };

@@ -56,7 +56,7 @@ function useMouseHandlers(
     const dims = getCanvasDims(canvasRef.current);
     const pos = toCanvasCoords(e.clientX, e.clientY, dims);
     const c = screenToComplex(pos.x, pos.y, dims.width, dims.height, viewport);
-    actions.zoom(e.deltaY > 0 ? 1.15 : 0.85, c.re, c.im);
+    actions.zoom(e.deltaY > 0 ? 1.4 : 0.7, c.re, c.im);
   }, [canvasRef, viewport, actions]);
 
   const handleMouseDown = useCallback((e: MouseEvent) => {
@@ -172,7 +172,7 @@ function useKeyboardHandler(
     } else if (e.key === '+' || e.key === '=' || e.key === '-') {
       const dims = getCanvasDims(canvasRef.current);
       const c = screenToComplex(dims.width / 2, dims.height / 2, dims.width, dims.height, viewport);
-      actions.zoom(e.key === '-' ? 1.2 : 0.8, c.re, c.im);
+      actions.zoom(e.key === '-' ? 1.4 : 0.7, c.re, c.im);
     }
   }, [canvasRef, viewport, actions, isPickingJulia]);
 }
