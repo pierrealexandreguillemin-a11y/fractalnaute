@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Tailwind v4 theme — maps CSS custom properties to Tailwind tokens
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
 @theme inline {
+  /* --- shadcn color tokens --- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -21,53 +26,156 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* --- fractal-specific color tokens --- */
+  --color-overlay: var(--overlay);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+
+  /* --- radius scale --- */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 6px);
+
+  /* --- font family --- */
+  --font-mono: 'SF Mono', 'Fira Code', monospace;
+  --font-sans: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Theme: default (Cosmos) — also serves as :root
+ * Source of truth: themes.ts OKLCH values
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="default"] {
+  --background: oklch(0.147 0.0107 285.0);
+  --secondary: oklch(0.197 0.0220 284.2);
+  --overlay: oklch(0.147 0.0107 285.0 / 0.85);
+  --foreground: oklch(0.933 0.0107 286.2);
+  --muted-foreground: oklch(0.639 0.0506 284.9);
+  --primary: oklch(0.585 0.2041 277.1);
+  --accent: oklch(0.627 0.2325 303.9);
+  --ring: oklch(0.585 0.2041 277.1 / 0.4);
+  --border: oklch(1.000 0.0000 89.9 / 0.1);
+  --glass-bg: oklch(0.199 0.0299 283.4 / 0.7);
+  --glass-border: oklch(1.000 0.0000 89.9 / 0.08);
+
+  /* shadcn-derived tokens (for shadcn components compatibility) */
+  --card: oklch(0.197 0.0220 284.2);
+  --card-foreground: oklch(0.933 0.0107 286.2);
+  --popover: oklch(0.197 0.0220 284.2);
+  --popover-foreground: oklch(0.933 0.0107 286.2);
+  --primary-foreground: oklch(1 0 0);
+  --secondary-foreground: oklch(0.933 0.0107 286.2);
+  --muted: oklch(0.197 0.0220 284.2);
+  --accent-foreground: oklch(0.933 0.0107 286.2);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --input: oklch(1.000 0.0000 89.9 / 0.1);
   --radius: 0.625rem;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Theme: miami
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="miami"] {
+  --background: oklch(0.193 0.0691 300.4);
+  --secondary: oklch(0.276 0.0901 296.3);
+  --overlay: oklch(0.193 0.0691 300.4 / 0.9);
+  --foreground: oklch(0.968 0.0174 355.1);
+  --muted-foreground: oklch(0.811 0.1278 349.8);
+  --primary: oklch(0.723 0.1854 1.8);
+  --accent: oklch(0.804 0.1459 219.5);
+  --ring: oklch(0.723 0.1854 1.8 / 0.5);
+  --border: oklch(0.723 0.1854 1.8 / 0.2);
+  --glass-bg: oklch(0.276 0.0901 296.3 / 0.75);
+  --glass-border: oklch(0.723 0.1854 1.8 / 0.15);
+
+  --card: oklch(0.276 0.0901 296.3);
+  --card-foreground: oklch(0.968 0.0174 355.1);
+  --popover: oklch(0.276 0.0901 296.3);
+  --popover-foreground: oklch(0.968 0.0174 355.1);
+  --primary-foreground: oklch(1 0 0);
+  --secondary-foreground: oklch(0.968 0.0174 355.1);
+  --muted: oklch(0.276 0.0901 296.3);
+  --accent-foreground: oklch(0.968 0.0174 355.1);
+  --input: oklch(0.723 0.1854 1.8 / 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Theme: ocean
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="ocean"] {
+  --background: oklch(0.211 0.0369 254.4);
+  --secondary: oklch(0.300 0.0629 251.4);
+  --overlay: oklch(0.211 0.0369 254.4 / 0.9);
+  --foreground: oklch(0.862 0.0696 253.2);
+  --muted-foreground: oklch(0.640 0.1209 251.2);
+  --primary: oklch(0.734 0.1450 234.6);
+  --accent: oklch(0.844 0.1457 209.3);
+  --ring: oklch(0.734 0.1450 234.6 / 0.4);
+  --border: oklch(0.734 0.1450 234.6 / 0.15);
+  --glass-bg: oklch(0.300 0.0629 251.4 / 0.75);
+  --glass-border: oklch(0.734 0.1450 234.6 / 0.1);
+
+  --card: oklch(0.300 0.0629 251.4);
+  --card-foreground: oklch(0.862 0.0696 253.2);
+  --popover: oklch(0.300 0.0629 251.4);
+  --popover-foreground: oklch(0.862 0.0696 253.2);
+  --primary-foreground: oklch(1 0 0);
+  --secondary-foreground: oklch(0.862 0.0696 253.2);
+  --muted: oklch(0.300 0.0629 251.4);
+  --accent-foreground: oklch(0.862 0.0696 253.2);
+  --input: oklch(0.734 0.1450 234.6 / 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Theme: light
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  --background: oklch(0.971 0.0027 286.4);
+  --secondary: oklch(1.000 0.0000 89.9);
+  --overlay: oklch(0.971 0.0027 286.4 / 0.92);
+  --foreground: oklch(0.232 0.0038 286.1);
+  --muted-foreground: oklch(0.540 0.0077 286.1);
+  --primary: oklch(0.563 0.1933 256.2);
+  --accent: oklch(0.730 0.1944 147.4);
+  --ring: oklch(0.563 0.1933 256.2 / 0.25);
+  --border: oklch(0.000 0.0000 0.0 / 0.1);
+  --glass-bg: oklch(1.000 0.0000 89.9 / 0.8);
+  --glass-border: oklch(0.000 0.0000 0.0 / 0.06);
+
+  --card: oklch(1.000 0.0000 89.9);
+  --card-foreground: oklch(0.232 0.0038 286.1);
+  --popover: oklch(1.000 0.0000 89.9);
+  --popover-foreground: oklch(0.232 0.0038 286.1);
+  --primary-foreground: oklch(1 0 0);
+  --secondary-foreground: oklch(0.232 0.0038 286.1);
+  --muted: oklch(1.000 0.0000 89.9);
+  --accent-foreground: oklch(0.232 0.0038 286.1);
+  --input: oklch(0.000 0.0000 0.0 / 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Keyframes (previously injected via JS)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes fractal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fractal-pulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }

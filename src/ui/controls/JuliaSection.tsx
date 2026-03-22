@@ -8,7 +8,10 @@
 import React from 'react';
 import type { FractalParams } from '../../domain';
 import { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, formatComplexCoords } from '../../domain';
-import { labelStyle, selectStyle, monoFontFamily, buttonStyle, radius } from '../styles';
+import { Button } from '@/components/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
 
 interface JuliaSectionProps {
   juliaParams: FractalParams;
@@ -29,57 +32,57 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
   );
 
   return (
-    <div style={{ marginBottom: '14px' }}>
-      <label style={labelStyle}>Paramètre Julia (c)</label>
-      <button
-        onClick={onPickJulia}
-        style={{ ...buttonStyle, width: '100%', marginBottom: '8px' }}
-      >
+    <div className="mb-3.5">
+      <label className="block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1">
+        Paramètre Julia (c)
+      </label>
+      <Button onClick={onPickJulia} variant="secondary" className="w-full mb-2">
         🎯 Choisir sur Mandelbrot
-      </button>
+      </Button>
 
       {isPickingJulia && (
-        <div style={{
-          padding: '8px 12px',
-          background: 'var(--fractal-accent-glow)',
-          border: '1px solid var(--fractal-accent-primary)',
-          borderRadius: radius.lg,
-          fontSize: '11px',
-          textAlign: 'center',
-          animation: 'fractal-pulse 1.5s ease-in-out infinite'
-        }}>
-          Cliquez sur Mandelbrot pour choisir c
-          <div style={{
-            fontFamily: monoFontFamily,
-            fontSize: '10px',
-            color: 'var(--fractal-accent-primary)',
-            marginTop: '4px'
-          }}>
-            {juliaLabel}
-          </div>
-        </div>
+        <PickingIndicator juliaLabel={juliaLabel} />
       )}
 
-      <div style={{ marginTop: '8px' }}>
-        <label style={labelStyle}>Presets Julia</label>
-        <select
-          onChange={(e) => {
-            if (e.target.value) {
-              const [re, im] = e.target.value.split(',').map(Number);
-              onJuliaParamsChange({ juliaRe: re, juliaIm: im });
-            }
-          }}
-          style={selectStyle}
-          defaultValue=""
-        >
-          <option value="">Personnalisé</option>
-          {JULIA_PRESETS.map((preset) => (
-            <option key={preset.name} value={`${preset.re},${preset.im}`}>
-              {preset.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <JuliaPresetSelect onJuliaParamsChange={onJuliaParamsChange} />
     </div>
   );
 };
+
+/** Animated indicator shown while picking Julia parameter */
+const PickingIndicator: React.FC<{ juliaLabel: string }> = ({ juliaLabel }) => (
+  <div className="p-2 px-3 bg-ring border border-primary rounded-lg text-[11px] text-center animate-[fractal-pulse_1.5s_ease-in-out_infinite]">
+    Cliquez sur Mandelbrot pour choisir c
+    <div className="font-mono text-[10px] text-primary mt-1">
+      {juliaLabel}
+    </div>
+  </div>
+);
+
+/** Julia preset selector */
+const JuliaPresetSelect: React.FC<{
+  onJuliaParamsChange: (params: FractalParams) => void;
+}> = ({ onJuliaParamsChange }) => (
+  <div className="mt-2">
+    <label className="block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1">
+      Presets Julia
+    </label>
+    <Select
+      onValueChange={(v) => {
+        const [re, im] = v.split(',').map(Number);
+        onJuliaParamsChange({ juliaRe: re, juliaIm: im });
+      }}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Personnalisé" />
+      </SelectTrigger>
+      <SelectContent>
+        {JULIA_PRESETS.map((preset) => (
+          <SelectItem key={preset.name} value={`${preset.re},${preset.im}`}>
+            {preset.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);

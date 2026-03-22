@@ -6,47 +6,33 @@
 
 import React from 'react';
 import type { RenderStats } from '../domain';
-import { glassBaseStyle, monoFontFamily } from './styles';
 
 interface InfoPanelProps {
   stats: RenderStats;
 }
 
-const accentValueStyle: React.CSSProperties = {
-  color: 'var(--fractal-accent-primary)',
-  fontWeight: 500
-};
-
-const statItemStyle: React.CSSProperties = { display: 'flex', gap: '4px' };
-
 export const InfoPanel: React.FC<InfoPanelProps> = ({ stats }) => (
   <div
-    style={{
-      ...glassBaseStyle,
-      position: 'absolute',
-      bottom: '16px',
-      left: '16px',
-      padding: '8px 16px',
-      fontSize: '11px',
-      fontFamily: monoFontFamily,
-      color: 'var(--fractal-text-secondary)',
-    }}
+    className={[
+      'absolute bottom-4 left-4 z-10 px-4 py-2',
+      'backdrop-blur-xl bg-glass-bg border border-glass-border rounded-xl',
+      'text-[11px] font-mono text-muted-foreground'
+    ].join(' ')}
   >
-    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-      <div style={statItemStyle}>
-        <span>Type:</span>
-        <span style={accentValueStyle}>{stats.fractalName}</span>
-      </div>
-      <div style={statItemStyle}>
-        <span>Zoom:</span>
-        <span style={accentValueStyle}>{stats.zoomLevel.toFixed(2)}x</span>
-      </div>
-      <div style={statItemStyle}>
-        <span>Centre:</span>
-        <span style={accentValueStyle}>
-          ({stats.centerRe.toFixed(4)}, {stats.centerIm.toFixed(4)})
-        </span>
-      </div>
+    <div className="flex gap-4 flex-wrap">
+      <StatItem label="Type" value={stats.fractalName} />
+      <StatItem label="Zoom" value={`${stats.zoomLevel.toFixed(2)}x`} />
+      <StatItem
+        label="Centre"
+        value={`(${stats.centerRe.toFixed(4)}, ${stats.centerIm.toFixed(4)})`}
+      />
     </div>
+  </div>
+);
+
+const StatItem: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex gap-1">
+    <span>{label}:</span>
+    <span className="text-primary font-medium">{value}</span>
   </div>
 );

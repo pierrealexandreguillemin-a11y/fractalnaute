@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { radius, zIndex, BORDER_COLOR } from './styles';
+import { cn } from '@/lib/utils';
 
 interface LoadingOverlayProps {
   isVisible: boolean;
@@ -13,28 +13,14 @@ interface LoadingOverlayProps {
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isVisible }) => (
   <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      background: 'var(--fractal-bg-overlay)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      opacity: isVisible ? 1 : 0,
-      pointerEvents: isVisible ? 'auto' : 'none',
-      transition: 'opacity 300ms ease',
-      zIndex: zIndex.overlay
-    }}
+    className={cn(
+      'absolute inset-0 z-50 flex items-center justify-center',
+      'bg-overlay transition-opacity duration-300',
+      isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+    )}
   >
     <div
-      style={{
-        width: '48px',
-        height: '48px',
-        border: `3px solid ${BORDER_COLOR}`,
-        borderTopColor: 'var(--fractal-accent-primary)',
-        borderRadius: radius.full,
-        animation: 'fractal-spin 0.8s linear infinite'
-      }}
+      className="w-12 h-12 border-3 border-border border-t-primary rounded-full animate-[fractal-spin_0.8s_linear_infinite]"
     />
   </div>
 );

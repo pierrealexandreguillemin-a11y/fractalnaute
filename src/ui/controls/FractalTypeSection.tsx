@@ -8,7 +8,9 @@
 import React from 'react';
 import type { FractalType } from '../../domain';
 import { getFractalTypeNames, getFractalLabel, getFractalConfig } from '../../domain';
-import { labelStyle, selectStyle, monoFontFamily, infoBoxStyle } from '../styles';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
 
 interface FractalTypeSectionProps {
   fractalType: FractalType;
@@ -22,27 +24,24 @@ export const FractalTypeSection: React.FC<FractalTypeSectionProps> = ({
   const config = getFractalConfig(fractalType);
 
   return (
-    <div style={{ marginBottom: '14px' }}>
-      <label style={labelStyle}>Type de fractale</label>
-      <select
-        value={fractalType}
-        onChange={(e) => onFractalTypeChange(e.target.value as FractalType)}
-        style={selectStyle}
-      >
-        {getFractalTypeNames().map((type) => (
-          <option key={type} value={type}>
-            {getFractalLabel(type)}
-          </option>
-        ))}
-      </select>
-      <div style={{ ...infoBoxStyle, marginTop: '4px' }}>
-        <span style={{
-          fontFamily: monoFontFamily,
-          color: 'var(--fractal-accent-primary)',
-          fontSize: '12px'
-        }}>
-          {config.formula}
-        </span>
+    <div className="mb-3.5">
+      <label className="block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1">
+        Type de fractale
+      </label>
+      <Select value={fractalType} onValueChange={(v) => onFractalTypeChange(v as FractalType)}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {getFractalTypeNames().map((type) => (
+            <SelectItem key={type} value={type}>
+              {getFractalLabel(type)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className="mt-1 text-[11px] text-muted-foreground p-2 bg-secondary rounded-md leading-snug">
+        <span className="font-mono text-primary text-xs">{config.formula}</span>
         <br />
         {config.description}
       </div>

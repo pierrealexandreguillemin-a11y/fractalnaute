@@ -9,7 +9,10 @@ import React from 'react';
 import type { ThemeName, PaletteName } from '../../domain';
 import { getPaletteNames, getPaletteLabel } from '../../domain';
 import { getThemeLabel, getThemeNames } from '../themes';
-import { labelStyle, selectStyle, radius, BG_SECONDARY } from '../styles';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 
 interface AppearanceSectionProps {
   theme: ThemeName;
@@ -20,57 +23,51 @@ interface AppearanceSectionProps {
   onIterationsChange: (iterations: number) => void;
 }
 
+const LABEL_CLASS = 'block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1';
+
 export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
-  theme,
-  palette,
-  maxIterations,
-  onThemeChange,
-  onPaletteChange,
-  onIterationsChange
+  theme, palette, maxIterations,
+  onThemeChange, onPaletteChange, onIterationsChange
 }) => (
   <>
-    <div style={{ marginBottom: '14px' }}>
-      <label style={labelStyle}>Thème</label>
-      <select
-        value={theme}
-        onChange={(e) => onThemeChange(e.target.value as ThemeName)}
-        style={selectStyle}
-      >
-        {getThemeNames().map((t) => (
-          <option key={t} value={t}>{getThemeLabel(t)}</option>
-        ))}
-      </select>
+    <div className="mb-3.5">
+      <label className={LABEL_CLASS}>Thème</label>
+      <Select value={theme} onValueChange={(v) => onThemeChange(v as ThemeName)}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {getThemeNames().map((t) => (
+            <SelectItem key={t} value={t}>{getThemeLabel(t)}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
 
-    <div style={{ marginBottom: '14px' }}>
-      <label style={labelStyle}>Palette de couleurs</label>
-      <select
-        value={palette}
-        onChange={(e) => onPaletteChange(e.target.value as PaletteName)}
-        style={selectStyle}
-      >
-        {getPaletteNames().map((p) => (
-          <option key={p} value={p}>{getPaletteLabel(p)}</option>
-        ))}
-      </select>
+    <div className="mb-3.5">
+      <label className={LABEL_CLASS}>Palette de couleurs</label>
+      <Select value={palette} onValueChange={(v) => onPaletteChange(v as PaletteName)}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {getPaletteNames().map((p) => (
+            <SelectItem key={p} value={p}>{getPaletteLabel(p)}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
 
-    <div style={{ marginBottom: '14px' }}>
-      <label style={labelStyle}>Itérations max: {maxIterations}</label>
-      <input
-        type="range"
-        min="50"
-        max="1000"
-        value={maxIterations}
-        onChange={(e) => onIterationsChange(parseInt(e.target.value, 10))}
-        style={{
-          width: '100%',
-          height: '4px',
-          background: BG_SECONDARY,
-          borderRadius: radius.xs,
-          outline: 'none',
-          cursor: 'pointer'
-        }}
+    <div className="mb-3.5">
+      <label className={LABEL_CLASS}>
+        Itérations max: {maxIterations}
+      </label>
+      <Slider
+        min={50}
+        max={1000}
+        step={1}
+        value={[maxIterations]}
+        onValueChange={([v]) => { if (v !== undefined) onIterationsChange(v); }}
       />
     </div>
   </>

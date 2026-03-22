@@ -7,10 +7,8 @@
 
 import React, { useState } from 'react';
 import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
-import { glassBaseStyle, dividerStyle, radius, zIndex, BG_SECONDARY, BORDER_SOLID, BORDER_COLOR } from './styles';
+import { cn } from '@/lib/utils';
 import { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
-
-const TEXT_PRIMARY = 'var(--fractal-text-primary)';
 
 interface ControlsPanelProps {
   fractalType: FractalType;
@@ -29,97 +27,39 @@ interface ControlsPanelProps {
   onExport: () => void;
 }
 
-const panelStyle: React.CSSProperties = {
-  ...glassBaseStyle,
-  position: 'absolute',
-  top: '16px',
-  right: '16px',
-  borderRadius: radius['2xl'],
-  padding: '16px',
-  minWidth: '260px',
-  maxHeight: 'calc(100vh - 32px)',
-  overflowY: 'auto',
-  boxShadow: '0 8px 32px oklch(0 0 0 / 0.3)',
-  color: TEXT_PRIMARY,
-  zIndex: zIndex.controls
-};
-
-const collapsedButtonStyle: React.CSSProperties = {
-  ...glassBaseStyle,
-  position: 'absolute',
-  top: '16px',
-  right: '16px',
-  width: '44px',
-  height: '44px',
-  color: TEXT_PRIMARY,
-  fontSize: '20px',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginBottom: '16px',
-  paddingBottom: '8px',
-  borderBottom: `1px solid ${BORDER_COLOR}`
-};
-
-const closeButtonStyle: React.CSSProperties = {
-  padding: '4px 8px',
-  background: BG_SECONDARY,
-  border: BORDER_SOLID,
-  borderRadius: radius.md,
-  color: TEXT_PRIMARY,
-  fontSize: '14px',
-  cursor: 'pointer'
-};
+const GLASS_PANEL = cn(
+  'backdrop-blur-xl bg-glass-bg border border-glass-border rounded-2xl',
+  'shadow-[0_8px_32px_oklch(0_0_0/0.3)]'
+);
 
 /** Panel header with title and collapse button */
 const PanelHeader: React.FC<{ onCollapse: () => void }> = ({ onCollapse }) => (
-  <div style={headerStyle}>
-    <span style={{
-      fontSize: '14px',
-      fontWeight: 600,
-      letterSpacing: '0.5px',
-      textTransform: 'uppercase',
-      color: 'var(--fractal-text-secondary)'
-    }}>
+  <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+    <span className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
       Fractal Explorer
     </span>
-    <button onClick={onCollapse} style={closeButtonStyle}>
+    <button
+      onClick={onCollapse}
+      className="px-2 py-1 bg-secondary border border-border rounded-md text-sm text-foreground cursor-pointer"
+    >
       X
     </button>
   </div>
 );
 
-export const ControlsPanel: React.FC<ControlsPanelProps> = ({
-  fractalType,
-  theme,
-  palette,
-  maxIterations,
-  juliaParams,
-  isPickingJulia,
-  onFractalTypeChange,
-  onThemeChange,
-  onPaletteChange,
-  onIterationsChange,
-  onJuliaParamsChange,
-  onPickJulia,
-  onReset,
-  onExport
-}) => {
+export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   if (isCollapsed) {
     return (
       <button
         onClick={() => setIsCollapsed(false)}
-        style={collapsedButtonStyle}
         title="Afficher les controles"
+        className={cn(
+          GLASS_PANEL,
+          'absolute top-4 right-4 w-11 h-11 z-100',
+          'text-foreground text-xl cursor-pointer flex items-center justify-center'
+        )}
       >
         *
       </button>
@@ -127,34 +67,51 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   }
 
   return (
-    <div style={panelStyle}>
-      <PanelHeader onCollapse={() => setIsCollapsed(true)} />
-
-      <FractalTypeSection fractalType={fractalType} onFractalTypeChange={onFractalTypeChange} />
-
-      {fractalType === 'julia' && (
-        <JuliaSection
-          juliaParams={juliaParams}
-          isPickingJulia={isPickingJulia}
-          onJuliaParamsChange={onJuliaParamsChange}
-          onPickJulia={onPickJulia}
-        />
-      )}
-
-      <div style={dividerStyle} />
-
-      <AppearanceSection
-        theme={theme}
-        palette={palette}
-        maxIterations={maxIterations}
-        onThemeChange={onThemeChange}
-        onPaletteChange={onPaletteChange}
-        onIterationsChange={onIterationsChange}
-      />
-
-      <div style={dividerStyle} />
-
-      <ActionsSection onReset={onReset} onExport={onExport} />
-    </div>
+    <ControlsPanelBody {...props} onCollapse={() => setIsCollapsed(true)} />
   );
 };
+
+/** Expanded panel body — extracted for max-lines-per-function compliance */
+const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void }> = ({
+  fractalType, theme, palette, maxIterations,
+  juliaParams, isPickingJulia,
+  onFractalTypeChange, onThemeChange, onPaletteChange,
+  onIterationsChange, onJuliaParamsChange, onPickJulia,
+  onReset, onExport, onCollapse
+}) => (
+  <div
+    className={cn(
+      GLASS_PANEL,
+      'absolute top-4 right-4 p-4 min-w-[260px] max-h-[calc(100vh-32px)]',
+      'overflow-y-auto text-foreground z-100'
+    )}
+  >
+    <PanelHeader onCollapse={onCollapse} />
+
+    <FractalTypeSection fractalType={fractalType} onFractalTypeChange={onFractalTypeChange} />
+
+    {fractalType === 'julia' && (
+      <JuliaSection
+        juliaParams={juliaParams}
+        isPickingJulia={isPickingJulia}
+        onJuliaParamsChange={onJuliaParamsChange}
+        onPickJulia={onPickJulia}
+      />
+    )}
+
+    <div className="h-px bg-border my-3" />
+
+    <AppearanceSection
+      theme={theme}
+      palette={palette}
+      maxIterations={maxIterations}
+      onThemeChange={onThemeChange}
+      onPaletteChange={onPaletteChange}
+      onIterationsChange={onIterationsChange}
+    />
+
+    <div className="h-px bg-border my-3" />
+
+    <ActionsSection onReset={onReset} onExport={onExport} />
+  </div>
+);

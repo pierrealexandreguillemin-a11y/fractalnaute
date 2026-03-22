@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { buttonStyle, radius } from '../styles';
+import { Button } from '@/components/ui/button';
 
 interface ActionsSectionProps {
   onReset: () => void;
@@ -14,28 +14,12 @@ interface ActionsSectionProps {
 }
 
 export const ActionsSection: React.FC<ActionsSectionProps> = ({ onReset, onExport }) => (
-  <div style={{ display: 'flex', gap: '8px' }}>
-    <button
-      onClick={onReset}
-      style={{
-        flex: 1,
-        padding: '8px 16px',
-        background: 'linear-gradient(135deg, var(--fractal-accent-primary), var(--fractal-accent-secondary))',
-        border: 'none',
-        borderRadius: radius.lg,
-        color: 'oklch(1 0 0)',
-        fontSize: '12px',
-        fontWeight: 600,
-        cursor: 'pointer'
-      }}
-    >
+  <div className="flex gap-2">
+    <Button onClick={onReset} className="flex-1">
       🔄 Reset
-    </button>
-    <button
-      onClick={onExport}
-      style={{ ...buttonStyle, flex: 1, padding: '8px 16px', fontWeight: 600 }}
-    >
+    </Button>
+    <Button onClick={onExport} variant="outline" className="flex-1">
       📷 Export
-    </button>
+    </Button>
   </div>
 );

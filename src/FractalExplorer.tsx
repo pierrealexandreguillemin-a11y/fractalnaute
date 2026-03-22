@@ -9,15 +9,9 @@
 
 import React from 'react';
 import type { ThemeName, PaletteName, FractalType } from './domain';
-import {
-  ControlsPanel,
-  InfoPanel,
-  HelpTooltip,
-  LoadingOverlay,
-  getThemeCSSVariables,
-  keyframesCSS
-} from './ui';
+import { ControlsPanel, InfoPanel, HelpTooltip, LoadingOverlay } from './ui';
 import { useFractalExplorer } from './useFractalExplorer';
+import { cn } from '@/lib/utils';
 
 export interface FractalExplorerProps {
   initialFractalType?: FractalType;
@@ -31,8 +25,6 @@ export interface FractalExplorerProps {
   style?: React.CSSProperties;
   onThemeChange?: (theme: ThemeName) => void;
 }
-
-const FONT_FAMILY = "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 export const FractalExplorer: React.FC<FractalExplorerProps> = ({
   initialFractalType = 'mandelbrot',
@@ -57,60 +49,46 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
     onThemeChange
   });
 
-  const themeVars = getThemeCSSVariables(state.theme);
-
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: keyframesCSS }} />
+    <div
+      ref={containerRef}
+      data-theme={state.theme}
+      className={cn(
+        'relative w-full h-full min-h-[400px] flex items-center justify-center overflow-hidden',
+        'bg-background text-foreground font-sans',
+        className
+      )}
+      style={style}
+    >
+      <canvas
+        ref={canvasRef}
+        className="block cursor-crosshair [image-rendering:pixelated]"
+      />
 
-      <div
-        ref={containerRef}
-        className={className}
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
-          minHeight: '400px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: themeVars['--fractal-bg-primary'],
-          overflow: 'hidden',
-          fontFamily: FONT_FAMILY,
-          ...themeVars as React.CSSProperties,
-          ...style
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          style={{ display: 'block', cursor: 'crosshair', imageRendering: 'pixelated' }}
+      <LoadingOverlay isVisible={state.isRendering} />
+
+      {showControls && (
+        <ControlsPanel
+          fractalType={state.fractalType}
+          theme={state.theme}
+          palette={state.palette}
+          maxIterations={state.maxIterations}
+          juliaParams={state.juliaParams}
+          isPickingJulia={state.isPickingJulia}
+          onFractalTypeChange={actions.setFractalType}
+          onThemeChange={handleThemeChange}
+          onPaletteChange={actions.setPalette}
+          onIterationsChange={actions.setIterations}
+          onJuliaParamsChange={actions.setJuliaParams}
+          onPickJulia={handlePickJulia}
+          onReset={actions.reset}
+          onExport={exportImage}
         />
+      )}
 
-        <LoadingOverlay isVisible={state.isRendering} />
-
-        {showControls && (
-          <ControlsPanel
-            fractalType={state.fractalType}
-            theme={state.theme}
-            palette={state.palette}
-            maxIterations={state.maxIterations}
-            juliaParams={state.juliaParams}
-            isPickingJulia={state.isPickingJulia}
-            onFractalTypeChange={actions.setFractalType}
-            onThemeChange={handleThemeChange}
-            onPaletteChange={actions.setPalette}
-            onIterationsChange={actions.setIterations}
-            onJuliaParamsChange={actions.setJuliaParams}
-            onPickJulia={handlePickJulia}
-            onReset={actions.reset}
-            onExport={exportImage}
-          />
-        )}
-
-        {showInfo && <InfoPanel stats={stats} />}
-        {showHelp && <HelpTooltip />}
-      </div>
-    </>
+      {showInfo && <InfoPanel stats={stats} />}
+      {showHelp && <HelpTooltip />}
+    </div>
   );
 };
 

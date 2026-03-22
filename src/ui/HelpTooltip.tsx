@@ -6,23 +6,15 @@
 
 import React from 'react';
 import { Kbd } from './Kbd';
-import { glassBaseStyle } from './styles';
 
 export const HelpTooltip: React.FC = () => (
   <div
-    style={{
-      ...glassBaseStyle,
-      position: 'absolute',
-      bottom: '16px',
-      right: '16px',
-      padding: '8px 16px',
-      fontSize: '11px',
-      color: 'var(--fractal-text-secondary)',
-      opacity: 0.7,
-      transition: 'opacity 150ms ease',
-    }}
-    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+    className={[
+      'absolute bottom-4 right-4 z-10 px-4 py-2',
+      'backdrop-blur-xl bg-glass-bg border border-glass-border rounded-xl',
+      'text-[11px] text-muted-foreground',
+      'opacity-70 transition-opacity duration-150 hover:opacity-100'
+    ].join(' ')}
   >
     <Kbd>Molette</Kbd> Zoom &nbsp;|&nbsp;
     <Kbd>Clic</Kbd> Centrer &nbsp;|&nbsp;

@@ -2,7 +2,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  * FRACTAL EXPLORER
  * Multi-fractal interactive explorer component
- * 
+ *
  * Supports: Mandelbrot, Julia, Burning Ship, Tricorn, Multibrot (3-5)
  * ═══════════════════════════════════════════════════════════════════════════
  */
@@ -51,5 +51,4 @@ export {
 export type { InitialFractalConfig } from './application';
 
 // Theme exports
-export { themes, getThemeCSSVariables, getThemeLabel } from './ui';
-export type { ThemeColors } from './ui';
+export { getThemeLabel, THEME_NAMES } from './ui';
