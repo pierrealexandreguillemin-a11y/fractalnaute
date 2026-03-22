@@ -5,16 +5,18 @@
  */
 
 import React from 'react';
+import { cn } from '@/lib/utils';
+import { GLASS_PANEL } from './shared';
 import { Kbd } from './Kbd';
 
 export const HelpTooltip: React.FC = () => (
   <div
-    className={[
+    className={cn(
       'absolute bottom-4 right-4 z-10 px-4 py-2',
-      'backdrop-blur-xl bg-glass-bg border border-glass-border rounded-xl',
+      GLASS_PANEL,
       'text-[11px] text-muted-foreground',
       'opacity-70 transition-opacity duration-150 hover:opacity-100'
-    ].join(' ')}
+    )}
   >
     <Kbd>Molette</Kbd> Zoom &nbsp;|&nbsp;
     <Kbd>Clic</Kbd> Centrer &nbsp;|&nbsp;

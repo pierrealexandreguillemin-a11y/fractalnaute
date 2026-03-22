@@ -15,10 +15,10 @@ interface ActionsSectionProps {
 
 export const ActionsSection: React.FC<ActionsSectionProps> = ({ onReset, onExport }) => (
   <div className="flex gap-2">
-    <Button onClick={onReset} className="flex-1">
+    <Button onClick={onReset} aria-label="Réinitialiser la vue" className="flex-1">
       🔄 Reset
     </Button>
-    <Button onClick={onExport} variant="outline" className="flex-1">
+    <Button onClick={onExport} aria-label="Exporter en PNG" variant="outline" className="flex-1">
       📷 Export
     </Button>
   </div>

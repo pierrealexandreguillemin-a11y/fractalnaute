@@ -61,6 +61,8 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
     >
       <canvas
         ref={canvasRef}
+        role="img"
+        aria-label="Visualisation fractale interactive"
         className="block cursor-crosshair [image-rendering:pixelated]"
       />
 

@@ -8,6 +8,7 @@
 import React from 'react';
 import type { FractalParams } from '../../domain';
 import { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, formatComplexCoords } from '../../domain';
+import { LABEL_CLASS } from './shared';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -33,7 +34,7 @@ export const JuliaSection: React.FC<JuliaSectionProps> = ({
 
   return (
     <div className="mb-3.5">
-      <label className="block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1">
+      <label className={LABEL_CLASS}>
         Paramètre Julia (c)
       </label>
       <Button onClick={onPickJulia} variant="secondary" className="w-full mb-2">
@@ -64,7 +65,7 @@ const JuliaPresetSelect: React.FC<{
   onJuliaParamsChange: (params: FractalParams) => void;
 }> = ({ onJuliaParamsChange }) => (
   <div className="mt-2">
-    <label className="block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1">
+    <label className={LABEL_CLASS}>
       Presets Julia
     </label>
     <Select

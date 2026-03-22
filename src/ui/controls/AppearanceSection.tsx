@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { LABEL_CLASS } from './shared';
 
 interface AppearanceSectionProps {
   theme: ThemeName;
@@ -22,8 +23,6 @@ interface AppearanceSectionProps {
   onPaletteChange: (palette: PaletteName) => void;
   onIterationsChange: (iterations: number) => void;
 }
-
-const LABEL_CLASS = 'block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1';
 
 export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
   theme, palette, maxIterations,

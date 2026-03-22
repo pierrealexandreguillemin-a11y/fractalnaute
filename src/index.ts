@@ -51,4 +51,4 @@ export {
 export type { InitialFractalConfig } from './application';
 
 // Theme exports
-export { getThemeLabel, THEME_NAMES } from './ui';
+export { getThemeLabel, getThemeNames, THEME_NAMES } from './ui';

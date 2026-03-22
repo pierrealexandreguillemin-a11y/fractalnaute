@@ -6,6 +6,8 @@
 
 import React from 'react';
 import type { RenderStats } from '../domain';
+import { cn } from '@/lib/utils';
+import { GLASS_PANEL } from './shared';
 
 interface InfoPanelProps {
   stats: RenderStats;
@@ -13,11 +15,11 @@ interface InfoPanelProps {
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({ stats }) => (
   <div
-    className={[
+    className={cn(
       'absolute bottom-4 left-4 z-10 px-4 py-2',
-      'backdrop-blur-xl bg-glass-bg border border-glass-border rounded-xl',
+      GLASS_PANEL,
       'text-[11px] font-mono text-muted-foreground'
-    ].join(' ')}
+    )}
   >
     <div className="flex gap-4 flex-wrap">
       <StatItem label="Type" value={stats.fractalName} />

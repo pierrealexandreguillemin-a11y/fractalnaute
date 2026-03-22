@@ -8,6 +8,7 @@
 import React from 'react';
 import type { FractalType } from '../../domain';
 import { getFractalTypeNames, getFractalLabel, getFractalConfig } from '../../domain';
+import { LABEL_CLASS } from './shared';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
@@ -25,7 +26,7 @@ export const FractalTypeSection: React.FC<FractalTypeSectionProps> = ({
 
   return (
     <div className="mb-3.5">
-      <label className="block text-[11px] font-medium tracking-wide uppercase text-muted-foreground mb-1">
+      <label className={LABEL_CLASS}>
         Type de fractale
       </label>
       <Select value={fractalType} onValueChange={(v) => onFractalTypeChange(v as FractalType)}>

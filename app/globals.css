@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin 'tailwindcss-animate';
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Tailwind v4 theme — maps CSS custom properties to Tailwind tokens
@@ -47,6 +48,8 @@
  * Theme: default (Cosmos) — also serves as :root
  * Source of truth: themes.ts OKLCH values
  * ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
 
 :root,
 [data-theme="default"] {
@@ -161,6 +164,8 @@
   --input: oklch(0.000 0.0000 0.0 / 0.1);
 }
 
+} /* end @layer base */
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Keyframes (previously injected via JS)
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -177,5 +182,17 @@
   }
   50% {
     opacity: 1;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Accessibility: reduced motion
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
 import { cn } from '@/lib/utils';
+import { GLASS_PANEL } from './shared';
 import { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
 
 interface ControlsPanelProps {
@@ -27,9 +28,9 @@ interface ControlsPanelProps {
   onExport: () => void;
 }
 
-const GLASS_PANEL = cn(
-  'backdrop-blur-xl bg-glass-bg border border-glass-border rounded-2xl',
-  'shadow-[0_8px_32px_oklch(0_0_0/0.3)]'
+const CONTROLS_PANEL = cn(
+  GLASS_PANEL,
+  'rounded-2xl shadow-[0_8px_32px_oklch(0_0_0/0.3)]'
 );
 
 /** Panel header with title and collapse button */
@@ -40,6 +41,7 @@ const PanelHeader: React.FC<{ onCollapse: () => void }> = ({ onCollapse }) => (
     </span>
     <button
       onClick={onCollapse}
+      aria-label="Réduire le panneau"
       className="px-2 py-1 bg-secondary border border-border rounded-md text-sm text-foreground cursor-pointer"
     >
       X
@@ -55,8 +57,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
       <button
         onClick={() => setIsCollapsed(false)}
         title="Afficher les controles"
+        aria-label="Afficher les contrôles"
         className={cn(
-          GLASS_PANEL,
+          CONTROLS_PANEL,
           'absolute top-4 right-4 w-11 h-11 z-100',
           'text-foreground text-xl cursor-pointer flex items-center justify-center'
         )}
@@ -81,7 +84,7 @@ const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void 
 }) => (
   <div
     className={cn(
-      GLASS_PANEL,
+      CONTROLS_PANEL,
       'absolute top-4 right-4 p-4 min-w-[260px] max-h-[calc(100vh-32px)]',
       'overflow-y-auto text-foreground z-100'
     )}

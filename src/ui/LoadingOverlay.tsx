@@ -13,6 +13,9 @@ interface LoadingOverlayProps {
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isVisible }) => (
   <div
+    role="status"
+    aria-live="polite"
+    aria-label={isVisible ? 'Chargement en cours' : undefined}
     className={cn(
       'absolute inset-0 z-50 flex items-center justify-center',
       'bg-overlay transition-opacity duration-300',
