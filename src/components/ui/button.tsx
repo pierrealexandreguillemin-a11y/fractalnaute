@@ -28,5 +28,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = 'Button';
 
 // Re-export buttonVariants for consumers (e.g. Link styled as Button)
-// eslint-disable-next-line react-refresh/only-export-components -- shadcn pattern: buttonVariants must be co-exported for use outside the Button component
 export { Button, buttonVariants };

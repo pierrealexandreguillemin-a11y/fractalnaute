@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "lib": [
-      "ESNext",
+      "ES2020",
       "DOM",
       "DOM.Iterable"
     ],
@@ -14,8 +14,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true,

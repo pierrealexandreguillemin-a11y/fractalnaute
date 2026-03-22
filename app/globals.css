@@ -71,7 +71,3 @@
   --input: oklch(0.269 0 0);
   --ring: oklch(0.439 0 0);
 }
-
-/* Reset */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%; height: 100%; }

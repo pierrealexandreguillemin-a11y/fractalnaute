@@ -1,0 +1,6 @@
+docs/
+standalone/
+*.md
+.husky/
+commitlint.config.js
+eslint.config.mjs
