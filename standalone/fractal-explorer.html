@@ -1,0 +1,1254 @@
+<!--
+  STANDALONE PROTOTYPE — not a mirror of the React version.
+  Independent codebase, sRGB color space, different rendering pipeline.
+  Source of truth: react/src/
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌀 Fractal Explorer</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════════
+       INFRASTRUCTURE LAYER - Theme System
+       ═══════════════════════════════════════════════════════════════════════ */
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #14141f;
+      --bg-overlay: rgba(10, 10, 15, 0.85);
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888aa;
+      --accent-primary: #6366f1;
+      --accent-secondary: #a855f7;
+      --accent-glow: rgba(99, 102, 241, 0.4);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --glass-bg: rgba(20, 20, 35, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --transition-fast: 150ms ease;
+      --transition-medium: 300ms ease;
+    }
+
+    [data-theme="miami"] {
+      --bg-primary: #1a0a2e;
+      --bg-secondary: #2d1b4e;
+      --bg-overlay: rgba(26, 10, 46, 0.9);
+      --text-primary: #fff0f5;
+      --text-secondary: #ff9ecd;
+      --accent-primary: #ff6b9d;
+      --accent-secondary: #00d4ff;
+      --accent-glow: rgba(255, 107, 157, 0.5);
+      --border-color: rgba(255, 107, 157, 0.2);
+      --glass-bg: rgba(45, 27, 78, 0.75);
+      --glass-border: rgba(255, 107, 157, 0.15);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-overlay: rgba(245, 245, 247, 0.92);
+      --text-primary: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --accent-primary: #0071e3;
+      --accent-secondary: #34c759;
+      --accent-glow: rgba(0, 113, 227, 0.25);
+      --border-color: rgba(0, 0, 0, 0.1);
+      --glass-bg: rgba(255, 255, 255, 0.8);
+      --glass-border: rgba(0, 0, 0, 0.06);
+    }
+
+    [data-theme="ocean"] {
+      --bg-primary: #0c1929;
+      --bg-secondary: #132f4c;
+      --bg-overlay: rgba(12, 25, 41, 0.9);
+      --text-primary: #b2d5ff;
+      --text-secondary: #5090d3;
+      --accent-primary: #29b6f6;
+      --accent-secondary: #00e5ff;
+      --accent-glow: rgba(41, 182, 246, 0.4);
+      --border-color: rgba(41, 182, 246, 0.15);
+      --glass-bg: rgba(19, 47, 76, 0.75);
+      --glass-border: rgba(41, 182, 246, 0.1);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       BASE STYLES
+       ═══════════════════════════════════════════════════════════════════════ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Main Container
+       ═══════════════════════════════════════════════════════════════════════ */
+    .fractal-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fractal-canvas {
+      display: block;
+      cursor: crosshair;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Controls Panel (Glassmorphism)
+       ═══════════════════════════════════════════════════════════════════════ */
+    .controls-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 16px;
+      min-width: 260px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: transform var(--transition-medium), opacity var(--transition-medium);
+      z-index: 100;
+    }
+
+    .controls-panel.collapsed {
+      transform: translateX(calc(100% + 16px));
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .controls-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .controls-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    .control-group {
+      margin-bottom: 14px;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .control-select,
+    .control-input {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .control-select:focus,
+    .control-input:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .control-range {
+      width: 100%;
+      height: 4px;
+      background: var(--bg-secondary);
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .control-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--accent-primary);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 8px var(--accent-glow);
+      transition: transform var(--transition-fast);
+    }
+
+    .control-range::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-row .btn {
+      flex: 1;
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .btn-small {
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Julia Picker Indicator
+       ═══════════════════════════════════════════════════════════════════════ */
+    .julia-indicator {
+      display: none;
+      padding: 8px 12px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-primary);
+      border-radius: 8px;
+      font-size: 11px;
+      color: var(--text-primary);
+      text-align: center;
+      margin-top: 8px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .julia-indicator.active {
+      display: block;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    .julia-coords {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 10px;
+      color: var(--accent-primary);
+      margin-top: 4px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Toggle Button
+       ═══════════════════════════════════════════════════════════════════════ */
+    .toggle-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 44px;
+      height: 44px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform var(--transition-fast), opacity var(--transition-fast);
+      z-index: 10;
+    }
+
+    .toggle-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .toggle-btn.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Info Panel
+       ═══════════════════════════════════════════════════════════════════════ */
+    .info-panel {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 11px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--text-secondary);
+      z-index: 10;
+    }
+
+    .info-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .info-item {
+      display: flex;
+      gap: 4px;
+    }
+
+    .info-value {
+      color: var(--accent-primary);
+      font-weight: 500;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Loading Overlay
+       ═══════════════════════════════════════════════════════════════════════ */
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-overlay);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition-medium);
+      z-index: 50;
+    }
+
+    .loading-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Help Tooltip
+       ═══════════════════════════════════════════════════════════════════════ */
+    .help-tooltip {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      opacity: 0.7;
+      transition: opacity var(--transition-fast);
+      z-index: 10;
+    }
+
+    .help-tooltip:hover {
+      opacity: 1;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 10px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - Fractal Description
+       ═══════════════════════════════════════════════════════════════════════ */
+    .fractal-description {
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 8px;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .fractal-formula {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--accent-primary);
+      font-size: 12px;
+    }
+
+    /* Section divider */
+    .section-divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       UI LAYER - HTML Structure
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="fractal-container" id="app">
+    <canvas class="fractal-canvas" id="canvas"></canvas>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Toggle Button -->
+    <button class="toggle-btn hidden" id="toggleBtn" title="Afficher les contrôles">⚙️</button>
+
+    <!-- Controls Panel -->
+    <div class="controls-panel" id="controls">
+      <div class="controls-header">
+        <span class="controls-title">🌀 Fractal Explorer</span>
+        <button class="btn btn-secondary btn-small" id="closeBtn">✕</button>
+      </div>
+
+      <!-- Fractal Type -->
+      <div class="control-group">
+        <label class="control-label">Type de fractale</label>
+        <select class="control-select" id="fractalSelect">
+          <option value="mandelbrot">Mandelbrot</option>
+          <option value="julia">Julia</option>
+          <option value="burningship">Burning Ship</option>
+          <option value="tricorn">Tricorn (Mandelbar)</option>
+          <option value="multibrot3">Multibrot (z³)</option>
+          <option value="multibrot4">Multibrot (z⁴)</option>
+          <option value="multibrot5">Multibrot (z⁵)</option>
+        </select>
+        <div class="fractal-description" id="fractalDesc">
+          <span class="fractal-formula">z → z² + c</span><br>
+          L'ensemble de Mandelbrot classique
+        </div>
+      </div>
+
+      <!-- Julia Picker Mode -->
+      <div class="control-group" id="juliaPickerGroup" style="display: none;">
+        <label class="control-label">Paramètre Julia (c)</label>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="pickJuliaBtn">🎯 Choisir sur Mandelbrot</button>
+        </div>
+        <div class="julia-indicator" id="juliaIndicator">
+          Cliquez sur Mandelbrot pour choisir c
+          <div class="julia-coords" id="juliaCoords">c = -0.7 + 0.27i</div>
+        </div>
+        <div style="margin-top: 8px;">
+          <label class="control-label">Presets Julia</label>
+          <select class="control-select" id="juliaPresets">
+            <option value="custom">Personnalisé</option>
+            <option value="-0.7,0.27015">Dendrite spirale</option>
+            <option value="-0.8,0.156">Lapin de Douady</option>
+            <option value="-0.4,0.6">Dragon</option>
+            <option value="0.285,0.01">Spirale dorée</option>
+            <option value="-0.835,-0.2321">Étoile de mer</option>
+            <option value="-0.75,0">San Marco</option>
+            <option value="0.355,0.355">Flocon</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Theme Select -->
+      <div class="control-group">
+        <label class="control-label">Thème</label>
+        <select class="control-select" id="themeSelect">
+          <option value="default">Cosmos (Défaut)</option>
+          <option value="miami">Miami Neon</option>
+          <option value="ocean">Océan Profond</option>
+          <option value="light">Lumière</option>
+        </select>
+      </div>
+
+      <!-- Palette Select -->
+      <div class="control-group">
+        <label class="control-label">Palette de couleurs</label>
+        <select class="control-select" id="paletteSelect">
+          <option value="classic">Classique</option>
+          <option value="fire">Feu</option>
+          <option value="ice">Glace</option>
+          <option value="neon">Néon</option>
+          <option value="grayscale">Niveaux de gris</option>
+          <option value="psychedelic">Psychédélique</option>
+          <option value="sunset">Coucher de soleil</option>
+          <option value="miami">Miami</option>
+          <option value="electric">Électrique</option>
+        </select>
+      </div>
+
+      <!-- Iterations -->
+      <div class="control-group">
+        <label class="control-label">Itérations max: <span id="iterValue">256</span></label>
+        <input type="range" class="control-range" id="iterRange" min="50" max="1000" value="256">
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Actions -->
+      <div class="control-group">
+        <div class="btn-row">
+          <button class="btn" id="resetBtn">🔄 Reset</button>
+          <button class="btn btn-secondary" id="exportBtn">📷 Export</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel" id="info">
+      <div class="info-row">
+        <div class="info-item">
+          <span>Type:</span>
+          <span class="info-value" id="fractalType">Mandelbrot</span>
+        </div>
+        <div class="info-item">
+          <span>Zoom:</span>
+          <span class="info-value" id="zoomValue">1.00x</span>
+        </div>
+        <div class="info-item">
+          <span>Centre:</span>
+          <span class="info-value" id="centerValue">(-0.5, 0)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help Tooltip -->
+    <div class="help-tooltip">
+      <kbd>Molette</kbd> Zoom &nbsp;|&nbsp; 
+      <kbd>Clic</kbd> Centrer &nbsp;|&nbsp; 
+      <kbd>Glisser</kbd> Déplacer &nbsp;|&nbsp;
+      <kbd>R</kbd> Reset
+    </div>
+  </div>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DOMAIN LAYER - Fractal Mathematics (Pure Functions)
+       ═══════════════════════════════════════════════════════════════════════════ */
+    
+    /**
+     * Fractal calculation functions
+     * Each returns { iterations, escaped, smoothValue }
+     */
+    const FractalCalculators = {
+      /**
+       * Classic Mandelbrot: z → z² + c
+       */
+      mandelbrot: (cRe, cIm, maxIter) => {
+        let zRe = 0, zIm = 0, zRe2 = 0, zIm2 = 0, iter = 0;
+        while (zRe2 + zIm2 <= 4 && iter < maxIter) {
+          zIm = 2 * zRe * zIm + cIm;
+          zRe = zRe2 - zIm2 + cRe;
+          zRe2 = zRe * zRe;
+          zIm2 = zIm * zIm;
+          iter++;
+        }
+        if (iter === maxIter) return { iterations: maxIter, escaped: false, smoothValue: maxIter };
+        const logZn = Math.log(zRe2 + zIm2) / 2;
+        const smoothValue = iter + 1 - Math.log(logZn / Math.log(2)) / Math.log(2);
+        return { iterations: iter, escaped: true, smoothValue };
+      },
+
+      /**
+       * Julia set: z → z² + c (c is fixed, z₀ varies)
+       */
+      julia: (z0Re, z0Im, maxIter, params) => {
+        const cRe = params.juliaRe ?? -0.7;
+        const cIm = params.juliaIm ?? 0.27015;
+        let zRe = z0Re, zIm = z0Im, zRe2 = zRe * zRe, zIm2 = zIm * zIm, iter = 0;
+        while (zRe2 + zIm2 <= 4 && iter < maxIter) {
+          zIm = 2 * zRe * zIm + cIm;
+          zRe = zRe2 - zIm2 + cRe;
+          zRe2 = zRe * zRe;
+          zIm2 = zIm * zIm;
+          iter++;
+        }
+        if (iter === maxIter) return { iterations: maxIter, escaped: false, smoothValue: maxIter };
+        const logZn = Math.log(zRe2 + zIm2) / 2;
+        const smoothValue = iter + 1 - Math.log(logZn / Math.log(2)) / Math.log(2);
+        return { iterations: iter, escaped: true, smoothValue };
+      },
+
+      /**
+       * Burning Ship: z → (|Re(z)| + i|Im(z)|)² + c
+       */
+      burningship: (cRe, cIm, maxIter) => {
+        let zRe = 0, zIm = 0, iter = 0;
+        while (zRe * zRe + zIm * zIm <= 4 && iter < maxIter) {
+          const newRe = zRe * zRe - zIm * zIm + cRe;
+          zIm = Math.abs(2 * zRe * zIm) + cIm;
+          zRe = newRe;
+          iter++;
+        }
+        if (iter === maxIter) return { iterations: maxIter, escaped: false, smoothValue: maxIter };
+        const mod2 = zRe * zRe + zIm * zIm;
+        const logZn = Math.log(mod2) / 2;
+        const smoothValue = iter + 1 - Math.log(logZn / Math.log(2)) / Math.log(2);
+        return { iterations: iter, escaped: true, smoothValue };
+      },
+
+      /**
+       * Tricorn (Mandelbar): z → conj(z)² + c
+       */
+      tricorn: (cRe, cIm, maxIter) => {
+        let zRe = 0, zIm = 0, iter = 0;
+        while (zRe * zRe + zIm * zIm <= 4 && iter < maxIter) {
+          const newRe = zRe * zRe - zIm * zIm + cRe;
+          zIm = -2 * zRe * zIm + cIm; // Note the negative sign (conjugate)
+          zRe = newRe;
+          iter++;
+        }
+        if (iter === maxIter) return { iterations: maxIter, escaped: false, smoothValue: maxIter };
+        const mod2 = zRe * zRe + zIm * zIm;
+        const logZn = Math.log(mod2) / 2;
+        const smoothValue = iter + 1 - Math.log(logZn / Math.log(2)) / Math.log(2);
+        return { iterations: iter, escaped: true, smoothValue };
+      },
+
+      /**
+       * Multibrot: z → zⁿ + c (generalized Mandelbrot)
+       */
+      multibrot: (cRe, cIm, maxIter, params) => {
+        const n = params.power ?? 3;
+        let zRe = 0, zIm = 0, iter = 0;
+        while (zRe * zRe + zIm * zIm <= 4 && iter < maxIter) {
+          // z^n using polar form
+          const r = Math.sqrt(zRe * zRe + zIm * zIm);
+          const theta = Math.atan2(zIm, zRe);
+          const rn = Math.pow(r, n);
+          const newRe = rn * Math.cos(n * theta) + cRe;
+          const newIm = rn * Math.sin(n * theta) + cIm;
+          zRe = newRe;
+          zIm = newIm;
+          iter++;
+        }
+        if (iter === maxIter) return { iterations: maxIter, escaped: false, smoothValue: maxIter };
+        const mod2 = zRe * zRe + zIm * zIm;
+        const logZn = Math.log(mod2) / 2;
+        const smoothValue = iter + 1 - Math.log(logZn / Math.log(n)) / Math.log(n);
+        return { iterations: iter, escaped: true, smoothValue };
+      }
+    };
+
+    /**
+     * Fractal type configurations
+     */
+    const FractalTypes = {
+      mandelbrot: {
+        name: 'Mandelbrot',
+        formula: 'z → z² + c',
+        description: "L'ensemble de Mandelbrot classique",
+        calculator: FractalCalculators.mandelbrot,
+        defaultView: { centerRe: -0.5, centerIm: 0, scale: 3.5 }
+      },
+      julia: {
+        name: 'Julia',
+        formula: 'z → z² + c (c fixe)',
+        description: 'Ensemble de Julia - cliquez sur Mandelbrot pour choisir c',
+        calculator: FractalCalculators.julia,
+        defaultView: { centerRe: 0, centerIm: 0, scale: 3.5 },
+        hasParams: true
+      },
+      burningship: {
+        name: 'Burning Ship',
+        formula: 'z → (|Re(z)| + i|Im(z)|)² + c',
+        description: 'Le navire en feu - découvert en 1992',
+        calculator: FractalCalculators.burningship,
+        defaultView: { centerRe: -0.5, centerIm: -0.5, scale: 3.5 }
+      },
+      tricorn: {
+        name: 'Tricorn',
+        formula: 'z → conj(z)² + c',
+        description: 'Le Tricorn ou Mandelbar - utilise le conjugué complexe',
+        calculator: FractalCalculators.tricorn,
+        defaultView: { centerRe: -0.3, centerIm: 0, scale: 3.5 }
+      },
+      multibrot3: {
+        name: 'Multibrot (z³)',
+        formula: 'z → z³ + c',
+        description: 'Multibrot de degré 3 - symétrie ternaire',
+        calculator: FractalCalculators.multibrot,
+        defaultView: { centerRe: 0, centerIm: 0, scale: 3 },
+        params: { power: 3 }
+      },
+      multibrot4: {
+        name: 'Multibrot (z⁴)',
+        formula: 'z → z⁴ + c',
+        description: 'Multibrot de degré 4 - symétrie quaternaire',
+        calculator: FractalCalculators.multibrot,
+        defaultView: { centerRe: 0, centerIm: 0, scale: 2.5 },
+        params: { power: 4 }
+      },
+      multibrot5: {
+        name: 'Multibrot (z⁵)',
+        formula: 'z → z⁵ + c',
+        description: 'Multibrot de degré 5 - symétrie pentagonale',
+        calculator: FractalCalculators.multibrot,
+        defaultView: { centerRe: 0, centerIm: 0, scale: 2.2 },
+        params: { power: 5 }
+      }
+    };
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DOMAIN LAYER - Color Palettes (Pure Functions)
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    const ColorPalettes = {
+      classic: (t) => [
+        Math.floor(9 * (1 - t) * t * t * t * 255),
+        Math.floor(15 * (1 - t) * (1 - t) * t * t * 255),
+        Math.floor(8.5 * (1 - t) * (1 - t) * (1 - t) * t * 255)
+      ],
+      fire: (t) => [
+        Math.floor(Math.min(255, t * 3 * 255)),
+        Math.floor(Math.max(0, Math.min(255, (t - 0.33) * 3 * 255))),
+        Math.floor(Math.max(0, Math.min(255, (t - 0.66) * 3 * 255)))
+      ],
+      ice: (t) => [
+        Math.floor(t * 150),
+        Math.floor(t * 200 + 55),
+        Math.floor(t * 50 + 205)
+      ],
+      neon: (t) => {
+        const phase = t * Math.PI * 2;
+        return [
+          Math.floor((Math.sin(phase) * 0.5 + 0.5) * 255),
+          Math.floor((Math.sin(phase + 2.094) * 0.5 + 0.5) * 255),
+          Math.floor((Math.sin(phase + 4.189) * 0.5 + 0.5) * 255)
+        ];
+      },
+      grayscale: (t) => { const v = Math.floor(t * 255); return [v, v, v]; },
+      psychedelic: (t) => [
+        Math.floor((Math.sin(t * 20) * 0.5 + 0.5) * 255),
+        Math.floor((Math.sin(t * 20 + 2) * 0.5 + 0.5) * 255),
+        Math.floor((Math.sin(t * 20 + 4) * 0.5 + 0.5) * 255)
+      ],
+      sunset: (t) => {
+        if (t < 0.5) {
+          const tt = t * 2;
+          return [255, Math.floor(tt * 150 + 50), Math.floor(tt * 100)];
+        }
+        const tt = (t - 0.5) * 2;
+        return [Math.floor(255 - tt * 100), Math.floor(200 - tt * 150), Math.floor(100 + tt * 155)];
+      },
+      miami: (t) => {
+        const pink = [255, 107, 157], cyan = [0, 212, 255], purple = [168, 85, 247];
+        if (t < 0.33) {
+          const tt = t * 3;
+          return [Math.floor(pink[0] + (cyan[0] - pink[0]) * tt), Math.floor(pink[1] + (cyan[1] - pink[1]) * tt), Math.floor(pink[2] + (cyan[2] - pink[2]) * tt)];
+        } else if (t < 0.66) {
+          const tt = (t - 0.33) * 3;
+          return [Math.floor(cyan[0] + (purple[0] - cyan[0]) * tt), Math.floor(cyan[1] + (purple[1] - cyan[1]) * tt), Math.floor(cyan[2] + (purple[2] - cyan[2]) * tt)];
+        }
+        const tt = (t - 0.66) * 3;
+        return [Math.floor(purple[0] + (pink[0] - purple[0]) * tt), Math.floor(purple[1] + (pink[1] - purple[1]) * tt), Math.floor(purple[2] + (pink[2] - purple[2]) * tt)];
+      },
+      electric: (t) => {
+        const phase = t * Math.PI * 4;
+        return [
+          Math.floor((Math.sin(phase) * 0.5 + 0.5) * 100 + 155),
+          Math.floor((Math.cos(phase * 0.7) * 0.5 + 0.5) * 255),
+          Math.floor(255 - t * 100)
+        ];
+      }
+    };
+
+    function getColor(result, maxIter, paletteName) {
+      if (!result.escaped) return [0, 0, 0];
+      const palette = ColorPalettes[paletteName] || ColorPalettes.classic;
+      const t = (result.smoothValue % 256) / 256;
+      return palette(t);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DOMAIN LAYER - Coordinate Transforms
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    function screenToComplex(x, y, width, height, viewport) {
+      const aspectRatio = width / height;
+      return {
+        re: viewport.centerRe + (x / width - 0.5) * viewport.scale * aspectRatio,
+        im: viewport.centerIm + (y / height - 0.5) * viewport.scale
+      };
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       APPLICATION LAYER - State Management
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    class FractalState {
+      constructor() {
+        this.fractalType = 'mandelbrot';
+        this.viewport = { ...FractalTypes.mandelbrot.defaultView };
+        this.maxIterations = 256;
+        this.palette = 'classic';
+        this.theme = 'default';
+        this.isRendering = false;
+        this.juliaParams = { juliaRe: -0.7, juliaIm: 0.27015 };
+        this.isPickingJulia = false;
+      }
+
+      setFractalType(type) {
+        this.fractalType = type;
+        const config = FractalTypes[type];
+        if (config.defaultView) {
+          this.viewport = { ...config.defaultView };
+        }
+        if (config.params) {
+          this.juliaParams = { ...this.juliaParams, ...config.params };
+        }
+      }
+
+      reset() {
+        const config = FractalTypes[this.fractalType];
+        this.viewport = { ...config.defaultView };
+      }
+
+      zoom(factor, focusRe, focusIm) {
+        this.viewport.centerRe += (focusRe - this.viewport.centerRe) * (1 - factor);
+        this.viewport.centerIm += (focusIm - this.viewport.centerIm) * (1 - factor);
+        this.viewport.scale *= factor;
+      }
+
+      pan(deltaRe, deltaIm) {
+        this.viewport.centerRe += deltaRe;
+        this.viewport.centerIm += deltaIm;
+      }
+
+      getZoomLevel() {
+        const defaultScale = FractalTypes[this.fractalType].defaultView.scale;
+        return (defaultScale / this.viewport.scale).toFixed(2);
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       INFRASTRUCTURE LAYER - Renderer
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    class FractalRenderer {
+      constructor(canvas, state) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.state = state;
+        this.imageData = null;
+      }
+
+      resize() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        this.imageData = this.ctx.createImageData(this.canvas.width, this.canvas.height);
+      }
+
+      render() {
+        if (this.state.isRendering) return;
+        this.state.isRendering = true;
+
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const data = this.imageData.data;
+        const viewport = this.state.viewport;
+        const maxIter = this.state.maxIterations;
+        const palette = this.state.palette;
+        const fractalConfig = FractalTypes[this.state.fractalType];
+        const calculator = fractalConfig.calculator;
+        const params = { ...fractalConfig.params, ...this.state.juliaParams };
+
+        let y = 0;
+        const chunkSize = 15;
+
+        const renderChunk = () => {
+          const endY = Math.min(y + chunkSize, height);
+
+          for (; y < endY; y++) {
+            for (let x = 0; x < width; x++) {
+              const c = screenToComplex(x, y, width, height, viewport);
+              const result = calculator(c.re, c.im, maxIter, params);
+              const [r, g, b] = getColor(result, maxIter, palette);
+              const idx = (y * width + x) * 4;
+              data[idx] = r;
+              data[idx + 1] = g;
+              data[idx + 2] = b;
+              data[idx + 3] = 255;
+            }
+          }
+
+          this.ctx.putImageData(this.imageData, 0, 0);
+
+          if (y < height) {
+            requestAnimationFrame(renderChunk);
+          } else {
+            this.state.isRendering = false;
+            document.getElementById('loading').classList.remove('active');
+          }
+        };
+
+        document.getElementById('loading').classList.add('active');
+        requestAnimationFrame(renderChunk);
+      }
+
+      exportImage() {
+        const link = document.createElement('a');
+        link.download = `fractal-${this.state.fractalType}-${Date.now()}.png`;
+        link.href = this.canvas.toDataURL('image/png');
+        link.click();
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       APPLICATION LAYER - Controller
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    class FractalController {
+      constructor() {
+        this.state = new FractalState();
+        this.canvas = document.getElementById('canvas');
+        this.renderer = new FractalRenderer(this.canvas, this.state);
+        this.isDragging = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        this.init();
+      }
+
+      init() {
+        this.bindEvents();
+        this.renderer.resize();
+        this.renderer.render();
+        this.updateUI();
+      }
+
+      bindEvents() {
+        // Window resize
+        window.addEventListener('resize', () => {
+          this.renderer.resize();
+          this.renderer.render();
+        });
+
+        // Mouse wheel zoom
+        this.canvas.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const rect = this.canvas.getBoundingClientRect();
+          const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+          const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+          const c = screenToComplex(x, y, this.canvas.width, this.canvas.height, this.state.viewport);
+          const zoomFactor = e.deltaY > 0 ? 1.15 : 0.85;
+          this.state.zoom(zoomFactor, c.re, c.im);
+          this.renderer.render();
+          this.updateUI();
+        }, { passive: false });
+
+        // Mouse events
+        this.canvas.addEventListener('mousedown', (e) => {
+          this.isDragging = true;
+          this.lastX = e.clientX;
+          this.lastY = e.clientY;
+          this.canvas.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+          if (!this.isDragging) return;
+          const rect = this.canvas.getBoundingClientRect();
+          const aspectRatio = this.canvas.width / this.canvas.height;
+          const deltaX = (e.clientX - this.lastX) / rect.width * this.state.viewport.scale * aspectRatio;
+          const deltaY = (e.clientY - this.lastY) / rect.height * this.state.viewport.scale;
+          this.state.pan(-deltaX, -deltaY);
+          this.lastX = e.clientX;
+          this.lastY = e.clientY;
+          this.renderer.render();
+          this.updateUI();
+        });
+
+        window.addEventListener('mouseup', () => {
+          this.isDragging = false;
+          this.canvas.style.cursor = this.state.isPickingJulia ? 'crosshair' : 'crosshair';
+        });
+
+        // Double click or Julia pick
+        this.canvas.addEventListener('dblclick', (e) => {
+          this.handleCanvasClick(e, true);
+        });
+
+        this.canvas.addEventListener('click', (e) => {
+          if (this.state.isPickingJulia) {
+            this.handleJuliaPick(e);
+          }
+        });
+
+        // Touch events
+        let touchStartDistance = 0;
+        let touchStartScale = 1;
+
+        this.canvas.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 1) {
+            this.isDragging = true;
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+          } else if (e.touches.length === 2) {
+            touchStartDistance = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            touchStartScale = this.state.viewport.scale;
+          }
+        }, { passive: true });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          if (e.touches.length === 1 && this.isDragging) {
+            const rect = this.canvas.getBoundingClientRect();
+            const aspectRatio = this.canvas.width / this.canvas.height;
+            const deltaX = (e.touches[0].clientX - this.lastX) / rect.width * this.state.viewport.scale * aspectRatio;
+            const deltaY = (e.touches[0].clientY - this.lastY) / rect.height * this.state.viewport.scale;
+            this.state.pan(-deltaX, -deltaY);
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+            this.renderer.render();
+            this.updateUI();
+          } else if (e.touches.length === 2) {
+            const distance = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            const scale = touchStartDistance / distance;
+            this.state.viewport.scale = touchStartScale * scale;
+            this.renderer.render();
+            this.updateUI();
+          }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', () => {
+          this.isDragging = false;
+        });
+
+        // Keyboard
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'r' || e.key === 'R') this.reset();
+          if (e.key === 'Escape' && this.state.isPickingJulia) this.toggleJuliaPicker(false);
+        });
+
+        // UI Controls
+        document.getElementById('fractalSelect').addEventListener('change', (e) => {
+          this.setFractalType(e.target.value);
+        });
+
+        document.getElementById('themeSelect').addEventListener('change', (e) => {
+          this.setTheme(e.target.value);
+        });
+
+        document.getElementById('paletteSelect').addEventListener('change', (e) => {
+          this.state.palette = e.target.value;
+          this.renderer.render();
+        });
+
+        document.getElementById('iterRange').addEventListener('input', (e) => {
+          this.state.maxIterations = parseInt(e.target.value);
+          document.getElementById('iterValue').textContent = e.target.value;
+        });
+
+        document.getElementById('iterRange').addEventListener('change', () => {
+          this.renderer.render();
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+        document.getElementById('exportBtn').addEventListener('click', () => this.renderer.exportImage());
+
+        // Julia picker
+        document.getElementById('pickJuliaBtn').addEventListener('click', () => {
+          this.toggleJuliaPicker(true);
+        });
+
+        document.getElementById('juliaPresets').addEventListener('change', (e) => {
+          if (e.target.value !== 'custom') {
+            const [re, im] = e.target.value.split(',').map(Number);
+            this.state.juliaParams.juliaRe = re;
+            this.state.juliaParams.juliaIm = im;
+            this.updateJuliaCoords();
+            if (this.state.fractalType === 'julia') {
+              this.renderer.render();
+            }
+          }
+        });
+
+        // Panel toggle
+        document.getElementById('closeBtn').addEventListener('click', () => {
+          document.getElementById('controls').classList.add('collapsed');
+          document.getElementById('toggleBtn').classList.remove('hidden');
+        });
+
+        document.getElementById('toggleBtn').addEventListener('click', () => {
+          document.getElementById('controls').classList.remove('collapsed');
+          document.getElementById('toggleBtn').classList.add('hidden');
+        });
+      }
+
+      handleCanvasClick(e, isDoubleClick) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        const c = screenToComplex(x, y, this.canvas.width, this.canvas.height, this.state.viewport);
+
+        if (isDoubleClick) {
+          this.state.viewport.centerRe = c.re;
+          this.state.viewport.centerIm = c.im;
+          this.state.zoom(0.5, c.re, c.im);
+          this.renderer.render();
+          this.updateUI();
+        }
+      }
+
+      handleJuliaPick(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+        const c = screenToComplex(x, y, this.canvas.width, this.canvas.height, this.state.viewport);
+
+        this.state.juliaParams.juliaRe = c.re;
+        this.state.juliaParams.juliaIm = c.im;
+        this.updateJuliaCoords();
+        
+        document.getElementById('juliaPresets').value = 'custom';
+        
+        // Switch to Julia view
+        this.toggleJuliaPicker(false);
+        this.setFractalType('julia');
+        document.getElementById('fractalSelect').value = 'julia';
+      }
+
+      toggleJuliaPicker(enable) {
+        this.state.isPickingJulia = enable;
+        document.getElementById('juliaIndicator').classList.toggle('active', enable);
+        
+        if (enable && this.state.fractalType !== 'mandelbrot') {
+          // Switch to Mandelbrot for picking
+          this.setFractalType('mandelbrot');
+          document.getElementById('fractalSelect').value = 'mandelbrot';
+        }
+      }
+
+      setFractalType(type) {
+        this.state.setFractalType(type);
+        const config = FractalTypes[type];
+        
+        // Update description
+        document.getElementById('fractalDesc').innerHTML = 
+          `<span class="fractal-formula">${config.formula}</span><br>${config.description}`;
+        
+        // Show/hide Julia options
+        document.getElementById('juliaPickerGroup').style.display = 
+          type === 'julia' ? 'block' : 'none';
+        
+        document.getElementById('fractalType').textContent = config.name;
+        
+        this.renderer.render();
+        this.updateUI();
+      }
+
+      setTheme(theme) {
+        this.state.theme = theme;
+        document.documentElement.setAttribute('data-theme', theme === 'default' ? '' : theme);
+      }
+
+      reset() {
+        this.state.reset();
+        this.renderer.render();
+        this.updateUI();
+      }
+
+      updateUI() {
+        document.getElementById('zoomValue').textContent = this.state.getZoomLevel() + 'x';
+        document.getElementById('centerValue').textContent = 
+          `(${this.state.viewport.centerRe.toFixed(4)}, ${this.state.viewport.centerIm.toFixed(4)})`;
+      }
+
+      updateJuliaCoords() {
+        const re = this.state.juliaParams.juliaRe;
+        const im = this.state.juliaParams.juliaIm;
+        const sign = im >= 0 ? '+' : '';
+        document.getElementById('juliaCoords').textContent = `c = ${re.toFixed(4)} ${sign} ${im.toFixed(4)}i`;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       BOOTSTRAP
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.fractalApp = new FractalController();
+    });
+  </script>
+</body>
+</html>
