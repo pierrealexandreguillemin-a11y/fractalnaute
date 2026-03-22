@@ -54,22 +54,6 @@ export const fractalTypes: Record<FractalType, FractalTypeConfig> = {
     calculator: calculateMultibrot,
     defaultView: { centerRe: 0, centerIm: 0, scale: 2.2 },
     params: { power: 3 }
-  },
-  multibrot4: {
-    name: 'Multibrot (z⁴)',
-    formula: 'z → z⁴ + c',
-    description: 'Multibrot de degré 4 - symétrie quaternaire',
-    calculator: calculateMultibrot,
-    defaultView: { centerRe: 0, centerIm: 0, scale: 2.0 },
-    params: { power: 4 }
-  },
-  multibrot5: {
-    name: 'Multibrot (z⁵)',
-    formula: 'z → z⁵ + c',
-    description: 'Multibrot de degré 5 - symétrie pentagonale',
-    calculator: calculateMultibrot,
-    defaultView: { centerRe: 0, centerIm: 0, scale: 1.8 },
-    params: { power: 5 }
   }
 };
 
