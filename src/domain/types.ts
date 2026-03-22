@@ -16,7 +16,19 @@ export interface FractalResult {
   iterations: number;
   escaped: boolean;
   smoothValue: number;
+  stripeValue: number;
+  decompAngle: number;
+  orbitTrapDist: number;
+  distanceEstimate: number;
 }
+
+/** Default values for coloring fields on interior points */
+export const INTERIOR_COLORING_DEFAULTS = {
+  stripeValue: 0,
+  decompAngle: 0,
+  orbitTrapDist: Infinity,
+  distanceEstimate: 0
+} as const;
 
 /** Viewport configuration for the complex plane */
 export interface Viewport {
@@ -65,11 +77,21 @@ export type ThemeName =
   | 'ocean'
   | 'light';
 
+/** Available coloring modes */
+export type ColoringMode =
+  | 'classic'
+  | 'stripe'
+  | 'decomposition'
+  | 'orbitTrap'
+  | 'normalMap';
+
 /** Parameters for fractal calculations */
 export interface FractalParams {
   juliaRe?: number;
   juliaIm?: number;
   power?: number;
+  /** @internal Set by renderBand — controls accumulation in calculators */
+  _needsAccumulation?: boolean;
 }
 
 /** Fractal calculator function signature */

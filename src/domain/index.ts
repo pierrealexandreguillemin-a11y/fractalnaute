@@ -20,7 +20,16 @@ export type {
   RenderStats
 } from './types';
 
-export { DEFAULT_JULIA_PARAMS, JULIA_PRESETS } from './types';
+export { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, INTERIOR_COLORING_DEFAULTS } from './types';
+
+export type { ColoringMode } from './types';
+
+export {
+  initAccumulator,
+  updateAccumulator,
+  finalizeEscape,
+  finalizeInterior
+} from './coloringAccumulator';
 
 // Fractal calculators
 export {
