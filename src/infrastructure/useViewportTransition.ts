@@ -7,7 +7,7 @@
  */
 
 import { useRef, useLayoutEffect, useCallback, useEffect } from 'react';
-import type { Viewport, FractalType, PaletteName, FractalParams } from '../domain/types';
+import type { Viewport, FractalType, PaletteName, FractalParams, ColoringMode } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import { renderFractal } from './renderer';
 import { renderStripsWithPool } from './renderCoordinator';
@@ -28,6 +28,8 @@ interface TransitionDeps {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  coloringMode: ColoringMode;
+  interiorColoring: boolean;
   cancelRenderRef: React.MutableRefObject<(() => void) | null>;
   onRenderStartRef: React.MutableRefObject<(() => void) | undefined>;
   onRenderCompleteRef: React.MutableRefObject<((t: number) => void) | undefined>;
@@ -55,6 +57,8 @@ function doRenderFull(
     maxIterations: deps.maxIterations,
     palette: deps.palette,
     params: deps.params,
+    coloringMode: deps.coloringMode,
+    interiorColoring: deps.interiorColoring,
     onComplete: (renderTime) => {
       cancelRenderRef.current = null;
       onRenderCompleteRef.current?.(renderTime);
@@ -111,6 +115,8 @@ function doRenderPanStrips(
     maxIterations: deps.maxIterations,
     palette: deps.palette,
     params: deps.params,
+    coloringMode: deps.coloringMode,
+    interiorColoring: deps.interiorColoring,
     onComplete: (renderTime) => {
       cancelRenderRef.current = null;
       onRenderCompleteRef.current?.(renderTime);
@@ -158,7 +164,7 @@ export function useViewportTransition(deps: TransitionDeps) {
   const depsRef = useRef(deps);
   useEffect(() => { depsRef.current = deps; });
 
-  const paramsKey = `${deps.fractalType}|${deps.maxIterations}|${deps.palette}|${JSON.stringify(deps.params)}`;
+  const paramsKey = `${deps.fractalType}|${deps.maxIterations}|${deps.palette}|${deps.coloringMode}|${deps.interiorColoring}|${JSON.stringify(deps.params)}`;
 
   // CSS transform: applied synchronously before paint
   useLayoutEffect(() => {

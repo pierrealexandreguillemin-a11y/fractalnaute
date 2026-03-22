@@ -7,7 +7,7 @@
  */
 
 import type {
-  FractalType, PaletteName, FractalParams, Viewport
+  FractalType, PaletteName, FractalParams, Viewport, ColoringMode
 } from '../domain/types';
 import { getFractalConfig } from '../domain/fractalTypes';
 import { resolvePalette, getColorFast } from '../domain/palettes';
@@ -25,6 +25,10 @@ export interface BandRenderParams {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  /** Coloring algorithm. Defaults to 'classic' (smooth iteration count). */
+  coloringMode?: ColoringMode;
+  /** Whether to color interior (non-escaping) points. Defaults to false (black). */
+  interiorColoring?: boolean;
   /** Pixel stride for progressive rendering. 1 = full-res (default), 4 = preview. */
   stride?: number;
 }
@@ -59,12 +63,15 @@ export function renderBand(
     startX: rawStartX, endX: rawEndX,
     startY, endY, width, height, viewport,
     fractalType, maxIterations, palette, params,
+    coloringMode: rawColoringMode, interiorColoring: rawInteriorColoring,
     stride: rawStride
   } = band;
 
   const stride = rawStride ?? 1;
   const startX = rawStartX ?? 0;
   const endX = rawEndX ?? width;
+  const coloringMode = rawColoringMode ?? 'classic';
+  const interiorColoring = rawInteriorColoring ?? false;
   const config = getFractalConfig(fractalType);
   const calculator = config.calculator;
   const resolvedPalette = resolvePalette(palette);
@@ -77,14 +84,20 @@ export function renderBand(
   const originRe = viewport.centerRe - viewport.scale * aspectRatio * 0.5;
   const originIm = viewport.centerIm - viewport.scale * 0.5;
 
+  // Tell calculators whether to accumulate orbit data for advanced coloring
+  const needsAccum = coloringMode !== 'classic' || interiorColoring;
+  const effectiveParams = needsAccum
+    ? { ...params, _needsAccumulation: true }
+    : params;
+
   for (let y = startY; y < endY; y += stride) {
     if (shouldCancel?.()) return false;
 
     for (let x = startX; x < endX; x += stride) {
       const re = originRe + x * stepRe;
       const im = originIm + y * stepIm;
-      const result = calculator(re, im, maxIterations, params);
-      const [r, g, b] = getColorFast(result, resolvedPalette);
+      const result = calculator(re, im, maxIterations, effectiveParams);
+      const [r, g, b] = getColorFast(result, resolvedPalette, coloringMode, interiorColoring);
 
       // Fill stride×stride block, clamped to band/canvas boundaries
       const blockEndY = Math.min(y + stride, endY);

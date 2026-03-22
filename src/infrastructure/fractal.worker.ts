@@ -8,7 +8,7 @@
 
 import { renderBand, buildMergedParams } from './renderBand';
 import type {
-  FractalType, PaletteName, FractalParams, Viewport
+  FractalType, PaletteName, FractalParams, Viewport, ColoringMode
 } from '../domain/types';
 
 interface WorkerInput {
@@ -22,6 +22,8 @@ interface WorkerInput {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  coloringMode?: ColoringMode;
+  interiorColoring?: boolean;
   pixelBuffer: SharedArrayBuffer;
   cancelFlag: SharedArrayBuffer;
 }

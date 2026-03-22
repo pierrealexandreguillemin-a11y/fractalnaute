@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
+import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
 import type { WorkerPool } from './workerPool';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
@@ -16,6 +16,8 @@ export interface RenderOptions {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  coloringMode?: ColoringMode;
+  interiorColoring?: boolean;
   onProgress?: (progress: number) => void;
   onComplete?: (renderTime: number) => void;
 }
@@ -38,6 +40,8 @@ export function renderFractal(
       maxIterations: options.maxIterations,
       palette: options.palette,
       params: options.params,
+      coloringMode: options.coloringMode,
+      interiorColoring: options.interiorColoring,
       onProgress: options.onProgress,
       onComplete: options.onComplete
     });
@@ -55,7 +59,8 @@ function renderFallback(
 
   const {
     fractalType, viewport, maxIterations,
-    palette, params, onProgress, onComplete
+    palette, params, coloringMode, interiorColoring,
+    onProgress, onComplete
   } = options;
   const { width, height } = canvas;
   const mergedParams = buildMergedParams(fractalType, params);
@@ -71,7 +76,8 @@ function renderFallback(
 
     renderBand(imageData.data, {
       startY: currentY, endY, width, height,
-      viewport, fractalType, maxIterations, palette, params: mergedParams
+      viewport, fractalType, maxIterations, palette, params: mergedParams,
+      coloringMode, interiorColoring
     }, () => cancelled);
 
     ctx.putImageData(imageData, 0, 0, 0, currentY, width, endY - currentY);

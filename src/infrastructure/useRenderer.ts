@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
+import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
 import { createWorkerPool, type WorkerPool } from './workerPool';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
 import { useViewportTransition } from './useViewportTransition';
@@ -20,6 +20,8 @@ interface UseRendererOptions {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  coloringMode?: ColoringMode;
+  interiorColoring?: boolean;
   onRenderStart?: () => void;
   onRenderComplete?: (renderTime: number) => void;
 }
@@ -31,6 +33,7 @@ interface UseRendererOptions {
 export function useRenderer({
   canvasRef, containerRef,
   fractalType, viewport, maxIterations, palette, params,
+  coloringMode = 'classic', interiorColoring = false,
   onRenderStart, onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
@@ -71,6 +74,7 @@ export function useRenderer({
   const { forceFullRender } = useViewportTransition({
     canvasRef, poolRef,
     fractalType, viewport, maxIterations, palette, params,
+    coloringMode, interiorColoring,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
 

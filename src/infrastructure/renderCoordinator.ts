@@ -7,7 +7,7 @@
  */
 
 import type {
-  FractalType, PaletteName, FractalParams, Viewport
+  FractalType, PaletteName, FractalParams, Viewport, ColoringMode
 } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import type { ExposedStrip } from './viewportTransform';
@@ -21,6 +21,8 @@ export interface CoordinatorRenderOptions {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  coloringMode?: ColoringMode;
+  interiorColoring?: boolean;
   onProgress?: (progress: number) => void;
   onComplete?: (renderTime: number) => void;
 }
@@ -46,6 +48,8 @@ interface RenderSession {
   maxIterations: number;
   palette: PaletteName;
   params: FractalParams;
+  coloringMode?: ColoringMode;
+  interiorColoring?: boolean;
   cancelled: boolean;
 }
 
@@ -105,6 +109,8 @@ function dispatchPass(
       maxIterations: session.maxIterations,
       palette: session.palette,
       params: session.params,
+      coloringMode: session.coloringMode,
+      interiorColoring: session.interiorColoring,
       pixelBuffer: buffer,
       cancelFlag: pool.cancelFlag
     });
@@ -133,6 +139,7 @@ export function renderWithPool(
   const {
     canvas, pool, viewport, fractalType,
     maxIterations, palette, params,
+    coloringMode, interiorColoring,
     onProgress, onComplete
   } = options;
 
@@ -153,6 +160,7 @@ export function renderWithPool(
   const session: RenderSession = {
     ctx, pool, buffer, view, imageData, width, height,
     viewport, fractalType, maxIterations, palette, params,
+    coloringMode, interiorColoring,
     cancelled: false
   };
 
@@ -194,6 +202,7 @@ export function renderStripsWithPool(
   const {
     canvas, pool, viewport, fractalType,
     maxIterations, palette, params,
+    coloringMode, interiorColoring,
     onProgress, onComplete
   } = options;
 
@@ -251,6 +260,7 @@ export function renderStripsWithPool(
       stride: 1,
       width, height, viewport, fractalType,
       maxIterations, palette, params,
+      coloringMode, interiorColoring,
       pixelBuffer: buffer,
       cancelFlag: pool.cancelFlag
     });
