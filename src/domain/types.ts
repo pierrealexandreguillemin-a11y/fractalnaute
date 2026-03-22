@@ -44,7 +44,9 @@ export type FractalType =
   | 'julia'
   | 'burningship'
   | 'tricorn'
-  | 'multibrot3';
+  | 'multibrot3'
+  | 'multibrot4'
+  | 'multibrot5';
 
 /** Available color palette names */
 export type PaletteName =
