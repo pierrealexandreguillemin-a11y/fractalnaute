@@ -8,18 +8,39 @@
 ## Coloring Modes
 
 1. **Classic** — smooth iteration count → palette LUT (current behavior)
-2. **Stripe** — stripe average coloring (`Re(z)*Im(z)/|z|²` accumulated), Catmull-Rom interpolated. "Brushed metal" effect.
+2. **Stripe** — stripe average coloring per Jussi Harkonen: `0.5 * sin(stripe_density * arg(z)) + 0.5` accumulated per iteration, smoothed via linear interpolation of last 2 partial sums using fractional escape count. "Brushed metal" effect.
 3. **Decomposition** — binary decomposition via `arg(z)` at escape. Tessellation/checkerboard at boundaries.
-4. **Orbit trap** — minimum distance from z to trap point (origin by default) during iteration. Reveals internal structure.
+4. **Orbit trap** — minimum squared distance from z to trap point (origin) during iteration, sqrt once at finalization. Reveals internal structure.
 5. **Normal map** — 3D lighting simulation via distance estimation gradient. Directional light on fractal "surface".
 
 ## Interior Toggle
 
 - Checkbox "Interior coloring", off by default
 - Off: `rgb(0,0,0)` — black absolute
-- On: palette color attenuated to 40% opacity over black
+- On: palette color using normalized `orbitTrapDist` (most visually meaningful for all modes), attenuated to 40%
 
 Independent of coloring mode.
+
+---
+
+## Interior Point Contract
+
+When `escaped === false` (interior points — cardioid/bulb pre-test, Brent's cycle detection, or maxIter reached):
+
+```typescript
+const INTERIOR_RESULT: Partial<FractalResult> = {
+  stripeValue: 0,
+  decompAngle: 0,        // not NaN — avoids silent NaN propagation
+  orbitTrapDist: Infinity, // or actual min distance if iterations ran (Brent's)
+  distanceEstimate: 0
+};
+```
+
+- **Cardioid/bulb early exit**: No iterations ran. All accumulator fields get defaults above.
+- **Brent's cycle detection**: Iterations ran partially. `orbitTrapDist` preserves the actual minimum distance (useful for interior coloring). `stripeValue` preserves partial accumulation.
+- **maxIter reached**: Full iteration ran. All accumulator values are valid.
+
+The coloring layer ALWAYS checks `result.escaped` before using mode-specific values. Interior points use `orbitTrapDist` for `t` when interior coloring is enabled, regardless of mode.
 
 ---
 
@@ -32,62 +53,103 @@ interface FractalResult {
   iterations: number;
   escaped: boolean;
   smoothValue: number;        // existing
-  stripeValue: number;        // Re(z)*Im(z)/|z|² accumulated + smoothed
-  decompAngle: number;        // arg(z) at escape, NaN if interior
-  orbitTrapDist: number;      // min(|z - origin|) during iteration
+  stripeValue: number;        // 0.5*sin(density*arg(z))+0.5 accumulated, smoothed
+  decompAngle: number;        // arg(z) at escape, 0 if interior
+  orbitTrapDist: number;      // min(|z|) during iteration (sqrt of tracked min |z|²)
   distanceEstimate: number;   // |z|·ln|z| / |dz|, 0 if interior
 }
 ```
 
-All values computed unconditionally — no branching per coloring mode. The mode selects which value to map to color in the palette layer.
+Every return path in every calculator MUST return all 7 fields. Define a `INTERIOR_DEFAULTS` constant for the 4 new fields.
 
-### Calculator changes (fractals.ts)
+### Conditional accumulation (performance)
 
-Each of the 5 calculators accumulates ALL values during the iteration loop:
+Accumulating 6 extra values per iteration adds ~60% overhead to the inner loop. This is unacceptable for Classic mode (the default).
 
-```
-Per iteration:
-  stripe += |Re(z)*Im(z)| / (|z|²)      // stripe average
-  trapDist = min(trapDist, |z|)          // orbit trap (origin)
-  dz = 2*z*dz + 1                        // derivative (Mandelbrot)
-                                          // varies per fractal type
-
-At escape:
-  decompAngle = atan2(zIm, zRe)
-  distEst = |z| * ln(|z|) / |dz|
-  stripeValue = smooth interpolation of last 2 stripe sums
-```
-
-**DRY concern**: The accumulation logic (stripe, trap, derivative) is identical across all 5 calculators. Extract into a shared helper:
+**Solution**: Single branch BEFORE the loop, not per-iteration:
 
 ```typescript
-// domain/coloringAccumulator.ts — NEW FILE
-interface AccumulatorState {
-  stripeSum: number;
-  prevStripeSum: number;
-  trapDist: number;
-  dzRe: number;
-  dzIm: number;
-}
-
-function initAccumulator(): AccumulatorState;
-function updateAccumulator(state, zRe, zIm, dzRe, dzIm): void;
-function finalizeAccumulator(state, zRe, zIm, iter, smoothValue): ColoringData;
+const needsAccumulation = coloringMode !== 'classic' || interiorColoring;
 ```
 
-Each calculator calls `updateAccumulator()` inside its loop and `finalizeAccumulator()` at escape. The derivative update (`dz`) differs per fractal type — passed as parameter or callback.
+- If `needsAccumulation === false`: skip all accumulation, return `INTERIOR_DEFAULTS` for new fields. Zero overhead on Classic mode.
+- If `needsAccumulation === true`: run full accumulation loop.
 
-**SRP**: `fractals.ts` stays focused on the escape-time iteration formula. `coloringAccumulator.ts` owns the coloring data accumulation. Clean boundary: calculator computes z, accumulator observes z.
+This means `coloringMode` must be passed to calculators (via params or a separate argument). Two code paths per calculator, but the inner loops share the z-iteration formula (DRY via the existing pattern).
 
 ### Derivative formulas per fractal type
 
-| Fractal | dz update |
-|---|---|
-| Mandelbrot | `dz = 2·z·dz + 1` |
-| Julia | `dz = 2·z·dz` (no +1, c is constant) |
-| Burning Ship | `dz = 2·|z|·dz + 1` (absolute values) |
-| Tricorn | `dz = 2·conj(z)·dz + 1` (conjugate) |
-| Multibrot | `dz = n·z^(n-1)·dz + 1` |
+Derivatives are computed INLINE in each calculator (not via callback — closures in hot loops risk V8 deopt and GC pressure). Only stripe + trap accumulation is shared via `coloringAccumulator.ts`.
+
+| Fractal | dz update (component form) | Notes |
+|---|---|---|
+| Mandelbrot | `dzRe' = 2(zRe·dzRe - zIm·dzIm) + 1`<br>`dzIm' = 2(zRe·dzIm + zIm·dzRe)` | Standard complex derivative |
+| Julia | `dzRe' = 2(zRe·dzRe - zIm·dzIm)`<br>`dzIm' = 2(zRe·dzIm + zIm·dzRe)` | No +1 (c is constant) |
+| Burning Ship | `dzRe' = 2(|zRe|·dzRe - |zIm|·dzIm) + 1`<br>`dzIm' = 2(|zRe|·dzIm + |zIm|·dzRe)` | Uses folded z components `(|Re|, |Im|)`, NOT scalar `|z|` |
+| Tricorn | Approximate: `dzRe' = 2(zRe·dzRe + zIm·dzIm) + 1`<br>`dzIm' = 2(-zRe·dzIm + zIm·dzRe)` | **@tradeoff**: Tricorn is anti-holomorphic (conjugation). Standard DE formula `|z|·ln|z|/|dz|` is mathematically invalid. We use an approximate derivative for visual normal mapping purposes. The visual result is aesthetically acceptable but not geometrically exact. |
+| Multibrot | `dz = n · z^(n-1) · dz + 1` | `z^(n-1)` captured from the existing power loop's second-to-last iteration (variable `pRe_prev, pIm_prev` before the final multiply). No duplicate computation. |
+
+### Calculator changes (fractals.ts)
+
+Each calculator has two paths:
+
+```typescript
+export const calculateMandelbrot: FractalCalculator = (cRe, cIm, maxIter, params) => {
+  // ... cardioid/bulb pre-test (returns INTERIOR_DEFAULTS for new fields)
+
+  if (!params._needsAccumulation) {
+    // Fast path: current code, no accumulation overhead
+    return fastPath(cRe, cIm, maxIter, params);
+  }
+
+  // Accumulation path: stripe, trap, derivative
+  return accumPath(cRe, cIm, maxIter, params);
+};
+```
+
+The fast path IS the current code with `INTERIOR_DEFAULTS` spread. The accum path adds the 6 extra accumulators. Both share the same z-iteration formula.
+
+---
+
+## Shared Accumulation Helper
+
+```typescript
+// domain/coloringAccumulator.ts — NEW FILE
+// Owns: stripe sum, orbit trap tracking, finalization
+// Does NOT own: derivative (fractal-specific, inlined in calculators)
+
+interface AccumulatorState {
+  stripeSum: number;
+  prevStripeSum: number;
+  trapDistSq: number;         // squared distance — sqrt once at end
+}
+
+function initAccumulator(): AccumulatorState;
+
+// Called per iteration — only stripe + trap (no derivative)
+function updateAccumulator(
+  state: AccumulatorState,
+  zRe: number, zIm: number
+): void;
+
+// Called at escape — finalize all coloring values
+function finalizeEscape(
+  state: AccumulatorState,
+  zRe: number, zIm: number,
+  dzRe: number, dzIm: number,
+  iter: number, smoothValue: number
+): { stripeValue: number; decompAngle: number; orbitTrapDist: number; distanceEstimate: number };
+
+// Called for interior points
+function finalizeInterior(
+  state: AccumulatorState
+): { stripeValue: number; decompAngle: number; orbitTrapDist: number; distanceEstimate: number };
+```
+
+**SRP boundaries**:
+- `fractals.ts` → computes z iteration + derivative (fractal-specific)
+- `coloringAccumulator.ts` → observes z for stripe/trap, finalizes coloring data
+- `coloringModes.ts` → maps coloring data → palette parameter t
 
 ---
 
@@ -99,30 +161,36 @@ Each calculator calls `updateAccumulator()` inside its loop and `finalizeAccumul
 type ColoringMode = 'classic' | 'stripe' | 'decomposition' | 'orbitTrap' | 'normalMap';
 ```
 
-### Color computation (palettes.ts)
+### Color computation
 
-**SRP concern**: `getColorFast` currently maps `FractalResult → RGB`. With 5 modes, this function would need a switch statement and grow too large.
-
-Extract mode-specific mapping into a new file:
+**SRP**: Extract mode-specific mapping into a new file:
 
 ```typescript
 // domain/coloringModes.ts — NEW FILE
+
 // Maps FractalResult → palette parameter t ∈ [0,1] based on mode
+// ALWAYS checks result.escaped first
 function mapToColorParam(result: FractalResult, mode: ColoringMode): number;
 
-// For normalMap: returns modified lightness, not just t
-function applyNormalLighting(result: FractalResult, lightAngle: number): number;
+// For normalMap: returns lightness modifier based on DE gradient
+function computeNormalLightness(result: FractalResult, lightAngle: number): number;
 ```
 
-`getColorFast` calls `mapToColorParam` to get `t`, then does the existing palette lookup. Interior handling: if `!escaped && !interiorColoring`, return black. If `!escaped && interiorColoring`, return palette color at 40%.
+Interior handling in `getColorFast`:
+1. If `!escaped && !interiorColoring` → return `[0, 0, 0]` (black)
+2. If `!escaped && interiorColoring` → `t = normalize(result.orbitTrapDist)`, palette at 40% brightness
+3. If `escaped` → `t = mapToColorParam(result, mode)`, full palette
 
-### Catmull-Rom smooth interpolation
+### Stripe smooth interpolation
 
-Replace linear interpolation in stripe mode with Catmull-Rom spline for smoother transitions. This is a pure function in `coloringModes.ts`:
+Standard stripe average smoothing uses linear interpolation between last 2 partial sums using fractional escape count `f`:
 
 ```typescript
-function catmullRomInterpolate(p0: number, p1: number, p2: number, p3: number, t: number): number;
+stripeValue = prevStripeSum + f * (stripeSum - prevStripeSum);
+// where f = fractional part of smooth iteration count
 ```
+
+Only 2 data points needed (prevStripeSum, stripeSum). No Catmull-Rom required — the smooth iteration count already provides continuous interpolation.
 
 ---
 
@@ -142,7 +210,7 @@ New actions:
 | { type: 'SET_INTERIOR_COLORING'; enabled: boolean }
 ```
 
-Both trigger a full re-render (new palette params, not viewport-only).
+Both trigger full re-render.
 
 ---
 
@@ -150,10 +218,12 @@ Both trigger a full re-render (new palette params, not viewport-only).
 
 ### ControlPanel.tsx
 
-After "Palette de couleurs" select, add:
-- **Select "Mode de coloration"** — 5 options with French labels:
+After "Palette de couleurs" select:
+- **Select "Mode de coloration"** — 5 options:
   - Classique, Métal brossé, Tessellation, Orbit trap, Éclairage 3D
 - **Checkbox "Colorer l'intérieur"** — unchecked by default
+
+If AppearanceSection exceeds 80 lines, extract coloring controls into `ColoringSection.tsx`.
 
 ---
 
@@ -161,11 +231,23 @@ After "Palette de couleurs" select, add:
 
 ### renderBand.ts
 
-`getColorFast` signature changes to accept `coloringMode` and `interiorColoring`. These are passed through the existing `BandRenderParams` (add 2 fields).
+`BandRenderParams` gains `coloringMode` and `interiorColoring`. These are passed to `getColorFast` AND to the calculator (via `params._needsAccumulation`).
 
-### fractal.worker.ts
+The `_needsAccumulation` flag is computed once in renderBand before the loop:
+```typescript
+const needsAccum = band.coloringMode !== 'classic' || band.interiorColoring;
+const mergedParams = { ...params, _needsAccumulation: needsAccum };
+```
 
-Worker message includes `coloringMode` and `interiorColoring` in params. No structural change — just 2 more fields in the message.
+### Interface cascade
+
+Adding `coloringMode` + `interiorColoring` requires updating these interfaces (2 fields each):
+- `BandRenderParams` (renderBand.ts)
+- `WorkerInput` (fractal.worker.ts)
+- `RenderOptions` (renderer.ts)
+- `CoordinatorRenderOptions` (renderCoordinator.ts)
+
+All pass-through — no logic change.
 
 ---
 
@@ -173,27 +255,29 @@ Worker message includes `coloringMode` and `interiorColoring` in params. No stru
 
 | File | Action | SRP |
 |---|---|---|
-| `domain/types.ts` | Modify | Add fields to FractalResult, add ColoringMode type |
-| `domain/coloringAccumulator.ts` | **Create** | Stripe/trap/derivative accumulation — shared across all 5 calculators |
-| `domain/coloringModes.ts` | **Create** | Mode → palette parameter mapping + Catmull-Rom + normal lighting |
-| `domain/fractals.ts` | Modify | Call accumulator in each calculator loop |
-| `domain/palettes.ts` | Modify | getColorFast uses coloringModes for mapping |
+| `domain/types.ts` | Modify | FractalResult + ColoringMode + INTERIOR_DEFAULTS |
+| `domain/coloringAccumulator.ts` | **Create** | Stripe/trap accumulation + finalization (no derivative) |
+| `domain/coloringModes.ts` | **Create** | Mode → palette parameter t mapping + normal lighting |
+| `domain/fractals.ts` | Modify | Conditional accumulation, inline derivatives |
+| `domain/palettes.ts` | Modify | getColorFast delegates to coloringModes |
 | `application/useFractalState.ts` | Modify | 2 new state fields + actions |
-| `ui/ControlPanel.tsx` | Modify | Select + checkbox |
-| `infrastructure/renderBand.ts` | Modify | Pass mode + interior to coloring |
+| `ui/ControlPanel.tsx` | Modify | Select + checkbox (extract section if >80 lines) |
+| `infrastructure/renderBand.ts` | Modify | Compute _needsAccumulation, pass to calculator |
 | `infrastructure/fractal.worker.ts` | Modify | 2 new fields in message |
-
-**No monolithic changes.** Two new focused files. Existing files get minimal additions.
+| `infrastructure/renderer.ts` | Modify | Pass-through 2 fields |
+| `infrastructure/renderCoordinator.ts` | Modify | Pass-through 2 fields |
 
 ---
 
 ## DRY/SRP Quality Gates
 
-1. **No calculator duplication**: All 5 calculators use `coloringAccumulator` — no copy-paste of stripe/trap/derivative logic
-2. **No coloring logic in calculators**: Calculators compute z. Accumulator observes z. Coloring maps to color. Three distinct responsibilities.
-3. **No mode branching in hot loop**: Mode selection happens once in `getColorFast`, not per-iteration
-4. **getColorFast stays small**: Delegates to `coloringModes.ts` for mode-specific mapping
-5. **FractalResult is the only interface between calculator and coloring**: No other coupling
+1. **No calculator duplication**: Stripe + trap accumulation shared via `coloringAccumulator.ts`. Derivative is inline (fractal-specific) but follows the same pattern.
+2. **No coloring logic in calculators**: Calculators compute z + dz. Accumulator observes z. Coloring maps to color. Three distinct responsibilities.
+3. **No per-iteration mode branching**: Single `_needsAccumulation` check before loop. Mode selection in `getColorFast` (once per pixel, outside loop).
+4. **getColorFast stays small**: Delegates to `coloringModes.ts`.
+5. **FractalResult is the only interface between calculator and coloring**: No other coupling.
+6. **INTERIOR_DEFAULTS constant**: Single source of truth for interior field values. Every early-exit path spreads it.
+7. **No NaN in results**: All fields are valid numbers. `escaped` flag is the discriminator, not sentinel values.
 
 ## Verification Quality Gates
 
@@ -203,5 +287,6 @@ Worker message includes `coloringMode` and `interiorColoring` in params. No stru
 4. Visual: each of the 5 modes renders distinctly on Mandelbrot default view
 5. Visual: interior toggle works (black ↔ colored) on each mode
 6. Visual: all 5 fractal types render correctly with each mode
-7. Performance: no measurable regression on Classic mode (accumulation overhead < 5%)
+7. Performance: **zero overhead on Classic mode** (conditional accumulation skipped). Accumulation modes: ~60% overhead acceptable.
 8. No function exceeds 80 lines (ESLint max-lines-per-function)
+9. All calculator early-exit paths return all 7 FractalResult fields (no undefined)
