@@ -12,7 +12,7 @@ import type {
 } from '../domain/types';
 
 interface WorkerInput {
-  band: { startY: number; endY: number };
+  band: { startX?: number; endX?: number; startY: number; endY: number };
   renderId: number;
   stride: number;
   width: number;
@@ -35,6 +35,8 @@ self.onmessage = (e: MessageEvent<WorkerInput>) => {
   const mergedParams = buildMergedParams(renderParams.fractalType, renderParams.params);
 
   const completed = renderBand(pixels, {
+    startX: band.startX,
+    endX: band.endX,
     startY: band.startY,
     endY: band.endY,
     ...renderParams,

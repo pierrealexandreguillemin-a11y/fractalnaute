@@ -10,7 +10,7 @@ import { useRef, useLayoutEffect, useCallback, useEffect } from 'react';
 import type { Viewport, FractalType, PaletteName, FractalParams } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import { renderFractal } from './renderer';
-import { renderStripsWithPool } from './renderCoordinator';
+import { renderStripsWithPool, getOrCreateImageData } from './renderCoordinator';
 import {
   computeCSSTransform, isPanOnly, computePanShift,
   computeExposedStrips, shiftPixelBuffer
@@ -95,10 +95,10 @@ function doRenderPanStrips(
   const { view } = pool.getPixelBuffer(canvas.width, canvas.height);
   shiftPixelBuffer(view, canvas.width, canvas.height, dx, dy);
 
-  // Paint shifted buffer immediately for instant visual feedback
+  // Paint shifted buffer immediately — reuse cached ImageData (no allocation)
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    const imageData = getOrCreateImageData(ctx, canvas.width, canvas.height);
     imageData.data.set(view);
     ctx.putImageData(imageData, 0, 0);
   }

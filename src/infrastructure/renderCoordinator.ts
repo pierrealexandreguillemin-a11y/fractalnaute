@@ -35,7 +35,7 @@ let cachedImageData: ImageData | null = null;
 let cachedWidth = 0;
 let cachedHeight = 0;
 
-function getOrCreateImageData(
+export function getOrCreateImageData(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number
@@ -244,7 +244,8 @@ export function renderStripsWithPool(
       imageData.data.set(view.subarray(bStart, bEnd), bStart);
       ctx.putImageData(
         imageData, 0, 0,
-        0, e.data.startY, width, e.data.endY - e.data.startY
+        strip.startX, e.data.startY,
+        strip.endX - strip.startX, e.data.endY - e.data.startY
       );
 
       completedStrips++;
@@ -259,7 +260,10 @@ export function renderStripsWithPool(
     handlers.push({ worker, handler });
 
     worker.postMessage({
-      band: { startY: strip.startY, endY: strip.endY },
+      band: {
+        startX: strip.startX, endX: strip.endX,
+        startY: strip.startY, endY: strip.endY
+      },
       renderId,
       stride: 1,
       width, height, viewport, fractalType,

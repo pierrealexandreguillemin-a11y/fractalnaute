@@ -13,6 +13,9 @@ import { getFractalConfig } from '../domain/fractalTypes';
 import { resolvePalette, getColorFast } from '../domain/palettes';
 
 export interface BandRenderParams {
+  /** X-range clipping for strip rendering. Defaults to full width. */
+  startX?: number;
+  endX?: number;
   startY: number;
   endY: number;
   width: number;
@@ -53,12 +56,15 @@ export function renderBand(
   shouldCancel?: () => boolean
 ): boolean {
   const {
+    startX: rawStartX, endX: rawEndX,
     startY, endY, width, height, viewport,
     fractalType, maxIterations, palette, params,
     stride: rawStride
   } = band;
 
   const stride = rawStride ?? 1;
+  const startX = rawStartX ?? 0;
+  const endX = rawEndX ?? width;
   const config = getFractalConfig(fractalType);
   const calculator = config.calculator;
   const resolvedPalette = resolvePalette(palette);
@@ -74,7 +80,7 @@ export function renderBand(
   for (let y = startY; y < endY; y += stride) {
     if (shouldCancel?.()) return false;
 
-    for (let x = 0; x < width; x += stride) {
+    for (let x = startX; x < endX; x += stride) {
       const re = originRe + x * stepRe;
       const im = originIm + y * stepIm;
       const result = calculator(re, im, maxIterations, params);
@@ -82,7 +88,7 @@ export function renderBand(
 
       // Fill stride×stride block, clamped to band/canvas boundaries
       const blockEndY = Math.min(y + stride, endY);
-      const blockEndX = Math.min(x + stride, width);
+      const blockEndX = Math.min(x + stride, endX);
       for (let by = y; by < blockEndY; by++) {
         for (let bx = x; bx < blockEndX; bx++) {
           const idx = (by * width + bx) * 4;
