@@ -6,7 +6,7 @@
  */
 
 import type { Viewport, PaletteName, FractalType, FractalParams } from '../domain';
-import { screenToComplex, getColor, getFractalConfig } from '../domain';
+import { getColor, getFractalConfig } from '../domain';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -44,6 +44,13 @@ export function renderFractal(
   let currentY = 0;
   const chunkSize = 12;
 
+  // Precalculate coordinate mapping (avoids 8M divisions + object allocations)
+  const aspectRatio = width / height;
+  const stepRe = viewport.scale * aspectRatio / width;
+  const stepIm = viewport.scale / height;
+  const originRe = viewport.centerRe - viewport.scale * aspectRatio * 0.5;
+  const originIm = viewport.centerIm - viewport.scale * 0.5;
+
   const renderChunk = () => {
     if (cancelled) return;
 
@@ -51,8 +58,9 @@ export function renderFractal(
 
     for (let y = currentY; y < endY; y++) {
       for (let x = 0; x < width; x++) {
-        const c = screenToComplex(x, y, width, height, viewport);
-        const result = calculator(c.re, c.im, maxIterations, mergedParams);
+        const re = originRe + x * stepRe;
+        const im = originIm + y * stepIm;
+        const result = calculator(re, im, maxIterations, mergedParams);
         const [r, g, b] = getColor(result, palette);
 
         const idx = (y * width + x) * 4;
@@ -63,7 +71,7 @@ export function renderFractal(
       }
     }
 
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imageData, 0, 0, 0, currentY, width, endY - currentY);
     currentY = endY;
 
     if (onProgress) {
