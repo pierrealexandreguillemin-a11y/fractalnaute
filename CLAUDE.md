@@ -93,12 +93,9 @@ grep -r @tradeoff src/
 - DEG_TO_RAD constant extraction
 - Web Workers v1: pool (hardwareConcurrency-1), SAB, band decomposition, Atomics cancel, renderId anti-stale, ImageData cache, buildMergedParams, destroyed guard, single-thread fallback
 - Adaptive iteration: cardioid/bulb pre-test (Mandelbrot), Brent's periodicity checking (all 5 fractals), epsilon 1e-15. Measured: 3.4x@256iter, 8.6x@1024iter
+- Progressive rendering v2: stride-based two-pass (stride 4 preview → stride 1 full-res). Preview in ~3ms, 5% total overhead. Industry-standard approach (Fractint/UltraFractal style).
 
-### Next: Progressive rendering (v2)
-- Low-resolution preview first, then refine to full resolution
-- Instant visual feedback on zoom/pan
-
-### Future: Tile caching (v3)
+### Next: Tile caching (v3)
 - Only re-render tiles affected by viewport change
 - Cache computed tiles, reuse on pan
 
