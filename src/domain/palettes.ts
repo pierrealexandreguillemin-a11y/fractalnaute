@@ -199,7 +199,7 @@ export function getColorFast(
     if (!interiorColoring) return [0, 0, 0];
     const t = mapInteriorToParam(result);
     const oklch = palette(t);
-    return oklchToRgb(oklch.L * 0.4, oklch.C * 0.4, oklch.H);
+    return oklchToRgb(oklch.L * 0.4, oklch.C, oklch.H);
   }
 
   const t = mapToColorParam(result, coloringMode);

@@ -38,9 +38,7 @@ function stripeToParam(result: FractalResult): number {
 }
 
 function decompToParam(result: FractalResult): number {
-  const base = (result.smoothValue % 256) / 256;
-  const band = result.decompAngle >= 0 ? 0.0 : 0.5;
-  return (base * 0.5 + band) % 1;
+  return result.decompAngle >= 0 ? 0.15 : 0.65;
 }
 
 function trapToParam(result: FractalResult): number {
@@ -50,7 +48,8 @@ function trapToParam(result: FractalResult): number {
 
 /**
  * Compute lightness modifier for normal map mode.
- * Simulates directional lighting based on distance estimation gradient.
+ * Uses the decomposition angle (arg(z) at escape) as surface normal direction,
+ * combined with distance estimation for height.
  * @returns multiplier for lightness [0.3, 1.5]
  */
 export function computeNormalLightness(
@@ -58,12 +57,16 @@ export function computeNormalLightness(
   lightAngleRad: number
 ): number {
   if (result.distanceEstimate <= 0) return 1;
-  const angle = Math.atan2(
-    result.smoothValue - Math.floor(result.smoothValue),
-    result.distanceEstimate
-  );
-  const dot = Math.cos(angle - lightAngleRad);
-  return 0.3 + 1.2 * (dot * 0.5 + 0.5);
+
+  // Use decomposition angle as normal direction (angle of z at escape)
+  // This approximates the surface normal of the iteration count field
+  const dot = Math.cos(result.decompAngle - lightAngleRad);
+
+  // Modulate with distance estimation for depth shading
+  const depth = Math.min(result.distanceEstimate * 50, 1);
+
+  // Combine: directional lighting + ambient + depth
+  return (0.3 + 0.7 * (dot * 0.5 + 0.5)) * (0.5 + 0.5 * depth);
 }
 
 /**

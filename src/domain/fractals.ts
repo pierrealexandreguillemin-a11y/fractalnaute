@@ -170,6 +170,8 @@ function juliaAccumPath(
   const cIm = params.juliaIm ?? DEFAULT_JULIA_PARAMS.juliaIm!;
 
   const acc = initAccumulator();
+  // Include z₀ in orbit trap — Julia starts at z₀ = pixel position, not origin
+  updateAccumulator(acc, z0Re, z0Im);
   let zRe = z0Re, zIm = z0Im;
   let zRe2 = zRe * zRe, zIm2 = zIm * zIm;
   let iter = 0;
@@ -251,10 +253,9 @@ function burningShipFastPath(cRe: number, cIm: number, maxIter: number): Fractal
     return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
   }
 
-  const mod2 = zRe * zRe + zIm * zIm;
   return {
     iterations: iter, escaped: true,
-    smoothValue: smoothEscape(iter, mod2, 0),
+    smoothValue: smoothEscape(iter, zRe * zRe, zIm * zIm),
     ...INTERIOR_COLORING_DEFAULTS
   };
 }
@@ -300,8 +301,7 @@ function burningShipAccumPath(cRe: number, cIm: number, maxIter: number): Fracta
     return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
   }
 
-  const mod2 = zRe * zRe + zIm * zIm;
-  const sv = smoothEscape(iter, mod2, 0);
+  const sv = smoothEscape(iter, zRe * zRe, zIm * zIm);
   const escape = finalizeEscape(acc, zRe, zIm, dzRe, dzIm, sv);
   return { iterations: iter, escaped: true, smoothValue: sv, ...escape };
 }
@@ -343,10 +343,9 @@ function tricornFastPath(cRe: number, cIm: number, maxIter: number): FractalResu
     return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
   }
 
-  const mod2 = zRe * zRe + zIm * zIm;
   return {
     iterations: iter, escaped: true,
-    smoothValue: smoothEscape(iter, mod2, 0),
+    smoothValue: smoothEscape(iter, zRe * zRe, zIm * zIm),
     ...INTERIOR_COLORING_DEFAULTS
   };
 }
@@ -390,8 +389,7 @@ function tricornAccumPath(cRe: number, cIm: number, maxIter: number): FractalRes
     return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
   }
 
-  const mod2 = zRe * zRe + zIm * zIm;
-  const sv = smoothEscape(iter, mod2, 0);
+  const sv = smoothEscape(iter, zRe * zRe, zIm * zIm);
   const escape = finalizeEscape(acc, zRe, zIm, dzRe, dzIm, sv);
   return { iterations: iter, escaped: true, smoothValue: sv, ...escape };
 }

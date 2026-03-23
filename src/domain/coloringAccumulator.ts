@@ -58,9 +58,8 @@ export function finalizeEscape(
   distanceEstimate: number;
 } {
   const frac = smoothValue - Math.floor(smoothValue);
-  const avgPrev = state.count > 1 ? state.prevStripeSum / (state.count - 1) : 0;
-  const avgCurr = state.count > 0 ? state.stripeSum / state.count : 0;
-  const stripeValue = avgPrev + frac * (avgCurr - avgPrev);
+  const rawLerped = state.prevStripeSum + frac * (state.stripeSum - state.prevStripeSum);
+  const stripeValue = state.count > 0 ? rawLerped / state.count : 0;
 
   const decompAngle = Math.atan2(zIm, zRe);
 
