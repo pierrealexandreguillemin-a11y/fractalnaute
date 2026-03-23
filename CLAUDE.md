@@ -97,10 +97,29 @@ grep -r @tradeoff src/
 - Instant viewport feedback v3 (XaoS-style): CSS transform via useLayoutEffect for instant visual feedback on pan/zoom (<2ms perceived). 80ms debounce, then: pan → pixel-shift + x-range-clipped strip render (2-3 strips, ~5% pixels); zoom → full two-pass re-render. will-change:transform GPU hint. Baseline: 71ms/157ms pan → instant CSS + 80ms debounce + strip render.
 - Advanced coloring: 5 modes (classic, stripe/métal brossé, tessellation/decomposition, orbit trap, normal map/éclairage 3D) + interior toggle. Conditional accumulation (zero Classic overhead measured: 228ms vs 228ms baseline). Stripe +75% overhead (atan2+sin per iter). Harkonen stripe avg, distance estimation (bailout 1e12), orbit trap (log scale), binary decomposition. SRP: coloringAccumulator.ts (observe) + coloringModes.ts (map+dispatch) + palettes.ts (pure lookup). Radix Checkbox, fieldset/legend WCAG 1.3.1, aria-labelledby on all selects, mobile responsive.
 
-### Next: GPU (WebGL/WebGPU)
+### Next: GPU rendering (WebGL 2 + TWGL)
 - Fragment shader for embarrassingly parallel pixel computation
-- ×100+ gain over CPU Workers
-- Precision limited to float32 (zoom cap ~10⁷)
+- Expected 10-60x gain (228ms → <5ms @1080p). Stack: TWGL (15KB, WebGL 2).
+- Precision: float32 (zoom cap ~10⁷). Double-single vec2 extends to ~10¹⁵.
+- Research: docs/gpu-rendering-stacks-research.md, docs/curation/README.md
+- Reference: DeepMandelbrot (JS+WebGL, perturbation, stripe coloring)
+
+### Future: Deep zoom (perturbation theory)
+- JS arbitrary precision ref orbit (Jampary-style) + float32 GPU delta
+- Only ~3 browser implementations exist — competitive advantage
+- Research: docs/research-deep-mandelbrot.md
+
+### Performance options evaluated
+- See docs/performance-history.md for full comparison table
+- GPU (A) is the only order-of-magnitude gain remaining
+- WASM (B) only for perturbation ref orbit if JS perf insufficient
+- OffscreenCanvas (C), adaptive debounce (E), pool resize (F) — marginal, unnecessary after GPU
+
+## Testing
+
+- Framework: vitest (`npm test`)
+- 58 unit tests for domain layer (coloringAccumulator, coloringModes, fractals)
+- All pure functions, deterministic, 32ms total
 
 ## Deploy
 

@@ -99,6 +99,42 @@ User input (mouse/touch/keyboard)
             └─ Band-by-band putImageData (progressive display)
 ```
 
-## Next: GPU (WebGL/WebGPU)
+### + Advanced Coloring
 
-Expected: ×100+ gain over CPU workers for pixel computation.
+5 coloring modes (classic, stripe, decomposition, orbit trap, normal map) + interior toggle. Conditional accumulation: zero overhead on Classic mode.
+
+| Metric | Value | Notes |
+|---|---|---|
+| Classic mode | 228ms | Zero overhead vs pre-coloring baseline |
+| Stripe mode | 400ms | +75% (Math.atan2 + Math.sin per iteration) |
+| Tessellation | ~230ms | Minimal overhead (just arg(z) at escape) |
+| Orbit trap | ~250ms | Log scale mapping |
+| Normal map | ~260ms | DE + angle computation |
+
+---
+
+## Performance Improvement Options
+
+| Option | Expected Gain | Effort | Status |
+|---|---|---|---|
+| **A. GPU WebGL 2 (TWGL)** | 10-60x — <5ms render @1080p | High | Research done (docs/gpu-rendering-stacks-research.md). TWGL recommended. |
+| **B. WASM (Rust)** | 1.5-2x vs JS CPU | Medium | Only useful for perturbation theory ref orbit, not pixel rendering |
+| **C. OffscreenCanvas** | ~20% — unblocks main thread | Low | Workers use OffscreenCanvas instead of SAB→putImageData |
+| **D. Perturbation theory** | Unlimited deep zoom | High | JS arbitrary precision (Jampary-style). Only ~3 browser implementations exist. |
+| **E. Adaptive debounce** | Better perceived responsiveness | Low | 40ms if last render <100ms, 120ms otherwise |
+| **F. Worker pool resize** | ~10-30% | Trivial | Dynamic pool size based on runtime load |
+
+### Recommended path
+
+1. **A (GPU)** — the only order-of-magnitude gain remaining. 228ms → <5ms.
+2. **D (Perturbation)** — after GPU. Deep zoom beyond float64. DeepMandelbrot proves JS-only is viable.
+3. C/E/F become unnecessary once GPU is in place.
+4. B (WASM) only for perturbation ref orbit computation if JS perf is insufficient.
+
+### Reference implementations
+
+- **DeepMandelbrot** (https://deep-mandelbrot.js.org/) — WebGL + perturbation, JS arbitrary precision (Jampary), stripe coloring. Gold standard.
+- **Mandelbrot.site** (https://mandelbrot.site) — Rust+WASM, best UX, no GPU. 277 stars.
+- **BenjaminAster WebGPU Mandelbrot** — minimal WebGPU reference.
+
+See `docs/curation/README.md` for full evaluation with screenshots.
