@@ -95,8 +95,9 @@ grep -r @tradeoff src/
 - Adaptive iteration: cardioid/bulb pre-test (Mandelbrot), Brent's periodicity checking (all 5 fractals), epsilon 1e-15. Measured: 3.4x@256iter, 8.6x@1024iter
 - Progressive rendering v2: stride-based two-pass (stride 4 preview → stride 1 full-res). Preview in ~3ms, 5% total overhead. Industry-standard approach (Fractint/UltraFractal style).
 - Instant viewport feedback v3 (XaoS-style): CSS transform via useLayoutEffect for instant visual feedback on pan/zoom (<2ms perceived). 80ms debounce, then: pan → pixel-shift + x-range-clipped strip render (2-3 strips, ~5% pixels); zoom → full two-pass re-render. will-change:transform GPU hint. Baseline: 71ms/157ms pan → instant CSS + 80ms debounce + strip render.
+- Advanced coloring: 5 modes (classic, stripe/métal brossé, tessellation/decomposition, orbit trap, normal map/éclairage 3D) + interior toggle. Conditional accumulation (zero overhead on classic). Stripe avg (Harkonen), distance estimation, orbit trap, binary decomposition. coloringAccumulator.ts + coloringModes.ts (SRP).
 
-### Future: GPU (WebGL/WebGPU)
+### Next: GPU (WebGL/WebGPU)
 - Fragment shader for embarrassingly parallel pixel computation
 - ×100+ gain over CPU Workers
 - Precision limited to float32 (zoom cap ~10⁷)
