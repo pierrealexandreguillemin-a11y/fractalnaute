@@ -119,6 +119,8 @@ const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void 
       onIterationsChange={onIterationsChange}
     />
 
+    <div className="h-px bg-border my-3" />
+
     <ColoringSection
       coloringMode={coloringMode}
       interiorColoring={interiorColoring}

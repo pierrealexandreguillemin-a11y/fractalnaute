@@ -26,11 +26,11 @@ export const FractalTypeSection: React.FC<FractalTypeSectionProps> = ({
 
   return (
     <div className="mb-3.5">
-      <label className={LABEL_CLASS}>
+      <label id="fractal-type-label" className={LABEL_CLASS}>
         Type de fractale
       </label>
       <Select value={fractalType} onValueChange={(v) => onFractalTypeChange(v as FractalType)}>
-        <SelectTrigger>
+        <SelectTrigger aria-labelledby="fractal-type-label">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

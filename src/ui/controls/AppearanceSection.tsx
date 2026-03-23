@@ -30,9 +30,9 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
 }) => (
   <>
     <div className="mb-3.5">
-      <label className={LABEL_CLASS}>Thème</label>
+      <label id="theme-label" className={LABEL_CLASS}>Thème</label>
       <Select value={theme} onValueChange={(v) => onThemeChange(v as ThemeName)}>
-        <SelectTrigger>
+        <SelectTrigger aria-labelledby="theme-label">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -44,9 +44,9 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
     </div>
 
     <div className="mb-3.5">
-      <label className={LABEL_CLASS}>Palette de couleurs</label>
+      <label id="palette-label" className={LABEL_CLASS}>Palette de couleurs</label>
       <Select value={palette} onValueChange={(v) => onPaletteChange(v as PaletteName)}>
-        <SelectTrigger>
+        <SelectTrigger aria-labelledby="palette-label">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

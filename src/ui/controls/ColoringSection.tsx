@@ -11,6 +11,7 @@ import { COLORING_MODE_LABELS } from '../../domain/coloringModes';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { LABEL_CLASS } from './shared';
 
 interface ColoringSectionProps {
@@ -20,37 +21,55 @@ interface ColoringSectionProps {
   onInteriorColoringChange: (enabled: boolean) => void;
 }
 
-const COLORING_MODES: ColoringMode[] = [
-  'classic', 'stripe', 'decomposition', 'orbitTrap', 'normalMap'
-];
+const COLORING_MODES = Object.keys(COLORING_MODE_LABELS) as ColoringMode[];
+
+/** Short descriptions for each mode */
+const MODE_DESCRIPTIONS: Record<ColoringMode, string> = {
+  classic: 'Dégradé lisse standard',
+  stripe: 'Reflets directionnels métalliques',
+  decomposition: 'Damier angulaire aux frontières',
+  orbitTrap: 'Distance minimale à l\'origine',
+  normalMap: 'Surface 3D avec éclairage directionnel'
+};
 
 export const ColoringSection: React.FC<ColoringSectionProps> = ({
   coloringMode, interiorColoring,
   onColoringModeChange, onInteriorColoringChange
 }) => (
-  <>
+  <fieldset className="border-0 p-0 m-0">
+    <legend className={LABEL_CLASS}>Coloration</legend>
+
     <div className="mb-3.5">
-      <label className={LABEL_CLASS}>Mode de coloration</label>
+      <label id="coloring-mode-label" className={LABEL_CLASS}>Mode de coloration</label>
       <Select value={coloringMode} onValueChange={(v) => onColoringModeChange(v as ColoringMode)}>
-        <SelectTrigger>
+        <SelectTrigger aria-labelledby="coloring-mode-label">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {COLORING_MODES.map((m) => (
-            <SelectItem key={m} value={m}>{COLORING_MODE_LABELS[m]}</SelectItem>
+            <SelectItem key={m} value={m}>
+              <span>{COLORING_MODE_LABELS[m]}</span>
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
+      <p className="text-[10px] text-muted-foreground mt-1">
+        {MODE_DESCRIPTIONS[coloringMode]}
+      </p>
     </div>
 
-    <label className="flex items-center gap-2 text-sm cursor-pointer mb-2">
-      <input
-        type="checkbox"
+    <div className="flex items-center gap-2 mb-3.5">
+      <Checkbox
+        id="interior-coloring"
         checked={interiorColoring}
-        onChange={(e) => onInteriorColoringChange(e.target.checked)}
-        className="accent-primary"
+        onCheckedChange={(checked) => onInteriorColoringChange(checked === true)}
       />
-      <span className="text-foreground">Colorer l&apos;intérieur</span>
-    </label>
-  </>
+      <label
+        htmlFor="interior-coloring"
+        className="text-sm text-foreground cursor-pointer select-none"
+      >
+        Colorer l&apos;intérieur
+      </label>
+    </div>
+  </fieldset>
 );
