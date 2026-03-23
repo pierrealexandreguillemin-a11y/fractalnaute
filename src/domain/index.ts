@@ -37,7 +37,8 @@ export {
   computeNormalLightness,
   getColorForResult,
   COLORING_MODE_LABELS,
-  COLORING_MODES
+  COLORING_MODES,
+  COLOR_CYCLE_PERIOD
 } from './coloringModes';
 
 export type { ColorPalette } from './types';

@@ -16,7 +16,7 @@ import {
 // ---- Named constants --------------------------------------------------------
 
 /** Iteration color cycle period — how many iterations before colors repeat */
-const COLOR_CYCLE_PERIOD = 256;
+export const COLOR_CYCLE_PERIOD = 256;
 
 /** Tighter cycle for orbit trap mode — creates more color variation at close distances */
 const ORBIT_TRAP_CYCLE = 64;
