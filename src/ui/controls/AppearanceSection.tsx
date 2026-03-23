@@ -28,7 +28,9 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
   theme, palette, maxIterations,
   onThemeChange, onPaletteChange, onIterationsChange
 }) => (
-  <>
+  <fieldset className="border-0 p-0 m-0">
+    <legend className={LABEL_CLASS}>Apparence</legend>
+
     <div className="mb-3.5">
       <label id="theme-label" className={LABEL_CLASS}>Thème</label>
       <Select value={theme} onValueChange={(v) => onThemeChange(v as ThemeName)}>
@@ -58,10 +60,11 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
     </div>
 
     <div className="mb-3.5">
-      <label className={LABEL_CLASS}>
+      <label id="iterations-label" className={LABEL_CLASS}>
         Itérations max: {maxIterations}
       </label>
       <Slider
+        aria-labelledby="iterations-label"
         min={50}
         max={1000}
         step={1}
@@ -69,5 +72,5 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
         onValueChange={([v]) => { if (v !== undefined) onIterationsChange(v); }}
       />
     </div>
-  </>
+  </fieldset>
 );

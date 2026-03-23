@@ -37,10 +37,12 @@ const CONTROLS_PANEL = cn(
   'rounded-2xl shadow-[0_8px_32px_oklch(0_0_0/0.3)]'
 );
 
+const PANEL_TITLE_CLASS = 'text-sm font-semibold tracking-wide uppercase text-muted-foreground';
+
 /** Panel header with title and collapse button */
 const PanelHeader: React.FC<{ onCollapse: () => void }> = ({ onCollapse }) => (
   <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
-    <span className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+    <span className={PANEL_TITLE_CLASS}>
       Fractal Explorer
     </span>
     <button
@@ -60,15 +62,17 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     return (
       <button
         onClick={() => setIsCollapsed(false)}
-        title="Afficher les controles"
+        title="Afficher les contrôles"
         aria-label="Afficher les contrôles"
         className={cn(
           CONTROLS_PANEL,
           'absolute top-4 right-4 w-11 h-11 z-100',
-          'text-foreground text-xl cursor-pointer flex items-center justify-center'
+          'text-foreground cursor-pointer flex items-center justify-center'
         )}
       >
-        *
+        <svg width="20" height="20" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1 7.5C1 7.22386 1.22386 7 1.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H1.5C1.22386 8 1 7.77614 1 7.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+        </svg>
       </button>
     );
   }
@@ -91,7 +95,7 @@ const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void 
   <div
     className={cn(
       CONTROLS_PANEL,
-      'absolute top-4 right-4 p-4 min-w-[260px] max-h-[calc(100vh-32px)]',
+      'absolute top-2 right-2 p-3 min-w-[220px] max-h-[calc(100vh-16px)] sm:top-4 sm:right-4 sm:p-4 sm:min-w-[260px] sm:max-h-[calc(100vh-32px)]',
       'overflow-y-auto text-foreground z-100'
     )}
   >
