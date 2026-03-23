@@ -46,6 +46,8 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
     maxIterations: state.maxIterations,
     palette: state.palette,
     params: state.juliaParams,
+    coloringMode: state.coloringMode,
+    interiorColoring: state.interiorColoring,
     onRenderStart: () => actions.setRendering(true),
     onRenderComplete: (renderTime: number) => actions.setRendering(false, renderTime)
   });

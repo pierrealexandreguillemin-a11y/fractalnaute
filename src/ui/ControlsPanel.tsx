@@ -6,10 +6,10 @@
  */
 
 import React, { useState } from 'react';
-import type { ThemeName, PaletteName, FractalType, FractalParams } from '../domain';
+import type { ThemeName, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
 import { cn } from '@/lib/utils';
 import { GLASS_PANEL } from './shared';
-import { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
+import { FractalTypeSection, JuliaSection, AppearanceSection, ColoringSection, ActionsSection } from './controls';
 
 interface ControlsPanelProps {
   fractalType: FractalType;
@@ -17,6 +17,8 @@ interface ControlsPanelProps {
   palette: PaletteName;
   maxIterations: number;
   juliaParams: FractalParams;
+  coloringMode: ColoringMode;
+  interiorColoring: boolean;
   isPickingJulia: boolean;
   onFractalTypeChange: (type: FractalType) => void;
   onThemeChange: (theme: ThemeName) => void;
@@ -24,6 +26,8 @@ interface ControlsPanelProps {
   onIterationsChange: (iterations: number) => void;
   onJuliaParamsChange: (params: FractalParams) => void;
   onPickJulia: () => void;
+  onColoringModeChange: (mode: ColoringMode) => void;
+  onInteriorColoringChange: (enabled: boolean) => void;
   onReset: () => void;
   onExport: () => void;
 }
@@ -77,9 +81,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
 /** Expanded panel body — extracted for max-lines-per-function compliance */
 const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void }> = ({
   fractalType, theme, palette, maxIterations,
+  coloringMode, interiorColoring,
   juliaParams, isPickingJulia,
   onFractalTypeChange, onThemeChange, onPaletteChange,
-  onIterationsChange, onJuliaParamsChange, onPickJulia,
+  onIterationsChange, onColoringModeChange, onInteriorColoringChange,
+  onJuliaParamsChange, onPickJulia,
   onReset, onExport, onCollapse
 }) => (
   <div
@@ -111,6 +117,13 @@ const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void 
       onThemeChange={onThemeChange}
       onPaletteChange={onPaletteChange}
       onIterationsChange={onIterationsChange}
+    />
+
+    <ColoringSection
+      coloringMode={coloringMode}
+      interiorColoring={interiorColoring}
+      onColoringModeChange={onColoringModeChange}
+      onInteriorColoringChange={onInteriorColoringChange}
     />
 
     <div className="h-px bg-border my-3" />

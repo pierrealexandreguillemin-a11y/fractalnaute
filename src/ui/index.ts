@@ -11,7 +11,7 @@ export { HelpTooltip } from './HelpTooltip';
 export { LoadingOverlay } from './LoadingOverlay';
 
 // Sub-sections (for advanced usage / testing)
-export { FractalTypeSection, JuliaSection, AppearanceSection, ActionsSection } from './controls';
+export { FractalTypeSection, JuliaSection, AppearanceSection, ColoringSection, ActionsSection } from './controls';
 
 // Themes
 export { getThemeLabel, getThemeNames, THEME_NAMES } from './themes';
