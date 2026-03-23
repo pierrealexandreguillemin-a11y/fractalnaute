@@ -15,6 +15,12 @@ import {
 
 // ---- Named constants --------------------------------------------------------
 
+/** Iteration color cycle period — how many iterations before colors repeat */
+const COLOR_CYCLE_PERIOD = 256;
+
+/** Tighter cycle for orbit trap mode — creates more color variation at close distances */
+const ORBIT_TRAP_CYCLE = 64;
+
 /** Default light direction for normal map mode (~315 deg, upper-left) */
 const NORMAL_MAP_LIGHT_ANGLE = -0.7854;
 
@@ -33,7 +39,7 @@ export function mapToColorParam(
 ): number {
   switch (mode) {
     case 'classic':
-      return (result.smoothValue % 256) / 256;
+      return (result.smoothValue % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
     case 'stripe':
       return stripeToParam(result);
     case 'decomposition':
@@ -43,12 +49,12 @@ export function mapToColorParam(
     case 'normalMap':
       return normalToParam(result);
     default:
-      return (result.smoothValue % 256) / 256;
+      return (result.smoothValue % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
   }
 }
 
 function stripeToParam(result: FractalResult): number {
-  const base = (result.smoothValue % 256) / 256;
+  const base = (result.smoothValue % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
   return (base + result.stripeValue * 0.5) % 1;
 }
 
@@ -61,13 +67,13 @@ function trapToParam(result: FractalResult): number {
   const d = Math.min(result.orbitTrapDist, 4);
   const logMapped = Math.log(1 + d) / Math.log(5); // [0, 1] with log spreading
   // Combine with smooth iteration for palette richness
-  const base = (result.smoothValue % 64) / 64;
+  const base = (result.smoothValue % ORBIT_TRAP_CYCLE) / ORBIT_TRAP_CYCLE;
   return (logMapped * 0.6 + base * 0.4) % 1;
 }
 
 function normalToParam(result: FractalResult): number {
   // Combine smooth iteration with escape angle for richer color variation
-  const base = (result.smoothValue % 256) / 256;
+  const base = (result.smoothValue % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
   const angleNorm = (result.decompAngle + Math.PI) / (2 * Math.PI); // [0, 1]
   return (base * 0.7 + angleNorm * 0.3) % 1;
 }

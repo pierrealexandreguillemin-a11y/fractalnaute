@@ -8,6 +8,7 @@
 import type { FractalCalculator, FractalResult, FractalParams } from './types';
 import { DEFAULT_JULIA_PARAMS, INTERIOR_COLORING_DEFAULTS } from './types';
 import { isPeriodic, isInCardioid, isInBulb } from './periodicity';
+import type { AccumulatorState } from './coloringAccumulator';
 import {
   initAccumulator,
   updateAccumulator,
@@ -15,12 +16,26 @@ import {
   finalizeInterior
 } from './coloringAccumulator';
 
+/** Build standard interior result — DRY: used by all calculators for cardioid/bulb/cycle/maxIter exits */
+function interiorResult(maxIter: number): FractalResult {
+  return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+}
+
+/** Build interior result with accumulator data for accumulation paths */
+function interiorResultWithAccum(maxIter: number, acc: AccumulatorState): FractalResult {
+  return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...finalizeInterior(acc) };
+}
+
 /**
  * Smooth coloring helper
  */
+/** Pre-computed ln(2) for the default logBase */
+const LN2 = Math.LN2;
+
 function smoothEscape(iter: number, zRe2: number, zIm2: number, logBase: number = 2): number {
   const logZn = Math.log(zRe2 + zIm2) / 2;
-  return iter + 1 - Math.log(logZn / Math.log(logBase)) / Math.log(logBase);
+  const logLogBase = logBase === 2 ? LN2 : Math.log(logBase);
+  return iter + 1 - Math.log(logZn / logLogBase) / logLogBase;
 }
 
 /**
@@ -28,7 +43,7 @@ function smoothEscape(iter: number, zRe2: number, zIm2: number, logBase: number 
  */
 function mandelbrotFastPath(cRe: number, cIm: number, maxIter: number): FractalResult {
   if (isInCardioid(cRe, cIm) || isInBulb(cRe, cIm)) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   let zRe = 0, zIm = 0, zRe2 = 0, zIm2 = 0, iter = 0;
@@ -42,7 +57,7 @@ function mandelbrotFastPath(cRe: number, cIm: number, maxIter: number): FractalR
     iter++;
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+      return interiorResult(maxIter);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -51,7 +66,7 @@ function mandelbrotFastPath(cRe: number, cIm: number, maxIter: number): FractalR
   }
 
   if (iter === maxIter) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   return {
@@ -66,7 +81,7 @@ function mandelbrotFastPath(cRe: number, cIm: number, maxIter: number): FractalR
  */
 function mandelbrotAccumPath(cRe: number, cIm: number, maxIter: number): FractalResult {
   if (isInCardioid(cRe, cIm) || isInBulb(cRe, cIm)) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   const acc = initAccumulator();
@@ -90,8 +105,7 @@ function mandelbrotAccumPath(cRe: number, cIm: number, maxIter: number): Fractal
     updateAccumulator(acc, zRe, zIm);
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      const interior = finalizeInterior(acc);
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+      return interiorResultWithAccum(maxIter, acc);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -100,8 +114,7 @@ function mandelbrotAccumPath(cRe: number, cIm: number, maxIter: number): Fractal
   }
 
   if (iter === maxIter) {
-    const interior = finalizeInterior(acc);
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+    return interiorResultWithAccum(maxIter, acc);
   }
 
   const sv = smoothEscape(iter, zRe2, zIm2);
@@ -139,7 +152,7 @@ function juliaFastPath(
     iter++;
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+      return interiorResult(maxIter);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -148,7 +161,7 @@ function juliaFastPath(
   }
 
   if (iter === maxIter) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   return {
@@ -193,8 +206,7 @@ function juliaAccumPath(
     updateAccumulator(acc, zRe, zIm);
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      const interior = finalizeInterior(acc);
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+      return interiorResultWithAccum(maxIter, acc);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -203,8 +215,7 @@ function juliaAccumPath(
   }
 
   if (iter === maxIter) {
-    const interior = finalizeInterior(acc);
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+    return interiorResultWithAccum(maxIter, acc);
   }
 
   const sv = smoothEscape(iter, zRe2, zIm2);
@@ -239,7 +250,7 @@ function burningShipFastPath(cRe: number, cIm: number, maxIter: number): Fractal
     iter++;
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+      return interiorResult(maxIter);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -248,7 +259,7 @@ function burningShipFastPath(cRe: number, cIm: number, maxIter: number): Fractal
   }
 
   if (iter === maxIter) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   return {
@@ -287,8 +298,7 @@ function burningShipAccumPath(cRe: number, cIm: number, maxIter: number): Fracta
     updateAccumulator(acc, zRe, zIm);
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      const interior = finalizeInterior(acc);
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+      return interiorResultWithAccum(maxIter, acc);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -297,8 +307,7 @@ function burningShipAccumPath(cRe: number, cIm: number, maxIter: number): Fracta
   }
 
   if (iter === maxIter) {
-    const interior = finalizeInterior(acc);
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+    return interiorResultWithAccum(maxIter, acc);
   }
 
   const sv = smoothEscape(iter, zRe2, zIm2);
@@ -331,7 +340,7 @@ function tricornFastPath(cRe: number, cIm: number, maxIter: number): FractalResu
     iter++;
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+      return interiorResult(maxIter);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -340,7 +349,7 @@ function tricornFastPath(cRe: number, cIm: number, maxIter: number): FractalResu
   }
 
   if (iter === maxIter) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   return {
@@ -377,8 +386,7 @@ function tricornAccumPath(cRe: number, cIm: number, maxIter: number): FractalRes
     updateAccumulator(acc, zRe, zIm);
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      const interior = finalizeInterior(acc);
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+      return interiorResultWithAccum(maxIter, acc);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -387,8 +395,7 @@ function tricornAccumPath(cRe: number, cIm: number, maxIter: number): FractalRes
   }
 
   if (iter === maxIter) {
-    const interior = finalizeInterior(acc);
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+    return interiorResultWithAccum(maxIter, acc);
   }
 
   const sv = smoothEscape(iter, zRe2, zIm2);
@@ -428,7 +435,7 @@ function multibrotFastPath(
     iter++;
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+      return interiorResult(maxIter);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -437,7 +444,7 @@ function multibrotFastPath(
   }
 
   if (iter === maxIter) {
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...INTERIOR_COLORING_DEFAULTS };
+    return interiorResult(maxIter);
   }
 
   const mod2 = zRe * zRe + zIm * zIm;
@@ -487,8 +494,7 @@ function multibrotAccumPath(
     updateAccumulator(acc, zRe, zIm);
 
     if (isPeriodic(zRe, zIm, refRe, refIm)) {
-      const interior = finalizeInterior(acc);
-      return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+      return interiorResultWithAccum(maxIter, acc);
     }
     if (++counter >= period) {
       refRe = zRe; refIm = zIm;
@@ -497,8 +503,7 @@ function multibrotAccumPath(
   }
 
   if (iter === maxIter) {
-    const interior = finalizeInterior(acc);
-    return { iterations: maxIter, escaped: false, smoothValue: maxIter, ...interior };
+    return interiorResultWithAccum(maxIter, acc);
   }
 
   const mod2 = zRe * zRe + zIm * zIm;

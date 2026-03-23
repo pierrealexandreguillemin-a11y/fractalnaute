@@ -144,11 +144,8 @@ export interface InitialFractalConfig {
   maxIterations?: number;
 }
 
-/**
- * Custom hook for fractal state management
- */
-export function useFractalState(initial?: InitialFractalConfig) {
-  const resolvedInitial: FractalState = {
+function buildInitialState(initial?: InitialFractalConfig): FractalState {
+  return {
     ...initialState,
     ...(initial?.fractalType && {
       fractalType: initial.fractalType,
@@ -158,8 +155,13 @@ export function useFractalState(initial?: InitialFractalConfig) {
     ...(initial?.palette && { palette: initial.palette }),
     ...(initial?.maxIterations !== undefined && { maxIterations: initial.maxIterations }),
   };
+}
 
-  const [state, dispatch] = useReducer(fractalReducer, resolvedInitial);
+/**
+ * Custom hook for fractal state management
+ */
+export function useFractalState(initial?: InitialFractalConfig) {
+  const [state, dispatch] = useReducer(fractalReducer, initial, buildInitialState);
 
   // Actions
   const setFractalType = useCallback((fractalType: FractalType) => {

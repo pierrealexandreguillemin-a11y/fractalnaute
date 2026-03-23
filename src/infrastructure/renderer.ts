@@ -68,11 +68,12 @@ function renderFallback(
   const startTime = performance.now();
   let cancelled = false;
   let currentY = 0;
-  const chunkSize = 12;
+  /** Rows per animation frame in fallback (single-thread) mode. Balances responsiveness vs overhead. */
+  const FALLBACK_CHUNK_HEIGHT = 12;
 
   const renderChunk = () => {
     if (cancelled) return;
-    const endY = Math.min(currentY + chunkSize, height);
+    const endY = Math.min(currentY + FALLBACK_CHUNK_HEIGHT, height);
 
     renderBand(imageData.data, {
       startY: currentY, endY, width, height,

@@ -33,11 +33,14 @@ export {
 
 export {
   mapToColorParam,
+  mapInteriorToParam,
   computeNormalLightness,
   getColorForResult,
   COLORING_MODE_LABELS,
   COLORING_MODES
 } from './coloringModes';
+
+export type { ColorPalette } from './types';
 
 // Fractal calculators
 export {
