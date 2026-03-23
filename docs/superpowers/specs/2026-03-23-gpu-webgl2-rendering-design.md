@@ -183,12 +183,11 @@ void main() {
 ```glsl
 // @mirror domain/fractals.ts:smoothEscape (logBase=2 specialization)
 // CPU formula: iter + 1 - log(log(zRe2 + zIm2) / 2 / ln2) / ln2
-// Simplified for logBase=2: iter + 1 - log2(log2(mod2) / 2)
+// Simplified for logBase=2: iter + 1 - log2(0.5 * log2(mod2))
 // where mod2 = zRe2 + zIm2 = |z|^2
+// Uses native log2() for clarity and GPU efficiency
 float smoothEscape(in int iter, in float mod2) {
-  float logZn = log(mod2) / 2.0;         // log(|z|) = log(|z|^2) / 2
-  float logRatio = logZn / log(2.0);     // logZn / ln(2)
-  return float(iter) + 1.0 - log(logRatio) / log(2.0);
+  return float(iter) + 1.0 - log2(0.5 * log2(mod2));
 }
 ```
 
@@ -588,7 +587,7 @@ Per WebGL Fundamentals, MDN, and Emscripten:
 | TWGL types | `types/twgl.d.ts` (if `@types/twgl.js` unavailable) |
 
 **Total new files**: 13 (+ optional type declarations)
-**Modified files**: 4 (`renderer.ts`, `useRenderer.ts`, `useViewportTransition.ts`, `package.json`)
+**Modified files**: 5 (`renderer.ts`, `useRenderer.ts`, `useViewportTransition.ts`, `package.json`, `domain/coloringModes.ts` — add `export` to `COLOR_CYCLE_PERIOD`)
 **CPU code changes**: minimal (guard `gpuActive` in `useViewportTransition.ts`)
 
 ---
