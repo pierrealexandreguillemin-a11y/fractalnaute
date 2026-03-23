@@ -46,7 +46,7 @@ export function renderFractal(
     });
     if (rendered) {
       options.onComplete?.(0); // GPU render is near-instant
-      return () => {}; // No cancel needed for synchronous GPU draw
+      return () => { gpuRenderer.cancelPending(); };
     }
     // GPU not ready (compiling) — fall through to CPU
   }
