@@ -36,7 +36,7 @@ const ITERATION_CHUNKS: Partial<Record<FractalType, string>> = {
   mandelbrot: mandelbrotIterationChunk
 };
 
-const ACCUMULATOR_CHUNKS: Record<string, string> = {
+const ACCUMULATOR_CHUNKS: Partial<Record<ColoringMode, string>> = {
   classic: accumulatorNoopChunk
 };
 

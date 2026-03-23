@@ -48,6 +48,7 @@ vec2 screenToComplex(vec2 fragCoord, vec2 center, float scale, vec2 resolution) 
  * CPU: iter + 1 - log(log(zRe2+zIm2)/2 / ln2) / ln2
  * Simplified: iter + 1 - log2(0.5 * log2(mod2))
  * Uses native log2() for clarity and GPU efficiency
+ * Note: v2 Multibrot needs logBase=n variant (fractals.ts line 453)
  */
 export const smoothEscapeChunk = /* glsl */ `
 float smoothEscape(int iter, float mod2) {
