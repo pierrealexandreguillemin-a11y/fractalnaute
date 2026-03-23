@@ -158,6 +158,7 @@ function assembleFragmentSource(
 
 ```glsl
 void main() {
+  // @mirror domain/coordinates.ts:screenToComplex — scale = visible height in complex units
   vec2 c = screenToComplex(gl_FragCoord.xy, u_center, u_scale, u_resolution);
 
   vec2 z;
