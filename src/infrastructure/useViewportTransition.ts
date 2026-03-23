@@ -160,9 +160,11 @@ export function useViewportTransition(deps: TransitionDeps) {
   const prevParamsKeyRef = useRef('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stable ref wrapper — synced via effect to avoid ref update during render
+  // Stable ref wrapper — synced via useLayoutEffect so it's up-to-date
+  // when the CSS transform useLayoutEffect fires (both run synchronously
+  // in declaration order before browser paint)
   const depsRef = useRef(deps);
-  useEffect(() => { depsRef.current = deps; });
+  useLayoutEffect(() => { depsRef.current = deps; });
 
   const paramsKey = `${deps.fractalType}|${deps.maxIterations}|${deps.palette}|${deps.coloringMode}|${deps.interiorColoring}|${JSON.stringify(deps.params)}`;
 

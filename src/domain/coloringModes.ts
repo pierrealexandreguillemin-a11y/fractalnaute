@@ -26,7 +26,7 @@ export function mapToColorParam(
     case 'orbitTrap':
       return trapToParam(result);
     case 'normalMap':
-      return (result.smoothValue % 256) / 256;
+      return normalToParam(result);
     default:
       return (result.smoothValue % 256) / 256;
   }
@@ -42,31 +42,41 @@ function decompToParam(result: FractalResult): number {
 }
 
 function trapToParam(result: FractalResult): number {
-  const d = Math.min(result.orbitTrapDist, 2) / 2;
-  return d;
+  // Log scale spreads the range — linear maps most points to a narrow band
+  const d = Math.min(result.orbitTrapDist, 4);
+  const logMapped = Math.log(1 + d) / Math.log(5); // [0, 1] with log spreading
+  // Combine with smooth iteration for palette richness
+  const base = (result.smoothValue % 64) / 64;
+  return (logMapped * 0.6 + base * 0.4) % 1;
+}
+
+function normalToParam(result: FractalResult): number {
+  // Combine smooth iteration with escape angle for richer color variation
+  const base = (result.smoothValue % 256) / 256;
+  const angleNorm = (result.decompAngle + Math.PI) / (2 * Math.PI); // [0, 1]
+  return (base * 0.7 + angleNorm * 0.3) % 1;
 }
 
 /**
  * Compute lightness modifier for normal map mode.
- * Uses the decomposition angle (arg(z) at escape) as surface normal direction,
- * combined with distance estimation for height.
- * @returns multiplier for lightness [0.3, 1.5]
+ * Uses escape angle as surface normal + distance estimation for height.
+ * @returns multiplier for lightness [0.2, 1.4]
  */
 export function computeNormalLightness(
   result: FractalResult,
   lightAngleRad: number
 ): number {
-  if (result.distanceEstimate <= 0) return 1;
+  if (result.distanceEstimate <= 0) return 0.5;
 
-  // Use decomposition angle as normal direction (angle of z at escape)
-  // This approximates the surface normal of the iteration count field
+  // Directional lighting via escape angle
   const dot = Math.cos(result.decompAngle - lightAngleRad);
 
-  // Modulate with distance estimation for depth shading
-  const depth = Math.min(result.distanceEstimate * 50, 1);
+  // Distance-based height field — log scale to avoid saturation
+  const logDE = Math.log(1 + result.distanceEstimate * 10);
+  const height = Math.min(logDE / 3, 1);
 
-  // Combine: directional lighting + ambient + depth
-  return (0.3 + 0.7 * (dot * 0.5 + 0.5)) * (0.5 + 0.5 * depth);
+  // Strong directional component + subtle ambient
+  return 0.2 + 1.2 * (dot * 0.5 + 0.5) * (0.3 + 0.7 * height);
 }
 
 /**
