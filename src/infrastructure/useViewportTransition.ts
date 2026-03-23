@@ -9,6 +9,7 @@
 import { useRef, useLayoutEffect, useCallback, useEffect } from 'react';
 import type { Viewport, FractalType, PaletteName, FractalParams, ColoringMode } from '../domain/types';
 import type { WorkerPool } from './workerPool';
+import type { WebGLRenderer } from './gpu';
 import { renderFractal } from './renderer';
 import { renderStripsWithPool } from './renderCoordinator';
 import { getOrCreateImageData } from './canvasUtils';
@@ -23,6 +24,7 @@ const DEBOUNCE_MS = 80;
 interface TransitionDeps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   poolRef: React.RefObject<WorkerPool | null>;
+  gpuRef: React.RefObject<WebGLRenderer | null>;
   fractalType: FractalType;
   viewport: Viewport;
   maxIterations: number;
@@ -40,7 +42,7 @@ function doRenderFull(
   deps: TransitionDeps,
   prevViewportRef: React.MutableRefObject<Viewport | null>
 ): void {
-  const { canvasRef, poolRef, cancelRenderRef, onRenderStartRef, onRenderCompleteRef } = deps;
+  const { canvasRef, poolRef, gpuRef, cancelRenderRef, onRenderStartRef, onRenderCompleteRef } = deps;
   const canvas = canvasRef.current;
   if (!canvas) return;
 
@@ -51,7 +53,7 @@ function doRenderFull(
   // Update baseline eagerly so CSS feedback stays in sync during rapid input
   prevViewportRef.current = deps.viewport;
 
-  cancelRenderRef.current = renderFractal(canvas, poolRef.current, null, {
+  cancelRenderRef.current = renderFractal(canvas, poolRef.current, gpuRef.current, {
     fractalType: deps.fractalType,
     viewport: deps.viewport,
     maxIterations: deps.maxIterations,
@@ -196,7 +198,11 @@ export function useViewportTransition(deps: TransitionDeps) {
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
       const d = depsRef.current;
-      if (prevViewportRef.current && isPanOnly(prevViewportRef.current, d.viewport)) {
+      const gpuActive = d.gpuRef.current?.isReady() ?? false;
+
+      // GPU active: always full render (no pixel-shift, GPU is fast enough)
+      // CPU: use pixel-shift strip optimization for pans
+      if (!gpuActive && prevViewportRef.current && isPanOnly(prevViewportRef.current, d.viewport)) {
         doRenderPanStrips(d, prevViewportRef);
       } else {
         doRenderFull(d, prevViewportRef);

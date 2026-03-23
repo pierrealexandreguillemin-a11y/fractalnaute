@@ -9,6 +9,8 @@
 import { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
 import { createWorkerPool, type WorkerPool } from './workerPool';
+import { isWebGL2Available, createWebGLRenderer } from './gpu';
+import type { WebGLRenderer } from './gpu';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
 import { useViewportTransition } from './useViewportTransition';
 
@@ -38,6 +40,8 @@ export function useRenderer({
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
   const poolRef = useRef<WorkerPool | null>(null);
+  const gpuRef = useRef<WebGLRenderer | null>(null);
+  const initialPaletteRef = useRef(palette);
 
   // Store callbacks in refs to avoid re-creating render closures on every parent render.
   const onRenderStartRef = useRef(onRenderStart);
@@ -47,14 +51,20 @@ export function useRenderer({
     onRenderCompleteRef.current = onRenderComplete;
   }, [onRenderStart, onRenderComplete]);
 
-  // Pool lifecycle: create on mount, destroy on unmount
+  // Pool + GPU lifecycle: create on mount, destroy on unmount
   useEffect(() => {
     poolRef.current = createWorkerPool(); // null if SAB unavailable
+    const canvas = canvasRef.current;
+    if (canvas && isWebGL2Available()) {
+      gpuRef.current = createWebGLRenderer(canvas, initialPaletteRef.current);
+    }
     return () => {
+      gpuRef.current?.destroy();
+      gpuRef.current = null;
       poolRef.current?.destroy();
       poolRef.current = null;
     };
-  }, []);
+  }, [canvasRef]);
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -72,11 +82,16 @@ export function useRenderer({
 
   // Viewport transition — CSS transform + debounced render
   const { forceFullRender } = useViewportTransition({
-    canvasRef, poolRef,
+    canvasRef, poolRef, gpuRef,
     fractalType, viewport, maxIterations, palette, params,
     coloringMode, interiorColoring,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
+
+  // Keep GPU palette texture in sync with React state
+  useEffect(() => {
+    gpuRef.current?.updatePalette(palette);
+  }, [palette]);
 
   // Window resize
   useEffect(() => {
