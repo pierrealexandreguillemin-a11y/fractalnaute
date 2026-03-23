@@ -1,12 +1,27 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===============================================================================
  * DOMAIN LAYER - Coloring Modes
- * Maps FractalResult → palette parameter t ∈ [0,1] based on active mode.
- * SRP: mode-specific logic isolated from palette lookup.
- * ═══════════════════════════════════════════════════════════════════════════
+ * Maps FractalResult -> palette parameter t in [0,1] based on active mode.
+ * Also owns mode dispatch + interior logic (SRP: palettes.ts only does lookup).
+ * ===============================================================================
  */
 
-import type { FractalResult, ColoringMode } from './types';
+import type { FractalResult, ColoringMode, ColorPalette, RGB } from './types';
+import {
+  lookupPaletteColor,
+  lookupPaletteColorWithLightness,
+  lookupPaletteColorAttenuated
+} from './palettes';
+
+// ---- Named constants --------------------------------------------------------
+
+/** Default light direction for normal map mode (~315 deg, upper-left) */
+const NORMAL_MAP_LIGHT_ANGLE = -0.7854;
+
+/** Interior coloring lightness attenuation factor */
+const INTERIOR_ATTENUATION = 0.4;
+
+// ---- Mode dispatch ----------------------------------------------------------
 
 /**
  * Map a fractal result to a palette parameter based on coloring mode.
@@ -42,7 +57,7 @@ function decompToParam(result: FractalResult): number {
 }
 
 function trapToParam(result: FractalResult): number {
-  // Log scale spreads the range — linear maps most points to a narrow band
+  // Log scale spreads the range -- linear maps most points to a narrow band
   const d = Math.min(result.orbitTrapDist, 4);
   const logMapped = Math.log(1 + d) / Math.log(5); // [0, 1] with log spreading
   // Combine with smooth iteration for palette richness
@@ -56,6 +71,8 @@ function normalToParam(result: FractalResult): number {
   const angleNorm = (result.decompAngle + Math.PI) / (2 * Math.PI); // [0, 1]
   return (base * 0.7 + angleNorm * 0.3) % 1;
 }
+
+// ---- Normal map lighting ----------------------------------------------------
 
 /**
  * Compute lightness modifier for normal map mode.
@@ -71,13 +88,15 @@ export function computeNormalLightness(
   // Directional lighting via escape angle
   const dot = Math.cos(result.decompAngle - lightAngleRad);
 
-  // Distance-based height field — log scale to avoid saturation
+  // Distance-based height field -- log scale to avoid saturation
   const logDE = Math.log(1 + result.distanceEstimate * 10);
   const height = Math.min(logDE / 3, 1);
 
   // Strong directional component + subtle ambient
   return 0.2 + 1.2 * (dot * 0.5 + 0.5) * (0.3 + 0.7 * height);
 }
+
+// ---- Interior coloring ------------------------------------------------------
 
 /**
  * Map interior point to palette parameter for interior coloring.
@@ -88,11 +107,45 @@ export function mapInteriorToParam(result: FractalResult): number {
   return Math.min(result.orbitTrapDist, 2) / 2;
 }
 
+// ---- Top-level coloring entry point -----------------------------------------
+
+/**
+ * Get the final RGB color for a fractal result.
+ * Handles all mode dispatch, interior logic, and palette lookup.
+ * This is the single entry point used by the render loop.
+ */
+export function getColorForResult(
+  result: FractalResult,
+  palette: ColorPalette,
+  coloringMode: ColoringMode = 'classic',
+  interiorColoring: boolean = false
+): RGB {
+  if (!result.escaped) {
+    if (!interiorColoring) return [0, 0, 0];
+    const t = mapInteriorToParam(result);
+    return lookupPaletteColorAttenuated(palette, t, INTERIOR_ATTENUATION);
+  }
+
+  const t = mapToColorParam(result, coloringMode);
+
+  if (coloringMode === 'normalMap') {
+    const lightness = computeNormalLightness(result, NORMAL_MAP_LIGHT_ANGLE);
+    return lookupPaletteColorWithLightness(palette, t, lightness);
+  }
+
+  return lookupPaletteColor(palette, t);
+}
+
+// ---- Labels & registry ------------------------------------------------------
+
 /** Coloring mode labels (French) */
 export const COLORING_MODE_LABELS: Record<ColoringMode, string> = {
   classic: 'Classique',
-  stripe: 'Métal brossé',
+  stripe: 'Metal brosse',
   decomposition: 'Tessellation',
   orbitTrap: 'Orbit trap',
-  normalMap: 'Éclairage 3D'
+  normalMap: 'Eclairage 3D'
 };
+
+/** Ordered list of all coloring modes */
+export const COLORING_MODES: ColoringMode[] = Object.keys(COLORING_MODE_LABELS) as ColoringMode[];

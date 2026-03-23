@@ -16,8 +16,12 @@ export interface AccumulatorState {
   count: number;
 }
 
-/** Stripe density parameter — controls stripe frequency */
-const STRIPE_DENSITY = 5;
+/**
+ * Stripe frequency parameter — higher values create finer stripes.
+ * Standard value from Harkonen stripe average coloring.
+ * @see https://www.math.univ-toulouse.fr/~music/Research/stripeAverage.pdf
+ */
+export const STRIPE_DENSITY = 5;
 
 export function initAccumulator(): AccumulatorState {
   return { stripeSum: 0, prevStripeSum: 0, trapDistSq: Infinity, count: 0 };

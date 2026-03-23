@@ -31,7 +31,13 @@ export {
   finalizeInterior
 } from './coloringAccumulator';
 
-export { mapToColorParam, computeNormalLightness, COLORING_MODE_LABELS } from './coloringModes';
+export {
+  mapToColorParam,
+  computeNormalLightness,
+  getColorForResult,
+  COLORING_MODE_LABELS,
+  COLORING_MODES
+} from './coloringModes';
 
 // Fractal calculators
 export {
@@ -53,9 +59,10 @@ export {
 
 // Color palettes
 export {
-  getColor,
-  getColorFast,
   resolvePalette,
+  lookupPaletteColor,
+  lookupPaletteColorWithLightness,
+  lookupPaletteColorAttenuated,
   getPaletteNames,
   getPaletteLabel
 } from './palettes';

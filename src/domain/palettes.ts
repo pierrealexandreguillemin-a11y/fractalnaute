@@ -5,10 +5,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import type { RGB, OKLCH, ColorPalette, PaletteName, FractalResult } from './types';
-import type { ColoringMode } from './types';
+import type { RGB, OKLCH, ColorPalette, PaletteName } from './types';
 import { oklchToRgb } from './color';
-import { mapToColorParam, computeNormalLightness, mapInteriorToParam } from './coloringModes';
 
 // ─── Interpolation engine ────────────────────────────────────────────────
 
@@ -160,10 +158,6 @@ const palettes: Record<PaletteName, ColorPalette> = {
 // ─── Public API ──────────────────────────────────────────────────────────
 
 /**
- * Get color for a fractal calculation result.
- * Palette works in OKLCH, conversion to sRGB at device boundary.
- */
-/**
  * Resolve a palette function by name.
  * Call once before render loop to avoid per-pixel string lookup.
  */
@@ -171,46 +165,40 @@ export function resolvePalette(paletteName: PaletteName): ColorPalette {
   return palettes[paletteName] ?? palettes.classic;
 }
 
-export function getColor(
-  result: FractalResult,
-  paletteName: PaletteName
+/**
+ * Pure palette lookup — convert OKLCH parameter to sRGB.
+ * No mode logic; use getColorForResult from coloringModes.ts instead.
+ */
+export function lookupPaletteColor(
+  palette: ColorPalette,
+  t: number
 ): RGB {
-  if (!result.escaped) {
-    return [0, 0, 0];
-  }
-
-  const palette = palettes[paletteName] ?? palettes.classic;
-  const t = (result.smoothValue % 256) / 256;
   const oklch = palette(t);
   return oklchToRgb(oklch.L, oklch.C, oklch.H);
 }
 
 /**
- * Get color using a pre-resolved palette (hot path variant).
- * Supports coloring modes and interior coloring.
+ * Palette lookup with lightness modifier (used by normal map mode).
  */
-export function getColorFast(
-  result: FractalResult,
+export function lookupPaletteColorWithLightness(
   palette: ColorPalette,
-  coloringMode: ColoringMode = 'classic',
-  interiorColoring: boolean = false
+  t: number,
+  lightness: number
 ): RGB {
-  if (!result.escaped) {
-    if (!interiorColoring) return [0, 0, 0];
-    const t = mapInteriorToParam(result);
-    const oklch = palette(t);
-    return oklchToRgb(oklch.L * 0.4, oklch.C, oklch.H);
-  }
-
-  const t = mapToColorParam(result, coloringMode);
   const oklch = palette(t);
+  return oklchToRgb(Math.min(oklch.L * lightness, 1), oklch.C, oklch.H);
+}
 
-  if (coloringMode === 'normalMap') {
-    const lightness = computeNormalLightness(result, -0.7854);
-    return oklchToRgb(Math.min(oklch.L * lightness, 1), oklch.C, oklch.H);
-  }
-
-  return oklchToRgb(oklch.L, oklch.C, oklch.H);
+/**
+ * Palette lookup with lightness attenuation (used by interior coloring).
+ */
+export function lookupPaletteColorAttenuated(
+  palette: ColorPalette,
+  t: number,
+  attenuation: number
+): RGB {
+  const oklch = palette(t);
+  return oklchToRgb(oklch.L * attenuation, oklch.C, oklch.H);
 }
 
 /**

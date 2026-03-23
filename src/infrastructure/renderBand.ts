@@ -10,7 +10,8 @@ import type {
   FractalType, PaletteName, FractalParams, Viewport, ColoringMode
 } from '../domain/types';
 import { getFractalConfig } from '../domain/fractalTypes';
-import { resolvePalette, getColorFast } from '../domain/palettes';
+import { resolvePalette } from '../domain/palettes';
+import { getColorForResult } from '../domain/coloringModes';
 
 export interface BandRenderParams {
   /** X-range clipping for strip rendering. Defaults to full width. */
@@ -86,9 +87,6 @@ export function renderBand(
 
   // Tell calculators whether to accumulate orbit data for advanced coloring
   const needsAccum = coloringMode !== 'classic' || interiorColoring;
-  const effectiveParams = needsAccum
-    ? { ...params, _needsAccumulation: true }
-    : params;
 
   for (let y = startY; y < endY; y += stride) {
     if (shouldCancel?.()) return false;
@@ -96,8 +94,8 @@ export function renderBand(
     for (let x = startX; x < endX; x += stride) {
       const re = originRe + x * stepRe;
       const im = originIm + y * stepIm;
-      const result = calculator(re, im, maxIterations, effectiveParams);
-      const [r, g, b] = getColorFast(result, resolvedPalette, coloringMode, interiorColoring);
+      const result = calculator(re, im, maxIterations, params, needsAccum);
+      const [r, g, b] = getColorForResult(result, resolvedPalette, coloringMode, interiorColoring);
 
       // Fill stride×stride block, clamped to band/canvas boundaries
       const blockEndY = Math.min(y + stride, endY);

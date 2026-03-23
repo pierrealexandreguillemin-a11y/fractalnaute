@@ -90,8 +90,6 @@ export interface FractalParams {
   juliaRe?: number;
   juliaIm?: number;
   power?: number;
-  /** @internal Set by renderBand — controls accumulation in calculators */
-  _needsAccumulation?: boolean;
 }
 
 /** Fractal calculator function signature */
@@ -99,7 +97,8 @@ export type FractalCalculator = (
   re: number,
   im: number,
   maxIterations: number,
-  params: FractalParams
+  params: FractalParams,
+  accumulate?: boolean
 ) => FractalResult;
 
 /** Configuration for a fractal type */

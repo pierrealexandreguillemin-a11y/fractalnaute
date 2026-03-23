@@ -36,7 +36,7 @@ export {
   fractalTypes,
   getFractalConfig,
   getFractalLabel,
-  getColor,
+  getColorForResult,
   getPaletteNames,
   getPaletteLabel,
   screenToComplex,
