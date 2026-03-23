@@ -60,7 +60,7 @@ const initialState: FractalState = {
   viewport: getDefaultViewport('mandelbrot'),
   maxIterations: 256,
   palette: 'classic',
-  coloringMode: 'classic' as ColoringMode,
+  coloringMode: 'classic',
   interiorColoring: false,
   theme: 'default',
   juliaParams: { ...DEFAULT_JULIA_PARAMS },
