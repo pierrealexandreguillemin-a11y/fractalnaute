@@ -96,16 +96,18 @@ grep -r @tradeoff src/
 - Progressive rendering v2: stride-based two-pass (stride 4 preview → stride 1 full-res). Preview in ~3ms, 5% total overhead. Industry-standard approach (Fractint/UltraFractal style).
 - Instant viewport feedback v3 (XaoS-style): CSS transform via useLayoutEffect for instant visual feedback on pan/zoom (<2ms perceived). 80ms debounce, then: pan → pixel-shift + x-range-clipped strip render (2-3 strips, ~5% pixels); zoom → full two-pass re-render. will-change:transform GPU hint. Baseline: 71ms/157ms pan → instant CSS + 80ms debounce + strip render.
 - Advanced coloring: 5 modes (classic, stripe/métal brossé, tessellation/decomposition, orbit trap, normal map/éclairage 3D) + interior toggle. Conditional accumulation (zero Classic overhead measured: 228ms vs 228ms baseline). Stripe +75% overhead (atan2+sin per iter). Harkonen stripe avg, distance estimation (bailout 1e12), orbit trap (log scale), binary decomposition. SRP: coloringAccumulator.ts (observe) + coloringModes.ts (map+dispatch) + palettes.ts (pure lookup). Radix Checkbox, fieldset/legend WCAG 1.3.1, aria-labelledby on all selects, mobile responsive.
+- GPU rendering v4 (WebGL 2 + TWGL): Mandelbrot + Classic coloring via fragment shader.
+  TWGL.js ~15KB. Composable GLSL chunks (compile-time, zero branching).
+  KHR_parallel_shader_compile async. Palette as 256×1 sRGB texture (gl.LINEAR).
+  Progressive FBO (quarter-res) when >16ms. Facade GPU→Workers→Fallback.
+  Context loss → CPU fallback. CSS transform feedback preserved.
 
-### Next: GPU rendering (WebGL 2 + TWGL)
-- Fragment shader for embarrassingly parallel pixel computation
-- Expected 10-60x gain (228ms → <5ms @1080p). Stack: TWGL (15KB, WebGL 2).
-- Precision: float32 (zoom cap ~10⁷). Double-single vec2 extends to ~10¹⁵.
-- Research: docs/gpu-rendering-stacks-research.md, docs/curation/README.md
-- Reference: DeepMandelbrot (JS+WebGL, perturbation, stripe coloring)
+### Next: GPU v2 (all fractals + coloring modes) & Deep zoom
+- GPU v2: extend WebGL 2 shaders to Julia, BurningShip, Tricorn, Multibrot + all 5 coloring modes
+- Precision: float32 (zoom cap ~10^7). Double-single vec2 extends to ~10^15.
 
 ### Future: Deep zoom (perturbation theory)
-- JS arbitrary precision ref orbit (Jampary-style) + float32 GPU delta
+- JS arbitrary precision ref orbit (Jampary-style) + float32 GPU delta iterations
 - Only ~3 browser implementations exist — competitive advantage
 - Research: docs/research-deep-mandelbrot.md
 

@@ -111,6 +111,18 @@ User input (mouse/touch/keyboard)
 | Orbit trap | ~250ms | Log scale mapping |
 | Normal map | ~260ms | DE + angle computation |
 
+### + GPU WebGL 2 (TWGL)
+
+WebGL 2 fragment shader via TWGL.js. Mandelbrot + Classic coloring. Fullscreen triangle, palette texture (256×1 sRGB, LINEAR). Composable GLSL chunks. Progressive FBO when >16ms.
+
+| Metric | Value | Notes |
+|---|---|---|
+| GPU render @256 | TBD | Pending browser benchmark |
+| GPU render @1024 | TBD | Pending browser benchmark |
+| Progressive threshold | 16ms / workload heuristic | Quarter-res preview → full-res |
+
+*Benchmark values to be filled after browser testing.*
+
 ---
 
 ## Performance Improvement Options
