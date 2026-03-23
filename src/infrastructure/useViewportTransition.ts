@@ -51,7 +51,7 @@ function doRenderFull(
   // Update baseline eagerly so CSS feedback stays in sync during rapid input
   prevViewportRef.current = deps.viewport;
 
-  cancelRenderRef.current = renderFractal(canvas, poolRef.current, {
+  cancelRenderRef.current = renderFractal(canvas, poolRef.current, null, {
     fractalType: deps.fractalType,
     viewport: deps.viewport,
     maxIterations: deps.maxIterations,

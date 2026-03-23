@@ -7,6 +7,7 @@
 
 import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
 import type { WorkerPool } from './workerPool';
+import type { WebGLRenderer } from './gpu';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
 
@@ -30,8 +31,26 @@ export interface RenderOptions {
 export function renderFractal(
   canvas: HTMLCanvasElement,
   pool: WorkerPool | null,
+  gpuRenderer: WebGLRenderer | null,
   options: RenderOptions
 ): () => void {
+  // Try GPU path first
+  if (gpuRenderer?.isReady()) {
+    const rendered = gpuRenderer.render({
+      viewport: options.viewport,
+      fractalType: options.fractalType,
+      maxIterations: options.maxIterations,
+      coloringMode: options.coloringMode ?? 'classic',
+      interiorColoring: options.interiorColoring ?? false,
+      fractalParams: options.params
+    });
+    if (rendered) {
+      options.onComplete?.(0); // GPU render is near-instant
+      return () => {}; // No cancel needed for synchronous GPU draw
+    }
+    // GPU not ready (compiling) — fall through to CPU
+  }
+
   if (pool) {
     return renderWithPool({
       canvas, pool,
