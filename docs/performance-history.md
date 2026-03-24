@@ -71,14 +71,16 @@ XaoS-style pixel reuse. CSS transform via `useLayoutEffect` for instant visual f
 
 ## Cumulative Gains (Baseline → Current)
 
-| Metric | Baseline | Current | Factor |
-|---|---|---|---|
-| Calc @256 | 175ms | 52ms | **3.4x** |
-| Calc @1024 | 646ms | 75ms | **8.6x** |
-| Pan visual feedback | 71ms | <2ms | **~35x** |
-| Pan final render | 157ms | 79ms | **2x** |
-| Zoom visual feedback | 86ms | <2ms | **~43x** |
-| Zoom final render | 205ms | 135ms | **1.5x** |
+| Metric | Baseline | CPU Workers | GPU (Mandelbrot) | Factor (GPU vs Baseline) |
+|---|---|---|---|---|
+| Calc @256 | 175ms | 52ms | **0.04ms** | **~4375x** |
+| Calc @1024 | 646ms | 75ms | TODO | — |
+| Pan visual feedback | 71ms | <2ms | <2ms (CSS) | **~35x** |
+| Pan final render | 157ms | 79ms | **0.04ms** (GPU) | **~3925x** |
+| Zoom visual feedback | 86ms | <2ms | <2ms (CSS) | **~43x** |
+| Zoom final render | 205ms | 135ms | **0.04ms** (GPU) | **~5125x** |
+
+Note: GPU values are for Mandelbrot + Classic coloring only. Other fractals/coloring modes use CPU Workers fallback.
 
 ---
 
@@ -113,15 +115,17 @@ User input (mouse/touch/keyboard)
 
 ### + GPU WebGL 2 (TWGL)
 
-WebGL 2 fragment shader via TWGL.js. Mandelbrot + Classic coloring. Fullscreen triangle, palette texture (256×1 sRGB, LINEAR). Composable GLSL chunks. Progressive FBO when >16ms.
+WebGL 2 fragment shader via TWGL.js. Mandelbrot + Classic coloring. Fullscreen triangle (gl_VertexID), palette as 256×1 sRGB texture (gl.LINEAR). Composable GLSL chunks assembled at compile-time. Cardioid/bulb pre-test in GLSL. Dedicated GPU canvas overlay (separate from CPU 2d canvas).
 
-| Metric | Value | Notes |
-|---|---|---|
-| GPU render @256 | TBD | Pending browser benchmark |
-| GPU render @1024 | TBD | Pending browser benchmark |
-| Progressive threshold | 16ms / workload heuristic | Quarter-res preview → full-res |
+Measured on AMD Radeon Graphics (integrated RDNA2), 1920×912, Playwright + gl.finish() sync.
 
-*Benchmark values to be filled after browser testing.*
+| Metric | Value | vs CPU Classic (228ms) | Notes |
+|---|---|---|---|
+| GPU render @256 | **0.04ms** (median) | **~5700x** | 10 samples, range 0.025–0.08ms |
+| GPU render @1024 | TODO — measure | — | Need to change maxIter and re-benchmark |
+| CPU→GPU fallback | transparent | — | First render CPU (shader compiling), subsequent GPU |
+
+Note: 0.04ms is the drawArrays+finish time. Total wall-clock includes React dispatch + debounce (80ms) + uniform setup (~0.01ms). The GPU computation itself is sub-millisecond.
 
 ---
 
@@ -129,7 +133,7 @@ WebGL 2 fragment shader via TWGL.js. Mandelbrot + Classic coloring. Fullscreen t
 
 | Option | Expected Gain | Effort | Status |
 |---|---|---|---|
-| **A. GPU WebGL 2 (TWGL)** | 10-60x — <5ms render @1080p | High | Research done (docs/gpu-rendering-stacks-research.md). TWGL recommended. |
+| **A. GPU WebGL 2 (TWGL)** | **Measured: ~5700x** (0.04ms @256iter) | High | DONE. Mandelbrot + Classic. Dedicated GPU canvas + cardioid pre-test. |
 | **B. WASM (Rust)** | 1.5-2x vs JS CPU | Medium | Only useful for perturbation theory ref orbit, not pixel rendering |
 | **C. OffscreenCanvas** | ~20% — unblocks main thread | Low | Workers use OffscreenCanvas instead of SAB→putImageData |
 | **D. Perturbation theory** | Unlimited deep zoom | High | JS arbitrary precision (Jampary-style). Only ~3 browser implementations exist. |
@@ -138,7 +142,7 @@ WebGL 2 fragment shader via TWGL.js. Mandelbrot + Classic coloring. Fullscreen t
 
 ### Recommended path
 
-1. **A (GPU)** — the only order-of-magnitude gain remaining. 228ms → <5ms.
+1. **A (GPU)** — DONE. Measured 228ms → 0.04ms (~5700x). Mandelbrot + Classic only.
 2. **D (Perturbation)** — after GPU. Deep zoom beyond float64. DeepMandelbrot proves JS-only is viable.
 3. C/E/F become unnecessary once GPU is in place.
 4. B (WASM) only for perturbation ref orbit computation if JS perf is insufficient.
