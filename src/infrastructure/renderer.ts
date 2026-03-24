@@ -46,11 +46,13 @@ export function renderFractal(
       fractalParams: options.params
     });
     if (rendered) {
+      gpuRenderer.setVisible(true);
       const elapsed = performance.now() - startTime;
       options.onComplete?.(elapsed);
       return () => { gpuRenderer.cancelPending(); };
     }
-    // GPU not ready (compiling) — fall through to CPU
+    // GPU not ready (compiling) — hide GPU canvas, fall through to CPU
+    gpuRenderer.setVisible(false);
   }
 
   if (pool) {

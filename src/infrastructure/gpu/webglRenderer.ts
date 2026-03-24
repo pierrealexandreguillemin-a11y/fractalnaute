@@ -35,6 +35,8 @@ export interface WebGLRenderer {
   render(options: GPURenderOptions): boolean;
   cancelPending(): void;
   updatePalette(palette: PaletteName): void;
+  resize(width: number, height: number): void;
+  setVisible(visible: boolean): void;
   destroy(): void;
   isReady(): boolean;
 }
@@ -207,6 +209,32 @@ function createProgressiveController(
   };
 }
 
+// ---- GPU canvas factory -----------------------------------------------------
+
+/**
+ * Create an overlay canvas for WebGL 2 rendering.
+ * Separate canvas avoids the one-context-per-canvas browser restriction
+ * (the CPU path needs a `2d` context on the main canvas).
+ */
+function createGpuCanvas(
+  container: HTMLElement
+): { gpuCanvas: HTMLCanvasElement; gl: WebGL2RenderingContext } | null {
+  const gpuCanvas = document.createElement('canvas');
+  gpuCanvas.style.position = 'absolute';
+  gpuCanvas.style.top = '0';
+  gpuCanvas.style.left = '0';
+  gpuCanvas.style.width = '100%';
+  gpuCanvas.style.height = '100%';
+  gpuCanvas.style.pointerEvents = 'none';
+  gpuCanvas.style.display = 'none';
+
+  const maybeGl = gpuCanvas.getContext('webgl2', { antialias: false, alpha: false });
+  if (!maybeGl) return null;
+
+  container.appendChild(gpuCanvas);
+  return { gpuCanvas, gl: maybeGl };
+}
+
 // ---- Factory ----------------------------------------------------------------
 
 const DEFAULT_PALETTE: PaletteName = 'classic';
@@ -214,16 +242,16 @@ const DEFAULT_PALETTE: PaletteName = 'classic';
 const PRECOMPILE_MAX_ITER = 256;
 
 /**
- * Create a WebGL 2 renderer bound to a canvas.
+ * Create a WebGL 2 renderer with its own dedicated canvas overlay.
  * Returns null if the browser does not support WebGL 2.
  */
 export function createWebGLRenderer(
-  canvas: HTMLCanvasElement,
+  container: HTMLElement,
   initialPalette?: PaletteName
 ): WebGLRenderer | null {
-  const maybeGl = canvas.getContext('webgl2', { antialias: false, alpha: false });
-  if (!maybeGl) return null;
-  const gl: WebGL2RenderingContext = maybeGl;
+  const result = createGpuCanvas(container);
+  if (!result) return null;
+  const { gpuCanvas, gl } = result;
 
   const emptyVAO = gl.createVertexArray();
   gl.bindVertexArray(emptyVAO);
@@ -250,8 +278,8 @@ export function createWebGLRenderer(
     getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
   };
 
-  canvas.addEventListener('webglcontextlost', onContextLost);
-  canvas.addEventListener('webglcontextrestored', onContextRestored);
+  gpuCanvas.addEventListener('webglcontextlost', onContextLost);
+  gpuCanvas.addEventListener('webglcontextrestored', onContextRestored);
 
   return {
     render(options: GPURenderOptions): boolean {
@@ -275,22 +303,30 @@ export function createWebGLRenderer(
       return true;
     },
 
-    cancelPending(): void {
-      progressive.cancelPending();
-    },
+    cancelPending(): void { progressive.cancelPending(); },
 
     updatePalette(name: PaletteName): void {
       currentPalette = name;
       if (!contextLost) updatePaletteTexture(gl, paletteTexture, name);
     },
 
+    resize(width: number, height: number): void {
+      gpuCanvas.width = width;
+      gpuCanvas.height = height;
+    },
+
+    setVisible(visible: boolean): void {
+      gpuCanvas.style.display = visible ? 'block' : 'none';
+    },
+
     destroy(): void {
       progressive.destroy();
-      canvas.removeEventListener('webglcontextlost', onContextLost);
-      canvas.removeEventListener('webglcontextrestored', onContextRestored);
+      gpuCanvas.removeEventListener('webglcontextlost', onContextLost);
+      gpuCanvas.removeEventListener('webglcontextrestored', onContextRestored);
       destroyAllPrograms(gl);
       gl.deleteTexture(paletteTexture);
       gl.deleteVertexArray(emptyVAO);
+      gpuCanvas.remove();
     },
 
     isReady(): boolean {

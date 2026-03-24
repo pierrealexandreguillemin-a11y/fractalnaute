@@ -54,9 +54,9 @@ export function useRenderer({
   // Pool + GPU lifecycle: create on mount, destroy on unmount
   useEffect(() => {
     poolRef.current = createWorkerPool(); // null if SAB unavailable
-    const canvas = canvasRef.current;
-    if (canvas && isWebGL2Available()) {
-      gpuRef.current = createWebGLRenderer(canvas, initialPaletteRef.current);
+    const container = containerRef.current;
+    if (container && isWebGL2Available()) {
+      gpuRef.current = createWebGLRenderer(container, initialPaletteRef.current);
     }
     return () => {
       gpuRef.current?.destroy();
@@ -64,13 +64,14 @@ export function useRenderer({
       poolRef.current?.destroy();
       poolRef.current = null;
     };
-  }, [canvasRef]);
+  }, [canvasRef, containerRef]);
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
     resizeCanvas(canvas, container);
+    gpuRef.current?.resize(canvas.width, canvas.height);
   }, [canvasRef, containerRef]);
 
   // Resize canvas synchronously before any render.
