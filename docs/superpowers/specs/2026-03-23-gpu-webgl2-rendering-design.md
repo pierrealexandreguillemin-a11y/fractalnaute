@@ -3,7 +3,9 @@
 **Date**: 2026-03-23
 **Scope v1**: Mandelbrot + Classic coloring, pipeline WebGL 2 complet
 **Stack**: TWGL.js (~15KB gzip, WebGL 2, zero dep)
-**Expected gain**: 10-60x (228ms CPU → <5ms GPU @1080p)
+**Measured gain**: ~5700x (228ms CPU → 0.04ms median GPU @1920x912)
+**Benchmark**: AMD Radeon Graphics (integrated RDNA2), Playwright + gl.finish() sync, @256iter
+**Range**: 0.025–0.08ms GPU render time
 
 ---
 
@@ -91,11 +93,18 @@ GPU path cancel: no-op for single-pass; cancels pending `requestAnimationFrame` 
 Workers path cancel: Atomics.store(cancelFlag, 0, 1) — unchanged.
 Fallback path cancel: set cancelled flag — unchanged.
 
-### Canvas Context Constraint
+### Dual Canvas Architecture (CRITICAL)
 
-A canvas can only have ONE context type (`webgl2` OR `2d`, not both). When GPU is active, the pixel-shift optimization in `useViewportTransition.ts` (which uses `getContext('2d')` + `putImageData`) is incompatible.
+A canvas can only have ONE context type (`webgl2` OR `2d`, not both). The GPU renderer therefore creates its **own** canvas element overlaid on the existing CPU 2d canvas.
 
-**Decision**: when GPU renderer is active, disable pixel-shift strip rendering for pans. GPU renders the full viewport in <5ms, making strip optimization unnecessary. The CSS transform instant feedback (<2ms) remains active for both paths.
+**Implementation**:
+- `createWebGLRenderer(container)` takes a **container element**, NOT a canvas
+- GPU creates an internal `<canvas>` with `position: absolute; pointer-events: none; display: none`
+- `setVisible(true/false)` toggles GPU canvas visibility (`display: none` ↔ `display: block`)
+- `resize(width, height)` syncs GPU canvas dimensions with the CPU canvas
+- CPU canvas remains for Workers/Fallback path (completely unchanged)
+
+This means the pixel-shift optimization in `useViewportTransition.ts` (which uses `getContext('2d')` + `putImageData`) continues to work on the CPU canvas without conflict. When GPU is active, the GPU canvas is shown on top; when falling back to CPU, the GPU canvas is hidden.
 
 `useViewportTransition.ts` receives a `gpuActive: boolean` flag:
 - `gpuActive = true` → all viewport changes trigger a full GPU re-render (no strip reuse)
@@ -134,11 +143,15 @@ import { COLOR_CYCLE_PERIOD } from '@/domain/coloringModes';
 
 type ShaderKey = `${FractalType}_${ColoringMode}_${number}`;
 
+// Returns null for unsupported fractal/coloring combinations (no throw).
+// Null causes transparent CPU fallback via getOrCompile() → isReady() = false.
 function assembleFragmentSource(
   fractal: FractalType,
   coloring: ColoringMode,
   maxIter: number
-): string {
+): string | null {
+  if (!iterations[fractal] || !coloringChunks[coloring]) return null;
+
   return [
     chunks.header,
     `#define MAX_ITER ${maxIter}`,
@@ -151,6 +164,24 @@ function assembleFragmentSource(
     coloringChunks[coloring],
     chunks.main,
   ].join('\n');
+}
+
+// Helper: check if a fractal/coloring combination has a GPU shader
+function isGpuSupported(fractal: FractalType, coloring: ColoringMode): boolean {
+  return fractal in iterations && coloring in coloringChunks;
+}
+```
+
+### screenToComplex chunk
+
+```glsl
+// @mirror domain/coordinates.ts:screenToComplex
+// Y-axis negation: WebGL gl_FragCoord.y=0 is BOTTOM of viewport,
+// while canvas y=0 is TOP. Must negate uv.y to match CPU coordinates.
+vec2 screenToComplex(vec2 fragCoord, vec2 center, float scale, vec2 resolution) {
+  vec2 uv = (fragCoord - 0.5 * resolution) / resolution.y;
+  float aspect = resolution.x / resolution.y;
+  return center + vec2(uv.x * scale * aspect, -uv.y * scale);
 }
 ```
 
@@ -211,6 +242,25 @@ void iterate(in vec2 c, out vec2 z, out int iter, out bool escaped,
   iter = 0;
   escaped = false;
 
+  // Cardioid/bulb pre-test — skips iteration for ~60% of Mandelbrot interior pixels
+  // @mirror domain/fractals.ts cardioid/bulb check
+  float x = c.x;
+  float y = c.y;
+  float y2c = y * y;
+  float q = (x - 0.25) * (x - 0.25) + y2c;
+  // Cardioid: q*(q + (x-0.25)) <= y²/4
+  if (q * (q + (x - 0.25)) <= y2c * 0.25) {
+    iter = MAX_ITER;
+    smoothVal = 0.0;
+    return;
+  }
+  // Period-2 bulb: (x+1)² + y² <= 1/16
+  if ((x + 1.0) * (x + 1.0) + y2c <= 0.0625) {
+    iter = MAX_ITER;
+    smoothVal = 0.0;
+    return;
+  }
+
   for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x;
     float y2 = z.y * z.y;
@@ -247,6 +297,8 @@ float mapToParam(in float smoothVal, in AccumState acc, in vec2 z, in int iter) 
 interface WebGLRenderer {
   render(options: GPURenderOptions): void;
   updatePalette(palette: PaletteName): void;
+  setVisible(visible: boolean): void;   // Toggle GPU canvas display
+  resize(width: number, height: number): void;  // Sync GPU canvas size
   destroy(): void;
   isReady(): boolean;
 }
@@ -263,7 +315,7 @@ interface GPURenderOptions {
 
 ### Lifecycle
 
-1. **`createWebGLRenderer(canvas)`** — get `webgl2` context, create empty VAO (required by WebGL 2), start async compile of Mandelbrot+Classic+256 via `KHR_parallel_shader_compile`
+1. **`createWebGLRenderer(container)`** — create internal GPU `<canvas>` (position: absolute, pointer-events: none, display: none) inside container, get `webgl2` context, create empty VAO (required by WebGL 2), start async compile of Mandelbrot+Classic+256 via `KHR_parallel_shader_compile`
 2. **`render(options)`** — check cache for `{fractalType, coloringMode, maxIter}` program. If cached → set uniforms + draw. If not → start async compile, return `isReady() = false` (caller falls back to CPU)
 3. **`updatePalette(name)`** — regenerate 256x1 texture via `paletteTexture.ts`
 4. **`destroy()`** — delete all programs, textures, buffers
@@ -298,7 +350,7 @@ const gpu = useRef<WebGLRenderer | null>(null);
 useEffect(() => {
   pool.current = createWorkerPool();
   if (isWebGL2Available()) {
-    gpu.current = createWebGLRenderer(canvasRef.current!);
+    gpu.current = createWebGLRenderer(containerRef.current!);  // container, not canvas
   }
   return () => {
     gpu.current?.destroy();
@@ -389,11 +441,11 @@ Poll is called from `render()` — zero extra timers, piggybacks on the render l
 
 ---
 
-## 10. Progressive GPU Rendering (Perf Guard)
+## 10. Progressive GPU Rendering (Perf Guard) — DISABLED
 
-At high iteration + deep zoom, even GPU can exceed 16ms. On integrated GPUs (Intel UHD) with maxIter=2048, this is realistic.
+The progressive FBO infrastructure is **built but disabled**. With the cardioid/bulb pre-test (Section 4), no measured GPU frame exceeds 16ms even at maxIter=2048 on integrated GPUs. The heuristic `needsProgressiveRender` always returns `false`.
 
-### Mechanism: Resolution Scaling (2 passes)
+### Mechanism: Resolution Scaling (2 passes) — available but inactive
 
 ```
 Pass 1 (preview): render at canvas/4 (480x270 @1080p) → upscale blit → immediate display
@@ -402,7 +454,7 @@ Pass 2 (full-res): render at native resolution (1920x1080) → final display
 
 Mirrors the CPU pattern (stride 4 → stride 1) but with FBO resolution scaling.
 
-### Detection
+### Detection — no evidence of need
 
 Primary: `EXT_disjoint_timer_query_webgl2` (~75% support) measures actual GPU frame time.
 
@@ -411,9 +463,10 @@ Fallback heuristic when timer query unavailable:
 ```typescript
 const workload = width * height * maxIterations;
 const PROGRESSIVE_THRESHOLD = 1920 * 1080 * 512;
-const needsProgressive = timerAvailable
+const needsProgressiveRender = timerAvailable
   ? lastGpuTimeMs > FRAME_BUDGET_MS
   : workload > PROGRESSIVE_THRESHOLD;
+// Currently always returns false — 0.04ms median @256iter, no >16ms frames observed
 ```
 
 ### Implementation (webglRenderer.ts)
@@ -424,6 +477,7 @@ let lastGpuTimeMs = 0;
 
 function render(options: GPURenderOptions): void {
   const needsProgressive = lastGpuTimeMs > FRAME_BUDGET_MS;
+  // needsProgressive has never been true in testing (0.04ms median)
 
   if (needsProgressive) {
     renderToFBO(quarterFBO, options);   // 1/16 pixels
@@ -434,7 +488,7 @@ function render(options: GPURenderOptions): void {
       lastGpuTimeMs = readTimerQuery();
     });
   } else {
-    renderToCanvas(options);
+    renderToCanvas(options);            // always takes this path
     lastGpuTimeMs = readTimerQuery();
   }
 }
@@ -547,6 +601,7 @@ Per WebGL Fundamentals, MDN, and Emscripten:
 - No `readPixels()` (no CPU-GPU sync, all rendering stays on GPU)
 - `gl.viewport()` called on every render (handles canvas resize)
 - All GLSL that mirrors CPU code tagged `@mirror domain/<file>:<function>` for traceability
+- Named constants: `PRECOMPILE_MAX_ITER` (not `DEFAULT_MAX_ITER`), `PREVIEW_SCALE_DIVISOR` (not magic `4`)
 
 ---
 
@@ -589,6 +644,7 @@ Per WebGL Fundamentals, MDN, and Emscripten:
 
 **Total new files**: 13 (+ optional type declarations)
 **Modified files**: 5 (`renderer.ts`, `useRenderer.ts`, `useViewportTransition.ts`, `package.json`, `domain/coloringModes.ts` — add `export` to `COLOR_CYCLE_PERIOD`)
+**Dual canvas impact**: `webglRenderer.ts` creates/manages internal GPU canvas; container element passed from `useRenderer.ts`; CPU canvas and 2d context remain untouched
 **CPU code changes**: minimal (guard `gpuActive` in `useViewportTransition.ts`)
 
 ---
@@ -600,3 +656,19 @@ Per WebGL Fundamentals, MDN, and Emscripten:
 - **v3**: Double-single emulation (vec2-based, zoom to 10^15) — new `chunks/doubleSingle.glsl`
 - **v4**: Perturbation theory — CPU arbitrary precision ref orbit + GPU float32 delta
 - **v4**: WebGPU path when browser support reaches ~90%
+
+---
+
+## 18. Research Findings (post-implementation)
+
+Lessons learned from actual implementation and benchmarking:
+
+1. **Do NOT port periodicity checking to GPU** — warp/wavefront divergence negates gains. Threads in the same warp take different iteration counts, causing all threads to wait for the slowest. The CPU Brent's periodicity check is effective precisely because each thread is independent.
+
+2. **Cardioid/bulb pre-test IS worth it on GPU** — uniform regions (large connected areas of the Mandelbrot interior) minimize divergence. All threads in a warp hit the early exit together, providing consistent speedup.
+
+3. **`gl.finish()`/`gl.flush()` not needed in production** — the browser compositor synchronizes at vsync. These calls are only useful for benchmarking (forcing GPU pipeline drain to get accurate timing). In production, they cause unnecessary CPU-GPU sync stalls.
+
+4. **TWGL.js only used for `createTexture`** — the library's 15KB footprint is used for a single function. Consider dropping TWGL and using raw WebGL 2 `texImage2D` + `texParameteri` calls to eliminate the dependency.
+
+5. **Distance estimation (dz tracking) is low-effort, high-value for normalMap mode** — tracking the derivative `dz` alongside `z` in the iteration loop enables distance estimation with minimal overhead. This is the natural path for implementing the normalMap coloring mode on GPU (v2).
