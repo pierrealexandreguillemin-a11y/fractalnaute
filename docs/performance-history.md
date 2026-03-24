@@ -73,8 +73,8 @@ XaoS-style pixel reuse. CSS transform via `useLayoutEffect` for instant visual f
 
 | Metric | Baseline | CPU Workers | GPU (Mandelbrot) | Factor (GPU vs Baseline) |
 |---|---|---|---|---|
-| Calc @256 | 175ms | 52ms | **0.04ms** | **~4375x** |
-| Calc @1024 | 646ms | 75ms | TODO | — |
+| Calc @256 (Mandelbrot) | 175ms | 52ms | **0.030ms** | **~5800x** |
+| Calc @256 (all 5 avg) | 175ms | 52ms | **0.037ms** | **~4700x** |
 | Pan visual feedback | 71ms | <2ms | <2ms (CSS) | **~35x** |
 | Pan final render | 157ms | 79ms | **0.04ms** (GPU) | **~3925x** |
 | Zoom visual feedback | 86ms | <2ms | <2ms (CSS) | **~43x** |
@@ -113,19 +113,21 @@ User input (mouse/touch/keyboard)
 | Orbit trap | ~250ms | Log scale mapping |
 | Normal map | ~260ms | DE + angle computation |
 
-### + GPU WebGL 2 (TWGL)
+### + GPU WebGL 2 (TWGL) — v1 Mandelbrot then v2 All Fractals
 
-WebGL 2 fragment shader via TWGL.js. Mandelbrot + Classic coloring. Fullscreen triangle (gl_VertexID), palette as 256×1 sRGB texture (gl.LINEAR). Composable GLSL chunks assembled at compile-time. Cardioid/bulb pre-test in GLSL. Dedicated GPU canvas overlay (separate from CPU 2d canvas).
+WebGL 2 fragment shader via TWGL.js. All 5 fractals + Classic coloring. Fullscreen triangle (gl_VertexID), palette as 256×1 sRGB texture (gl.LINEAR). Composable GLSL chunks assembled at compile-time. Cardioid/bulb pre-test (Mandelbrot only). Derivative (dz) tracking for future distance estimation. Dedicated GPU canvas overlay (separate from CPU 2d canvas).
 
-Measured on AMD Radeon Graphics (integrated RDNA2), 1920×912, Playwright + gl.finish() sync.
+Measured on AMD Radeon Graphics (integrated RDNA2), 1920×912 @256iter, Playwright + gl.finish() sync.
 
-| Metric | Value | vs CPU Classic (228ms) | Notes |
+| Fractal | GPU (ms) | vs CPU baseline (175ms) | Notes |
 |---|---|---|---|
-| GPU render @256 | **0.04ms** (median) | **~5700x** | 10 samples, range 0.025–0.08ms |
-| GPU render @1024 | TODO — measure | — | Need to change maxIter and re-benchmark |
-| CPU→GPU fallback | transparent | — | First render CPU (shader compiling), subsequent GPU |
+| **Mandelbrot** | 0.030 | **~5800x** | Cardioid/bulb pre-test active |
+| **Julia** | 0.045 | **~3900x** | z₀ = pixel, c = uniform |
+| **BurningShip** | 0.050 | **~3500x** | abs(z) before squaring |
+| **Tricorn** | 0.035 | **~5000x** | conj(z) before squaring |
+| **Multibrot3** | 0.025 | **~7000x** | z³ via direct multiplication |
 
-Note: 0.04ms is the drawArrays+finish time. Total wall-clock includes React dispatch + debounce (80ms) + uniform setup (~0.01ms). The GPU computation itself is sub-millisecond.
+Note: times are drawArrays+finish (GPU sync). Total wall-clock includes React dispatch + debounce (80ms) + uniform setup (~0.01ms). All sub-0.05ms.
 
 ---
 
