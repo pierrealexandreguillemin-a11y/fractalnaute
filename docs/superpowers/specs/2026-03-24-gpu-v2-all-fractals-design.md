@@ -119,13 +119,14 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
              out float smoothVal, inout AccumState acc) {
   z = vec2(0.0);
-  vec2 dz = vec2(1.0, 0.0);
+  vec2 dz = vec2(0.0);  // dz starts at 0 (z₀=0, dz₀=0)
   iter = 0; escaped = false; smoothVal = 0.0;
 
   for (int i = 0; i < MAX_ITER; i++) {
     z = abs(z);  // BurningShip: absolute value before squaring
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > 4.0) { escaped = true; iter = i; smoothVal = smoothEscape(i, x2 + y2); return; }
+    // dz = 2*abs(z)*dz + 1 (derivative uses folded z)
     dz = vec2(2.0*(z.x*dz.x - z.y*dz.y) + 1.0, 2.0*(z.x*dz.y + z.y*dz.x));
     z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
     updateAccumulator(z, dz, acc);
@@ -141,14 +142,15 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
 void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
              out float smoothVal, inout AccumState acc) {
   z = vec2(0.0);
-  vec2 dz = vec2(1.0, 0.0);
+  vec2 dz = vec2(0.0);  // dz starts at 0 (z₀=0, dz₀=0)
   iter = 0; escaped = false; smoothVal = 0.0;
 
   for (int i = 0; i < MAX_ITER; i++) {
-    z.y = -z.y;  // Tricorn: conjugate z before squaring
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > 4.0) { escaped = true; iter = i; smoothVal = smoothEscape(i, x2 + y2); return; }
-    dz = vec2(2.0*(z.x*dz.x - z.y*dz.y) + 1.0, 2.0*(z.x*dz.y + z.y*dz.x));
+    // dz = 2*conj(z)*dz + 1 (anti-holomorphic, approximate)
+    dz = vec2(2.0*(z.x*dz.x + z.y*dz.y) + 1.0, 2.0*(-z.x*dz.y + z.y*dz.x));
+    z.y = -z.y;  // Tricorn: conjugate z before squaring
     z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
     updateAccumulator(z, dz, acc);
   }
@@ -164,23 +166,26 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
 void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
              out float smoothVal, inout AccumState acc) {
   z = vec2(0.0);
-  vec2 dz = vec2(1.0, 0.0);
+  vec2 dz = vec2(0.0);  // dz starts at 0 (z₀=0, dz₀=0)
   iter = 0; escaped = false; smoothVal = 0.0;
 
   for (int i = 0; i < MAX_ITER; i++) {
     float mod2 = z.x * z.x + z.y * z.y;
     if (mod2 > 4.0) { escaped = true; iter = i; smoothVal = smoothEscape(i, mod2); return; }
 
-    // z^n via repeated complex multiplication
+    // z^n via repeated complex multiplication, capture z^(n-1) for derivative
     vec2 zn = z;
-    vec2 dzn = dz;
+    vec2 zprev = vec2(1.0, 0.0);
     for (int p = 1; p < u_power; p++) {
-      vec2 prev = zn;
-      zn = vec2(prev.x * z.x - prev.y * z.y, prev.x * z.y + prev.y * z.x);
-      // d(z^n)/dz = n*z^(n-1)*dz — chain via product rule
-      dzn = vec2(dzn.x * z.x - dzn.y * z.y, dzn.x * z.y + dzn.y * z.x);
+      zprev = zn;
+      zn = vec2(zprev.x*z.x - zprev.y*z.y, zprev.x*z.y + zprev.y*z.x);
     }
-    dz = vec2(dzn.x * float(u_power), dzn.y * float(u_power));
+    // dz = n*z^(n-1)*dz + 1
+    float nf = float(u_power);
+    dz = vec2(
+      nf*(zprev.x*dz.x - zprev.y*dz.y) + 1.0,
+      nf*(zprev.x*dz.y + zprev.y*dz.x)
+    );
 
     z = zn + c;
     updateAccumulator(z, dz, acc);
@@ -189,7 +194,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
 }
 ```
 
-Note: the inner `for (p < u_power)` loop is bounded by uniform. GPU handles this efficiently for small n (3-5). For large n, polar form would be better — not needed for current UI (n=3 only).
+Note: the inner `for (p < u_power)` loop is bounded by uniform. GPU handles this efficiently for small n (3-5). `zprev` captures `z^(n-1)` for the derivative computation.
 
 ---
 
