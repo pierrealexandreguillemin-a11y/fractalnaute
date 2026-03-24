@@ -55,8 +55,13 @@ export function useRenderer({
   useEffect(() => {
     poolRef.current = createWorkerPool(); // null if SAB unavailable
     const container = containerRef.current;
+    const canvas = canvasRef.current;
     if (container && isWebGL2Available()) {
       gpuRef.current = createWebGLRenderer(container, initialPaletteRef.current);
+      // Sync GPU canvas size immediately — useLayoutEffect resize already ran
+      if (canvas) {
+        gpuRef.current?.resize(canvas.width, canvas.height);
+      }
     }
     return () => {
       gpuRef.current?.destroy();
