@@ -106,8 +106,12 @@ grep -r @tradeoff src/
   Graceful fallback: unsupported fractal/coloring → null → CPU Workers (no throw).
   Facade GPU→Workers→Fallback. Context loss → CPU fallback.
 
-### Next: GPU v2 (all fractals + coloring modes) & Deep zoom
-- GPU v2: extend WebGL 2 shaders to Julia, BurningShip, Tricorn, Multibrot + all 5 coloring modes
+- GPU v2 (all 5 fractals): Julia, BurningShip, Tricorn, Multibrot ported to GLSL.
+  Derivative (dz) tracking in all shaders for future distance estimation.
+  Measured: 0.025-0.050ms @256iter all fractals (3500-7000x vs CPU).
+
+### Next: GPU v3 (coloring modes) & Deep zoom
+- GPU v3: port 5 coloring modes to GLSL (stripe, decomposition, orbitTrap, normalMap) + real accumulator + interior coloring
 - Precision: float32 (zoom cap ~10^7). Double-single vec2 extends to ~10^15.
 
 ### Future: Deep zoom (perturbation theory)
