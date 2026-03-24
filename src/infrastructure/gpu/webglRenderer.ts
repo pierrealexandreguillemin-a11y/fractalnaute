@@ -99,19 +99,19 @@ function renderToTarget(
 
 // ---- Progressive rendering heuristic ----------------------------------------
 
-/** @tradeoff Heuristic threshold — matches 1080p at 512 iterations. */
-const PROGRESSIVE_THRESHOLD = 1920 * 1080 * 512;
-const FRAME_BUDGET_MS = 16;
+// @tradeoff Progressive thresholds — preserved for re-enable when timer queries available
+// const PROGRESSIVE_THRESHOLD = 1920 * 1080 * 2048;
+// const FRAME_BUDGET_MS = 16;
 
 function needsProgressiveRender(
-  gl: WebGL2RenderingContext,
-  maxIterations: number,
-  hasTimerQuery: boolean,
-  lastGpuTimeMs: number
+  _gl: WebGL2RenderingContext,
+  _maxIterations: number,
+  _hasTimerQuery: boolean,
+  _lastGpuTimeMs: number
 ): boolean {
-  if (hasTimerQuery) return lastGpuTimeMs > FRAME_BUDGET_MS;
-  const workload = gl.drawingBufferWidth * gl.drawingBufferHeight * maxIterations;
-  return workload > PROGRESSIVE_THRESHOLD;
+  // @tradeoff Progressive disabled in v1 — cardioid pre-test makes GPU fast enough
+  // Re-enable when timer queries confirm >16ms at high iterations
+  return false;
 }
 
 // ---- Progressive controller -------------------------------------------------

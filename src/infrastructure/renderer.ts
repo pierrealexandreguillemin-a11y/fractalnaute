@@ -36,6 +36,7 @@ export function renderFractal(
 ): () => void {
   // Try GPU path first
   if (gpuRenderer?.isReady()) {
+    const startTime = performance.now();
     const rendered = gpuRenderer.render({
       viewport: options.viewport,
       fractalType: options.fractalType,
@@ -45,7 +46,8 @@ export function renderFractal(
       fractalParams: options.params
     });
     if (rendered) {
-      options.onComplete?.(0); // GPU render is near-instant
+      const elapsed = performance.now() - startTime;
+      options.onComplete?.(elapsed);
       return () => { gpuRenderer.cancelPending(); };
     }
     // GPU not ready (compiling) — fall through to CPU

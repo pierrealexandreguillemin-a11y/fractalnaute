@@ -77,22 +77,40 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   z = vec2(0.0);
   iter = 0;
   escaped = false;
+  smoothVal = 0.0;
 
+  // @mirror domain/periodicity.ts:isInCardioid + isInBulb
+  // Cardioid pre-test: q = (x - 1/4)^2 + y^2; q*(q + (x - 1/4)) <= y^2/4
+  float x_minus_quarter = c.x - 0.25;
+  float y2 = c.y * c.y;
+  float q = x_minus_quarter * x_minus_quarter + y2;
+  if (q * (q + x_minus_quarter) <= 0.25 * y2) {
+    iter = MAX_ITER;
+    return;
+  }
+
+  // Period-2 bulb pre-test: (x+1)^2 + y^2 <= 1/16
+  float x_plus_one = c.x + 1.0;
+  if (x_plus_one * x_plus_one + y2 <= 0.0625) {
+    iter = MAX_ITER;
+    return;
+  }
+
+  // Standard iteration loop
   for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x;
-    float y2 = z.y * z.y;
-    if (x2 + y2 > 4.0) {
+    float y2_iter = z.y * z.y;
+    if (x2 + y2_iter > 4.0) {
       escaped = true;
       iter = i;
-      smoothVal = smoothEscape(i, x2 + y2);
+      smoothVal = smoothEscape(i, x2 + y2_iter);
       return;
     }
-    z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
+    z = vec2(x2 - y2_iter, 2.0 * z.x * z.y) + c;
     updateAccumulator(z, acc);
   }
 
   iter = MAX_ITER;
-  smoothVal = 0.0;
 }
 `;
 
