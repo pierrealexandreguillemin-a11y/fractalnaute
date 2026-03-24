@@ -81,13 +81,28 @@ function bindPaletteTexture(
   gl.uniform1i(paletteLoc, 0);
 }
 
+/** Bind fractal-specific uniforms (Julia c, Multibrot power). */
+function setFractalParams(
+  gl: WebGL2RenderingContext,
+  locations: Map<string, WebGLUniformLocation>,
+  params: FractalParams
+): void {
+  const juliaRe = locations.get('u_juliaRe');
+  const juliaIm = locations.get('u_juliaIm');
+  const power = locations.get('u_power');
+  if (juliaRe) gl.uniform1f(juliaRe, params.juliaRe ?? -0.7);
+  if (juliaIm) gl.uniform1f(juliaIm, params.juliaIm ?? 0.27015);
+  if (power) gl.uniform1i(power, params.power ?? 3);
+}
+
 /** Render the fractal to a specific target (FBO or canvas). */
 function renderToTarget(
   gl: WebGL2RenderingContext,
   target: DrawTarget,
   compiled: CompiledRef,
   viewport: Viewport,
-  paletteTexture: WebGLTexture
+  paletteTexture: WebGLTexture,
+  fractalParams: FractalParams
 ): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
   gl.viewport(0, 0, target.width, target.height);
@@ -95,6 +110,7 @@ function renderToTarget(
   setCenterAndScale(gl, compiled.uniformLocations, viewport);
   const res = compiled.uniformLocations.get('u_resolution');
   if (res) gl.uniform2f(res, target.width, target.height);
+  setFractalParams(gl, compiled.uniformLocations, fractalParams);
   bindPaletteTexture(gl, compiled.uniformLocations, paletteTexture);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
@@ -167,7 +183,8 @@ function createProgressiveController(
       pendingFullResRAF = null;
       gl.bindVertexArray(vao);
       renderToTarget(
-        gl, canvasTarget(), compiled, options.viewport, paletteTexture
+        gl, canvasTarget(), compiled, options.viewport, paletteTexture,
+        options.fractalParams
       );
       lastGpuTimeMs = performance.now() - start;
     });
@@ -192,7 +209,7 @@ function createProgressiveController(
         height: quarterFBO.height
       };
       gl.bindVertexArray(vao);
-      renderToTarget(gl, fboTarget, compiled, options.viewport, paletteTexture);
+      renderToTarget(gl, fboTarget, compiled, options.viewport, paletteTexture, options.fractalParams);
       blitFBOToCanvas(gl, quarterFBO);
       scheduleFullRes(compiled, options, vao, paletteTexture);
     },
@@ -297,7 +314,7 @@ export function createWebGLRenderer(
         renderToTarget(
           gl,
           { fbo: null, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
-          compiled, options.viewport, paletteTexture
+          compiled, options.viewport, paletteTexture, options.fractalParams
         );
       }
       return true;

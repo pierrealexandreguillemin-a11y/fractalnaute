@@ -11,7 +11,9 @@ import {
   fullscreenVert,
   headerChunk, screenToComplexChunk, smoothEscapeChunk,
   paletteLookupChunk, accumulatorNoopChunk,
-  mandelbrotIterationChunk, classicColoringChunk, mainChunk
+  mandelbrotIterationChunk, juliaIterationChunk,
+  burningshipIterationChunk, tricornIterationChunk,
+  multibrotIterationChunk, classicColoringChunk, mainChunk
 } from './shaders';
 
 // ---- Types ------------------------------------------------------------------
@@ -33,7 +35,11 @@ interface PendingCompile {
 // ---- Supported shader sets --------------------------------------------------
 
 const ITERATION_CHUNKS: Partial<Record<FractalType, string>> = {
-  mandelbrot: mandelbrotIterationChunk
+  mandelbrot: mandelbrotIterationChunk,
+  julia: juliaIterationChunk,
+  burningship: burningshipIterationChunk,
+  tricorn: tricornIterationChunk,
+  multibrot3: multibrotIterationChunk,
 };
 
 const ACCUMULATOR_CHUNKS: Partial<Record<ColoringMode, string>> = {
@@ -46,7 +52,7 @@ const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
 
 // ---- Uniform names to cache -------------------------------------------------
 
-const UNIFORM_NAMES = ['u_center', 'u_scale', 'u_resolution', 'u_palette'];
+const UNIFORM_NAMES = ['u_center', 'u_scale', 'u_resolution', 'u_palette', 'u_juliaRe', 'u_juliaIm', 'u_power'];
 
 // ---- Assembly (pure, testable) ----------------------------------------------
 

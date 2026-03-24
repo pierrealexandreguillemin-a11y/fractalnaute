@@ -25,6 +25,9 @@ uniform vec2 u_center;
 uniform float u_scale;
 uniform vec2 u_resolution;
 uniform sampler2D u_palette;
+uniform float u_juliaRe;
+uniform float u_juliaIm;
+uniform int u_power;
 
 out vec4 fragColor;
 `;
@@ -67,7 +70,7 @@ vec3 paletteLookup(float t) {
 export const accumulatorNoopChunk = /* glsl */ `
 struct AccumState { float _unused; };
 AccumState initAccumulator() { return AccumState(0.0); }
-void updateAccumulator(vec2 z, inout AccumState acc) {}
+void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) {}
 `;
 
 // ---- Iteration chunks -------------------------------------------------------
@@ -77,41 +80,144 @@ export const mandelbrotIterationChunk = /* glsl */ `
 void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
              out float smoothVal, inout AccumState acc) {
   z = vec2(0.0);
+  vec2 dz = vec2(0.0);
   iter = 0;
   escaped = false;
   smoothVal = 0.0;
 
   // @mirror domain/periodicity.ts:isInCardioid + isInBulb
-  // Cardioid pre-test: q = (x - 1/4)^2 + y^2; q*(q + (x - 1/4)) <= y^2/4
   float x_minus_quarter = c.x - 0.25;
   float y2 = c.y * c.y;
   float q = x_minus_quarter * x_minus_quarter + y2;
-  if (q * (q + x_minus_quarter) <= 0.25 * y2) {
-    iter = MAX_ITER;
-    return;
-  }
+  if (q * (q + x_minus_quarter) <= 0.25 * y2) { iter = MAX_ITER; return; }
 
-  // Period-2 bulb pre-test: (x+1)^2 + y^2 <= 1/16
   float x_plus_one = c.x + 1.0;
-  if (x_plus_one * x_plus_one + y2 <= 0.0625) {
-    iter = MAX_ITER;
-    return;
-  }
+  if (x_plus_one * x_plus_one + y2 <= 0.0625) { iter = MAX_ITER; return; }
 
-  // Standard iteration loop
   for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x;
     float y2_iter = z.y * z.y;
     if (x2 + y2_iter > 4.0) {
-      escaped = true;
-      iter = i;
+      escaped = true; iter = i;
       smoothVal = smoothEscape(i, x2 + y2_iter);
       return;
     }
+    // dz = 2*z*dz + 1 (complex multiply)
+    dz = vec2(2.0*(z.x*dz.x - z.y*dz.y) + 1.0, 2.0*(z.x*dz.y + z.y*dz.x));
     z = vec2(x2 - y2_iter, 2.0 * z.x * z.y) + c;
-    updateAccumulator(z, acc);
+    updateAccumulator(z, dz, acc);
   }
 
+  iter = MAX_ITER;
+}
+`;
+
+/** @mirror domain/fractals.ts:juliaFastPath */
+export const juliaIterationChunk = /* glsl */ `
+void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
+             out float smoothVal, inout AccumState acc) {
+  z = c_pixel;
+  vec2 c = vec2(u_juliaRe, u_juliaIm);
+  vec2 dz = vec2(1.0, 0.0);
+  iter = 0; escaped = false; smoothVal = 0.0;
+
+  for (int i = 0; i < MAX_ITER; i++) {
+    float x2 = z.x * z.x, y2 = z.y * z.y;
+    if (x2 + y2 > 4.0) {
+      escaped = true; iter = i;
+      smoothVal = smoothEscape(i, x2 + y2);
+      return;
+    }
+    // dz = 2*z*dz (Julia: dc/dc_pixel = 0, no +1)
+    dz = vec2(2.0*(z.x*dz.x - z.y*dz.y), 2.0*(z.x*dz.y + z.y*dz.x));
+    z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
+    updateAccumulator(z, dz, acc);
+  }
+  iter = MAX_ITER;
+}
+`;
+
+/** @mirror domain/fractals.ts:burningShipFastPath */
+export const burningshipIterationChunk = /* glsl */ `
+void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
+             out float smoothVal, inout AccumState acc) {
+  z = vec2(0.0);
+  vec2 dz = vec2(0.0);
+  iter = 0; escaped = false; smoothVal = 0.0;
+
+  for (int i = 0; i < MAX_ITER; i++) {
+    z = abs(z);
+    float x2 = z.x * z.x, y2 = z.y * z.y;
+    if (x2 + y2 > 4.0) {
+      escaped = true; iter = i;
+      smoothVal = smoothEscape(i, x2 + y2);
+      return;
+    }
+    // dz = 2*abs(z)*dz + 1 (derivative uses folded z)
+    dz = vec2(2.0*(z.x*dz.x - z.y*dz.y) + 1.0, 2.0*(z.x*dz.y + z.y*dz.x));
+    z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
+    updateAccumulator(z, dz, acc);
+  }
+  iter = MAX_ITER;
+}
+`;
+
+/** @mirror domain/fractals.ts:tricornFastPath */
+export const tricornIterationChunk = /* glsl */ `
+void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
+             out float smoothVal, inout AccumState acc) {
+  z = vec2(0.0);
+  vec2 dz = vec2(0.0);
+  iter = 0; escaped = false; smoothVal = 0.0;
+
+  for (int i = 0; i < MAX_ITER; i++) {
+    float x2 = z.x * z.x, y2 = z.y * z.y;
+    if (x2 + y2 > 4.0) {
+      escaped = true; iter = i;
+      smoothVal = smoothEscape(i, x2 + y2);
+      return;
+    }
+    // dz = 2*conj(z)*dz + 1 (anti-holomorphic, approximate)
+    dz = vec2(2.0*(z.x*dz.x + z.y*dz.y) + 1.0, 2.0*(-z.x*dz.y + z.y*dz.x));
+    z.y = -z.y;
+    z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
+    updateAccumulator(z, dz, acc);
+  }
+  iter = MAX_ITER;
+}
+`;
+
+/** @mirror domain/fractals.ts:multibrotFastPath */
+export const multibrotIterationChunk = /* glsl */ `
+void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
+             out float smoothVal, inout AccumState acc) {
+  z = vec2(0.0);
+  vec2 dz = vec2(0.0);
+  iter = 0; escaped = false; smoothVal = 0.0;
+
+  for (int i = 0; i < MAX_ITER; i++) {
+    float mod2 = z.x * z.x + z.y * z.y;
+    if (mod2 > 4.0) {
+      escaped = true; iter = i;
+      smoothVal = smoothEscape(i, mod2);
+      return;
+    }
+    // z^n via repeated complex multiplication, capture z^(n-1) for derivative
+    vec2 zn = z;
+    vec2 zprev = vec2(1.0, 0.0);
+    for (int p = 1; p < u_power; p++) {
+      zprev = zn;
+      zn = vec2(zprev.x*z.x - zprev.y*z.y, zprev.x*z.y + zprev.y*z.x);
+    }
+    // dz = n*z^(n-1)*dz + 1
+    float nf = float(u_power);
+    dz = vec2(
+      nf*(zprev.x*dz.x - zprev.y*dz.y) + 1.0,
+      nf*(zprev.x*dz.y + zprev.y*dz.x)
+    );
+    z = zn + c;
+    updateAccumulator(z, dz, acc);
+  }
   iter = MAX_ITER;
 }
 `;
