@@ -5,6 +5,9 @@
  * ===============================================================================
  */
 
+/** Preview renders at 1/N of canvas resolution (each dimension). 4 = 1/16 pixels. */
+const PREVIEW_SCALE_DIVISOR = 4;
+
 // ---- Types ------------------------------------------------------------------
 
 export interface GPUFramebuffer {
@@ -20,8 +23,8 @@ export interface GPUFramebuffer {
 export function createQuarterFBO(
   gl: WebGL2RenderingContext
 ): GPUFramebuffer {
-  const width = Math.max(1, Math.floor(gl.drawingBufferWidth / 4));
-  const height = Math.max(1, Math.floor(gl.drawingBufferHeight / 4));
+  const width = Math.max(1, Math.floor(gl.drawingBufferWidth / PREVIEW_SCALE_DIVISOR));
+  const height = Math.max(1, Math.floor(gl.drawingBufferHeight / PREVIEW_SCALE_DIVISOR));
 
   const texture = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -52,8 +55,8 @@ export function resizeQuarterFBO(
   gl: WebGL2RenderingContext,
   existing: GPUFramebuffer
 ): GPUFramebuffer {
-  const newWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / 4));
-  const newHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / 4));
+  const newWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / PREVIEW_SCALE_DIVISOR));
+  const newHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / PREVIEW_SCALE_DIVISOR));
   if (newWidth === existing.width && newHeight === existing.height) {
     return existing;
   }

@@ -99,18 +99,18 @@ function renderToTarget(
 
 // ---- Progressive rendering heuristic ----------------------------------------
 
-// @tradeoff Progressive thresholds — preserved for re-enable when timer queries available
-// const PROGRESSIVE_THRESHOLD = 1920 * 1080 * 2048;
-// const FRAME_BUDGET_MS = 16;
-
+/**
+ * Progressive rendering is disabled: no measured evidence that GPU frames
+ * exceed 16ms with cardioid/bulb pre-test at typical resolutions.
+ * To re-enable: implement EXT_disjoint_timer_query_webgl2 measurement,
+ * confirm >16ms frames, then add workload-based heuristic here.
+ */
 function needsProgressiveRender(
   _gl: WebGL2RenderingContext,
   _maxIterations: number,
   _hasTimerQuery: boolean,
   _lastGpuTimeMs: number
 ): boolean {
-  // @tradeoff Progressive disabled in v1 — cardioid pre-test makes GPU fast enough
-  // Re-enable when timer queries confirm >16ms at high iterations
   return false;
 }
 
@@ -210,7 +210,8 @@ function createProgressiveController(
 // ---- Factory ----------------------------------------------------------------
 
 const DEFAULT_PALETTE: PaletteName = 'classic';
-const DEFAULT_MAX_ITER = 256;
+/** Default iteration count for eager pre-compilation of the initial shader. */
+const PRECOMPILE_MAX_ITER = 256;
 
 /**
  * Create a WebGL 2 renderer bound to a canvas.
@@ -234,7 +235,7 @@ export function createWebGLRenderer(
   let contextLost = false;
 
   const progressive = createProgressiveController(gl);
-  getOrCompile(gl, 'mandelbrot', 'classic', DEFAULT_MAX_ITER);
+  getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
 
   const onContextLost = (e: Event): void => {
     e.preventDefault();
@@ -246,7 +247,7 @@ export function createWebGLRenderer(
     progressive.resetState();
     initCompiler(gl);
     paletteTexture = createPaletteTexture(gl, currentPalette);
-    getOrCompile(gl, 'mandelbrot', 'classic', DEFAULT_MAX_ITER);
+    getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
   };
 
   canvas.addEventListener('webglcontextlost', onContextLost);
