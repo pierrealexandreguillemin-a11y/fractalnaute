@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assembleFragmentSource } from '../shaderCompiler';
+import { assembleFragmentSource, isGpuSupported } from '../shaderCompiler';
 
 describe('shaderCompiler', () => {
   describe('assembleFragmentSource', () => {
@@ -33,14 +33,26 @@ describe('shaderCompiler', () => {
       expect(source).toContain('AccumState initAccumulator()');
     });
 
-    it('throws for unsupported fractal type', () => {
-      expect(() => assembleFragmentSource('julia', 'classic', 256))
-        .toThrow('No GPU shader for fractal');
+    it('returns null for unsupported fractal type', () => {
+      expect(assembleFragmentSource('julia', 'classic', 256)).toBeNull();
     });
 
-    it('throws for unsupported coloring mode', () => {
-      expect(() => assembleFragmentSource('mandelbrot', 'stripe', 256))
-        .toThrow('No GPU shader for coloring');
+    it('returns null for unsupported coloring mode', () => {
+      expect(assembleFragmentSource('mandelbrot', 'stripe', 256)).toBeNull();
+    });
+  });
+
+  describe('isGpuSupported', () => {
+    it('returns true for Mandelbrot + Classic', () => {
+      expect(isGpuSupported('mandelbrot', 'classic')).toBe(true);
+    });
+
+    it('returns false for Julia (no GPU shader yet)', () => {
+      expect(isGpuSupported('julia', 'classic')).toBe(false);
+    });
+
+    it('returns false for unsupported coloring mode', () => {
+      expect(isGpuSupported('mandelbrot', 'stripe')).toBe(false);
     });
   });
 });

@@ -34,12 +34,14 @@ out vec4 fragColor;
  * CPU: re = centerRe + (x/width - 0.5) * scale * aspect
  *      im = centerIm + (y/height - 0.5) * scale
  * where scale = visible height in complex-plane units
+ * Y negated: WebGL y=0 is bottom of viewport, canvas y=0 is top
  */
 export const screenToComplexChunk = /* glsl */ `
 vec2 screenToComplex(vec2 fragCoord, vec2 center, float scale, vec2 resolution) {
   float aspect = resolution.x / resolution.y;
   vec2 uv = fragCoord / resolution - 0.5;
-  return center + vec2(uv.x * scale * aspect, uv.y * scale);
+  // Negate Y: WebGL gl_FragCoord.y=0 is bottom, but canvas y=0 is top
+  return center + vec2(uv.x * scale * aspect, -uv.y * scale);
 }
 `;
 

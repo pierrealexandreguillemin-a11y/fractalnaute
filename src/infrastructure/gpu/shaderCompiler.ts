@@ -57,42 +57,39 @@ function buildDefines(maxIter: number): string {
   ].join('\n');
 }
 
-function getIterationChunk(fractal: FractalType): string {
-  const chunk = ITERATION_CHUNKS[fractal];
-  if (!chunk) {
-    throw new Error(`No GPU shader for fractal: ${fractal}`);
-  }
-  return chunk;
+function getIterationChunk(fractal: FractalType): string | null {
+  return ITERATION_CHUNKS[fractal] ?? null;
 }
 
-function getAccumulatorChunk(coloring: ColoringMode): string {
-  const chunk = ACCUMULATOR_CHUNKS[coloring];
-  if (!chunk) {
-    throw new Error(`No GPU shader for coloring: ${coloring}`);
-  }
-  return chunk;
+function getAccumulatorChunk(coloring: ColoringMode): string | null {
+  return ACCUMULATOR_CHUNKS[coloring] ?? null;
 }
 
-function getColoringChunk(coloring: ColoringMode): string {
-  const chunk = COLORING_CHUNKS[coloring];
-  if (!chunk) {
-    throw new Error(`No GPU shader for coloring: ${coloring}`);
-  }
-  return chunk;
+function getColoringChunk(coloring: ColoringMode): string | null {
+  return COLORING_CHUNKS[coloring] ?? null;
 }
 
 /**
  * Assemble a complete fragment shader source from chunks.
  * Pure function — no WebGL dependency, fully testable.
  */
+/** Check if a fractal+coloring combination has GPU support. */
+export function isGpuSupported(fractal: FractalType, coloring: ColoringMode): boolean {
+  return getIterationChunk(fractal) !== null
+    && getAccumulatorChunk(coloring) !== null
+    && getColoringChunk(coloring) !== null;
+}
+
 export function assembleFragmentSource(
   fractal: FractalType,
   coloring: ColoringMode,
   maxIter: number
-): string {
+): string | null {
   const iteration = getIterationChunk(fractal);
   const accumulator = getAccumulatorChunk(coloring);
   const coloringChunk = getColoringChunk(coloring);
+
+  if (!iteration || !accumulator || !coloringChunk) return null;
 
   return [
     headerChunk,
@@ -217,6 +214,8 @@ export function getOrCompile(
   if (pendingCompiles.some(p => p.key === key)) return null;
 
   const fragSource = assembleFragmentSource(fractal, coloring, maxIter);
+  if (!fragSource) return null; // Unsupported combination — graceful fallback to CPU
+
   const vert = createShader(gl, gl.VERTEX_SHADER, fullscreenVert);
   const frag = createShader(gl, gl.FRAGMENT_SHADER, fragSource);
   if (!vert || !frag) return null;
