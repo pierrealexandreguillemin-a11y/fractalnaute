@@ -97,10 +97,14 @@ grep -r @tradeoff src/
 - Instant viewport feedback v3 (XaoS-style): CSS transform via useLayoutEffect for instant visual feedback on pan/zoom (<2ms perceived). 80ms debounce, then: pan → pixel-shift + x-range-clipped strip render (2-3 strips, ~5% pixels); zoom → full two-pass re-render. will-change:transform GPU hint. Baseline: 71ms/157ms pan → instant CSS + 80ms debounce + strip render.
 - Advanced coloring: 5 modes (classic, stripe/métal brossé, tessellation/decomposition, orbit trap, normal map/éclairage 3D) + interior toggle. Conditional accumulation (zero Classic overhead measured: 228ms vs 228ms baseline). Stripe +75% overhead (atan2+sin per iter). Harkonen stripe avg, distance estimation (bailout 1e12), orbit trap (log scale), binary decomposition. SRP: coloringAccumulator.ts (observe) + coloringModes.ts (map+dispatch) + palettes.ts (pure lookup). Radix Checkbox, fieldset/legend WCAG 1.3.1, aria-labelledby on all selects, mobile responsive.
 - GPU rendering v4 (WebGL 2 + TWGL): Mandelbrot + Classic coloring via fragment shader.
-  TWGL.js ~15KB. Composable GLSL chunks (compile-time, zero branching).
+  Measured: 0.04ms @256iter 1920x912 (~5700x vs CPU 228ms). AMD Radeon integrated RDNA2.
+  Dual canvas: GPU creates own overlay canvas (pointer-events:none) — single canvas can't have both webgl2 AND 2d context.
+  TWGL.js ~15KB (only createTexture). Composable GLSL chunks as TS string constants (compile-time, zero branching).
+  Cardioid/bulb pre-test in GLSL. Y-axis negated (-uv.y) for WebGL→canvas convention.
   KHR_parallel_shader_compile async. Palette as 256×1 sRGB texture (gl.LINEAR).
-  Progressive FBO (quarter-res) when >16ms. Facade GPU→Workers→Fallback.
-  Context loss → CPU fallback. CSS transform feedback preserved.
+  Progressive FBO infrastructure built but disabled (no measured need).
+  Graceful fallback: unsupported fractal/coloring → null → CPU Workers (no throw).
+  Facade GPU→Workers→Fallback. Context loss → CPU fallback.
 
 ### Next: GPU v2 (all fractals + coloring modes) & Deep zoom
 - GPU v2: extend WebGL 2 shaders to Julia, BurningShip, Tricorn, Multibrot + all 5 coloring modes
@@ -111,9 +115,18 @@ grep -r @tradeoff src/
 - Only ~3 browser implementations exist — competitive advantage
 - Research: docs/research-deep-mandelbrot.md
 
+### GPU gotchas (lecons apprises)
+- Canvas context exclusif: un canvas ne peut avoir qu'UN type de context (webgl2 OU 2d). Solution: dual canvas overlay.
+- WebGL Y-axis: gl_FragCoord.y=0 est le BAS du viewport. Negate uv.y dans screenToComplex.
+- Periodicity checking (Brent) sur GPU: NE PAS PORTER. Divergence warp annule le gain. Brute-force GPU est suffisant.
+- gl.finish()/gl.flush(): NE PAS appeler en production. Browser compose au vsync. Seulement pour benchmark.
+- GLSL string constants en TypeScript (pas de raw loader) — compatible Turbopack sans config.
+- Shader compilation async (KHR_parallel_shader_compile): premier render tombe sur CPU, GPU prend le relais ensuite.
+- assembleFragmentSource retourne null (pas throw) pour fallback gracieux vers CPU.
+
 ### Performance options evaluated
 - See docs/performance-history.md for full comparison table
-- GPU (A) is the only order-of-magnitude gain remaining
+- GPU (A) DONE — measured ~5700x (0.04ms @256iter). Mandelbrot+Classic only.
 - WASM (B) only for perturbation ref orbit if JS perf insufficient
 - OffscreenCanvas (C), adaptive debounce (E), pool resize (F) — marginal, unnecessary after GPU
 
