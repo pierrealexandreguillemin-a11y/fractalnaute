@@ -141,12 +141,19 @@ grep -r @tradeoff src/
 - GPU (A) DONE — measured ~5700x (0.04ms @256iter). All 25 fractal×coloring combinations.
 - WASM (B) only for perturbation ref orbit if JS perf insufficient
 - OffscreenCanvas (C), adaptive debounce (E), pool resize (F) — marginal, unnecessary after GPU
+- Adaptive debounce (E) DONE — 40ms when GPU<1ms, 80ms otherwise
+
+### UX Features
+- URL state persistence: hash-based (`#re=&im=&s=&f=&i=&p=&c=&ic=`), replaceState, debounced
+- Touch: pinch-to-zoom + two-finger pan (single finger = no-op)
+- Responsive UI: mobile bottom-sheet layout <640px, scrollable, stacked panels
+- Adaptive debounce: 40ms when GPU renders <1ms (vs fixed 80ms)
 
 ## Testing
 
 - Framework: vitest (`npm test`)
-- 155 unit tests for domain + infrastructure layers (coloringAccumulator, coloringModes, fractals, shaderCompiler, paletteTexture, gpuCpuParity)
-- All pure functions, deterministic, ~112ms total
+- 310 unit tests (14 test files) for domain + infrastructure + application layers
+- All pure functions, deterministic, ~333ms total
 
 ## Deploy
 
