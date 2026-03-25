@@ -5,9 +5,9 @@
  * ===================================================================
  */
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
 import type { ThemeName, FractalType } from './domain';
-import { useFractalState, useCanvasEvents } from './application';
+import { useFractalState, useCanvasEvents, useUrlInitialConfig, useUrlSync } from './application';
 import type { InitialFractalConfig } from './application';
 import { useRenderer } from './infrastructure';
 
@@ -21,7 +21,21 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { state, stats, actions } = useFractalState(initialConfig);
+  // URL hash overrides props-based initial config
+  const urlConfig = useUrlInitialConfig();
+  const mergedConfig = useMemo<InitialFractalConfig>(
+    () => ({ ...initialConfig, ...urlConfig }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
+    []
+  );
+
+  const { state, stats, actions } = useFractalState(mergedConfig);
+
+  // Sync state changes back to URL hash (debounced)
+  useUrlSync(
+    state.viewport, state.fractalType, state.maxIterations,
+    state.palette, state.coloringMode, state.interiorColoring, state.ssaa
+  );
 
   const handleJuliaPick = useCallback((re: number, im: number) => {
     actions.setJuliaParams({ juliaRe: re, juliaIm: im });
@@ -49,6 +63,7 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
     coloringMode: state.coloringMode,
     interiorColoring: state.interiorColoring,
     ssaa: state.ssaa,
+    lastRenderTime: state.renderTime,
     onRenderStart: () => actions.setRendering(true),
     onRenderComplete: (renderTime, backend) => actions.setRendering(false, renderTime, backend)
   });

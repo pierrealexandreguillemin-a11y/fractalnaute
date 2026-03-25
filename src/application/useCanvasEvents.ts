@@ -100,58 +100,68 @@ function useMouseHandlers(
   return { handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, handleClick, handleDoubleClick };
 }
 
-/** Hook: touch event handlers (pan + pinch zoom) */
+/** Hook: touch event handlers (two-finger pinch zoom + two-finger pan) */
 function useTouchHandlers(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   viewport: Viewport,
   actions: FractalActions
 ) {
-  const isDragging = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
-  const touchDist = useRef(0);
+  const pinchDist = useRef(0);
+  const pinchCenter = useRef({ x: 0, y: 0 });
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     const t0 = e.touches[0];
     const t1 = e.touches[1];
-    if (e.touches.length === 1 && t0) {
-      isDragging.current = true;
-      lastPos.current = { x: t0.clientX, y: t0.clientY };
-    } else if (e.touches.length === 2 && t0 && t1) {
-      isDragging.current = false;
-      touchDist.current = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    if (e.touches.length >= 2 && t0 && t1) {
+      e.preventDefault();
+      pinchDist.current = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      pinchCenter.current = {
+        x: (t0.clientX + t1.clientX) / 2,
+        y: (t0.clientY + t1.clientY) / 2,
+      };
     }
   }, []);
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length < 2) return;
     e.preventDefault();
     const t0 = e.touches[0];
     const t1 = e.touches[1];
+    if (!t0 || !t1) return;
 
-    if (e.touches.length === 1 && isDragging.current && t0) {
-      const dims = getCanvasDims(canvasRef.current);
-      if (!dims.rect) return;
-      const ar = dims.width / dims.height;
-      const dx = (t0.clientX - lastPos.current.x) / dims.rect.width * viewport.scale * ar;
-      const dy = (t0.clientY - lastPos.current.y) / dims.rect.height * viewport.scale;
-      actions.pan(-dx, -dy);
-      lastPos.current = { x: t0.clientX, y: t0.clientY };
-      return;
-    }
+    const cx = (t0.clientX + t1.clientX) / 2;
+    const cy = (t0.clientY + t1.clientY) / 2;
+    const dims = getCanvasDims(canvasRef.current);
+    if (!dims.rect) return;
 
-    if (e.touches.length === 2 && t0 && t1) {
-      const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
-      const cx = (t0.clientX + t1.clientX) / 2;
-      const cy = (t0.clientY + t1.clientY) / 2;
-      const dims = getCanvasDims(canvasRef.current);
+    // Two-finger pan
+    const ar = dims.width / dims.height;
+    const dx = (cx - pinchCenter.current.x) / dims.rect.width * viewport.scale * ar;
+    const dy = (cy - pinchCenter.current.y) / dims.rect.height * viewport.scale;
+    actions.pan(-dx, -dy);
+
+    // Pinch zoom around midpoint
+    const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    if (pinchDist.current > 0 && dist > 0) {
       const pos = toCanvasCoords(cx, cy, dims);
       const c = screenToComplex(pos.x, pos.y, dims.width, dims.height, viewport);
-      actions.zoom(touchDist.current / dist, c.re, c.im);
-      touchDist.current = dist;
+      actions.zoom(pinchDist.current / dist, c.re, c.im);
     }
+
+    pinchDist.current = dist;
+    pinchCenter.current = { x: cx, y: cy };
   }, [canvasRef, viewport, actions]);
 
-  const handleTouchEnd = useCallback(() => {
-    isDragging.current = false;
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    if (e.touches.length >= 2 && t0 && t1) {
+      pinchDist.current = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+      pinchCenter.current = {
+        x: (t0.clientX + t1.clientX) / 2,
+        y: (t0.clientY + t1.clientY) / 2,
+      };
+    }
   }, []);
 
   return { handleTouchStart, handleTouchMove, handleTouchEnd };
@@ -200,7 +210,7 @@ export function useCanvasEvents({
     canvas.addEventListener('mousedown', mouse.handleMouseDown);
     canvas.addEventListener('click', mouse.handleClick);
     canvas.addEventListener('dblclick', mouse.handleDoubleClick);
-    canvas.addEventListener('touchstart', touch.handleTouchStart, { passive: true });
+    canvas.addEventListener('touchstart', touch.handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', touch.handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', touch.handleTouchEnd);
     window.addEventListener('mousemove', mouse.handleMouseMove);

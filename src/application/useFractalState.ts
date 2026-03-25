@@ -160,10 +160,16 @@ export interface InitialFractalConfig {
   theme?: ThemeName;
   palette?: PaletteName;
   maxIterations?: number;
+  centerRe?: number;
+  centerIm?: number;
+  scale?: number;
+  coloringMode?: ColoringMode;
+  interiorColoring?: boolean;
+  ssaa?: boolean;
 }
 
 function buildInitialState(initial?: InitialFractalConfig): FractalState {
-  return {
+  const base = {
     ...initialState,
     ...(initial?.fractalType && {
       fractalType: initial.fractalType,
@@ -172,6 +178,31 @@ function buildInitialState(initial?: InitialFractalConfig): FractalState {
     ...(initial?.theme && { theme: initial.theme }),
     ...(initial?.palette && { palette: initial.palette }),
     ...(initial?.maxIterations !== undefined && { maxIterations: initial.maxIterations }),
+    ...(initial?.coloringMode && { coloringMode: initial.coloringMode }),
+    ...(initial?.interiorColoring !== undefined && { interiorColoring: initial.interiorColoring }),
+    ...(initial?.ssaa !== undefined && { ssaa: initial.ssaa }),
+  };
+  return applyViewportOverrides(base, initial);
+}
+
+/** Apply viewport coordinate overrides after fractalType default viewport is set */
+function applyViewportOverrides(
+  state: FractalState,
+  initial?: InitialFractalConfig
+): FractalState {
+  if (!initial) return state;
+  const has =
+    initial.centerRe !== undefined ||
+    initial.centerIm !== undefined ||
+    initial.scale !== undefined;
+  if (!has) return state;
+  return {
+    ...state,
+    viewport: {
+      centerRe: initial.centerRe ?? state.viewport.centerRe,
+      centerIm: initial.centerIm ?? state.viewport.centerIm,
+      scale: initial.scale ?? state.viewport.scale,
+    },
   };
 }
 
