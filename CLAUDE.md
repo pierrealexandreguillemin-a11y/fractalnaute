@@ -122,8 +122,17 @@ grep -r @tradeoff src/
 3. ~~Progressive FBO + timer query~~ DONE — adaptive heuristic (>16ms → FBO preview), EXT_disjoint_timer_query_webgl2, conservative @2048+ iter
 4. ~~SSAA 2x2~~ DONE — GPU 2x FBO → GL_LINEAR downsample, toggle UI, composes with progressive
 5. ~~Double-single emulation~~ DONE — Mandelbrot DS iteration (vec2 hi+lo), Veltkamp split, zoom 10^-15
-6. Perturbation theory (CPU ref orbit + GPU delta) — zoom 10^-238, ~3 impls browser existent
-- Research: docs/research-deep-mandelbrot.md
+6. Perturbation theory (CPU ref orbit + GPU delta) — zoom 10^-60+
+   - Precision ladder: DS (10^-15) → DD (10^-30) → Jampary/QD (10^-60+)
+   - Reference: mandelbrot.page (DD/QD, 2025), deep-mandelbrot (Jampary), Ambrose (BigFloat, 10^-238)
+   - Architecture: CPU Worker arbitrary precision ref orbit → GPU float32 delta iteration
+   - Glitch detection: detect bad reference points, auto re-reference
+   - Research: docs/research-deep-mandelbrot.md, docs/competitive-analysis.md
+7. Histogram coloring — uniform color distribution via iteration CDF (two-pass)
+   - Reference: mandelbrot.page (HCL histogram), eliminates banding completely
+8. Progressive infinite refinement — start low iter, keep doubling in background
+   - Reference: mandelbrot.page (progressive + cycle detection)
+9. Video export — deep zoom animation recording + download
 
 ### GPU gotchas (lecons apprises)
 - Canvas context exclusif: un canvas ne peut avoir qu'UN type de context (webgl2 OU 2d). Solution: dual canvas overlay.
@@ -140,7 +149,16 @@ grep -r @tradeoff src/
 - See docs/performance-history.md for full comparison table
 - GPU (A) DONE — measured ~5700x (0.04ms @256iter). All 25 fractal×coloring combinations.
 - WASM (B) only for perturbation ref orbit if JS perf insufficient
-- OffscreenCanvas (C), adaptive debounce (E), pool resize (F) — marginal, unnecessary after GPU
+- OffscreenCanvas (C), adaptive debounce (E) DONE, pool resize (F) — marginal
+- See docs/competitive-analysis.md for full competitive landscape (March 2026)
+
+### Competitive advantages (unique in market)
+- 5 fractals × 5 coloring modes GPU-rendered (all others are Mandelbrot-only)
+- WebGL 2 native (<1ms render, no library overhead)
+- SSAA 2x2 toggle (no competitor has this)
+- Touch mobile (most are desktop-only)
+- URL state with Julia params (viewport + fractal + coloring + Julia c)
+- OKLCH perceptually uniform color system
 - Adaptive debounce (E) DONE — 40ms when GPU<1ms, 80ms otherwise
 
 ### UX Features
