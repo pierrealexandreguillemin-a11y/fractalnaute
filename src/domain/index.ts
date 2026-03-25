@@ -38,7 +38,10 @@ export {
   getColorForResult,
   COLORING_MODE_LABELS,
   COLORING_MODES,
-  COLOR_CYCLE_PERIOD
+  COLOR_CYCLE_PERIOD,
+  ORBIT_TRAP_CYCLE,
+  NORMAL_MAP_LIGHT_ANGLE,
+  INTERIOR_ATTENUATION
 } from './coloringModes';
 
 export type { ColorPalette } from './types';

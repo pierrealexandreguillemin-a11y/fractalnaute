@@ -102,7 +102,8 @@ function renderToTarget(
   compiled: CompiledRef,
   viewport: Viewport,
   paletteTexture: WebGLTexture,
-  fractalParams: FractalParams
+  fractalParams: FractalParams,
+  interiorColoring: boolean = false
 ): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
   gl.viewport(0, 0, target.width, target.height);
@@ -111,6 +112,8 @@ function renderToTarget(
   const res = compiled.uniformLocations.get('u_resolution');
   if (res) gl.uniform2f(res, target.width, target.height);
   setFractalParams(gl, compiled.uniformLocations, fractalParams);
+  const intColor = compiled.uniformLocations.get('u_interiorColoring');
+  if (intColor) gl.uniform1i(intColor, interiorColoring ? 1 : 0);
   bindPaletteTexture(gl, compiled.uniformLocations, paletteTexture);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
@@ -184,7 +187,7 @@ function createProgressiveController(
       gl.bindVertexArray(vao);
       renderToTarget(
         gl, canvasTarget(), compiled, options.viewport, paletteTexture,
-        options.fractalParams
+        options.fractalParams, options.interiorColoring
       );
       lastGpuTimeMs = performance.now() - start;
     });
@@ -209,7 +212,7 @@ function createProgressiveController(
         height: quarterFBO.height
       };
       gl.bindVertexArray(vao);
-      renderToTarget(gl, fboTarget, compiled, options.viewport, paletteTexture, options.fractalParams);
+      renderToTarget(gl, fboTarget, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
       blitFBOToCanvas(gl, quarterFBO);
       scheduleFullRes(compiled, options, vao, paletteTexture);
     },
@@ -314,7 +317,8 @@ export function createWebGLRenderer(
         renderToTarget(
           gl,
           { fbo: null, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
-          compiled, options.viewport, paletteTexture, options.fractalParams
+          compiled, options.viewport, paletteTexture, options.fractalParams,
+          options.interiorColoring
         );
       }
       return true;

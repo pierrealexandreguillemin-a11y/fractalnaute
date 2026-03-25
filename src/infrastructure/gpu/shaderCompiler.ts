@@ -6,14 +6,22 @@
  */
 
 import type { FractalType, ColoringMode } from '../../domain/types';
-import { COLOR_CYCLE_PERIOD } from '../../domain/coloringModes';
+import {
+  COLOR_CYCLE_PERIOD, ORBIT_TRAP_CYCLE,
+  NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION
+} from '../../domain/coloringModes';
+import { STRIPE_DENSITY } from '../../domain/coloringAccumulator';
 import {
   fullscreenVert,
   headerChunk, screenToComplexChunk, smoothEscapeChunk,
-  paletteLookupChunk, accumulatorNoopChunk,
+  paletteLookupChunk, accumulatorNoopChunk, accumulatorRealChunk,
   mandelbrotIterationChunk, juliaIterationChunk,
   burningshipIterationChunk, tricornIterationChunk,
-  multibrotIterationChunk, classicColoringChunk, mainChunk
+  multibrotIterationChunk,
+  classicColoringChunk, stripeColoringChunk,
+  decompositionColoringChunk, orbitTrapColoringChunk,
+  normalMapColoringChunk,
+  mainChunk
 } from './shaders';
 
 // ---- Types ------------------------------------------------------------------
@@ -43,23 +51,35 @@ const ITERATION_CHUNKS: Partial<Record<FractalType, string>> = {
 };
 
 const ACCUMULATOR_CHUNKS: Partial<Record<ColoringMode, string>> = {
-  classic: accumulatorNoopChunk
+  classic: accumulatorNoopChunk,
+  stripe: accumulatorRealChunk,
+  decomposition: accumulatorRealChunk,
+  orbitTrap: accumulatorRealChunk,
+  normalMap: accumulatorRealChunk,
 };
 
 const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
-  classic: classicColoringChunk
+  classic: classicColoringChunk,
+  stripe: stripeColoringChunk,
+  decomposition: decompositionColoringChunk,
+  orbitTrap: orbitTrapColoringChunk,
+  normalMap: normalMapColoringChunk,
 };
 
 // ---- Uniform names to cache -------------------------------------------------
 
-const UNIFORM_NAMES = ['u_center', 'u_scale', 'u_resolution', 'u_palette', 'u_juliaRe', 'u_juliaIm', 'u_power'];
+const UNIFORM_NAMES = ['u_center', 'u_scale', 'u_resolution', 'u_palette', 'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring'];
 
 // ---- Assembly (pure, testable) ----------------------------------------------
 
 function buildDefines(maxIter: number): string {
   return [
     `#define MAX_ITER ${maxIter}`,
-    `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`
+    `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
+    `#define STRIPE_DENSITY ${STRIPE_DENSITY}.0`,
+    `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
+    `#define NORMAL_MAP_LIGHT_ANGLE (${NORMAL_MAP_LIGHT_ANGLE})`,
+    `#define INTERIOR_ATTENUATION ${INTERIOR_ATTENUATION}`
   ].join('\n');
 }
 

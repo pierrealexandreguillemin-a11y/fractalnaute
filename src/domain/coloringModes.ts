@@ -19,13 +19,13 @@ import {
 export const COLOR_CYCLE_PERIOD = 256;
 
 /** Tighter cycle for orbit trap mode — creates more color variation at close distances */
-const ORBIT_TRAP_CYCLE = 64;
+export const ORBIT_TRAP_CYCLE = 64;
 
 /** Default light direction for normal map mode (~315 deg, upper-left) */
-const NORMAL_MAP_LIGHT_ANGLE = -0.7854;
+export const NORMAL_MAP_LIGHT_ANGLE = -0.7854;
 
 /** Interior coloring lightness attenuation factor */
-const INTERIOR_ATTENUATION = 0.4;
+export const INTERIOR_ATTENUATION = 0.4;
 
 // ---- Mode dispatch ----------------------------------------------------------
 

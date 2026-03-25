@@ -28,6 +28,7 @@ uniform sampler2D u_palette;
 uniform float u_juliaRe;
 uniform float u_juliaIm;
 uniform int u_power;
+uniform int u_interiorColoring;
 
 out vec4 fragColor;
 `;
@@ -71,6 +72,39 @@ export const accumulatorNoopChunk = /* glsl */ `
 struct AccumState { float _unused; };
 AccumState initAccumulator() { return AccumState(0.0); }
 void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) {}
+`;
+
+/**
+ * @mirror domain/coloringAccumulator.ts
+ * Real accumulator: stripe average + orbit trap + derivative tracking.
+ * STRIPE_DENSITY injected as #define from domain constant (DRY).
+ */
+export const accumulatorRealChunk = /* glsl */ `
+struct AccumState {
+  float stripeSum;
+  float prevStripeSum;
+  float trapDistSq;
+  int count;
+  vec2 dz;
+};
+
+AccumState initAccumulator() {
+  return AccumState(0.0, 0.0, 1e20, 0, vec2(0.0));
+}
+
+void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) {
+  // @mirror domain/coloringAccumulator.ts:updateAccumulator
+  float arg = atan(z.y, z.x);
+  acc.prevStripeSum = acc.stripeSum;
+  acc.stripeSum += 0.5 * sin(STRIPE_DENSITY * arg) + 0.5;
+  acc.count++;
+  acc.dz = dz;
+
+  float distSq = z.x * z.x + z.y * z.y;
+  if (distSq < acc.trapDistSq) {
+    acc.trapDistSq = distSq;
+  }
+}
 `;
 
 // ---- Iteration chunks -------------------------------------------------------
@@ -232,6 +266,73 @@ export const classicColoringChunk = /* glsl */ `
 float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
   return mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
 }
+float computeLightness(AccumState acc, vec2 z) { return 1.0; }
+`;
+
+/**
+ * @mirror domain/coloringModes.ts:stripeToParam
+ * Harkonen stripe average coloring — lerps between prev/current stripe sum.
+ */
+export const stripeColoringChunk = /* glsl */ `
+float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
+  float frac = smoothVal - floor(smoothVal);
+  float rawLerped = acc.prevStripeSum + frac * (acc.stripeSum - acc.prevStripeSum);
+  float stripeVal = acc.count > 0 ? rawLerped / float(acc.count) : 0.0;
+  float base = mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+  return mod(base + stripeVal * 0.5, 1.0);
+}
+float computeLightness(AccumState acc, vec2 z) { return 1.0; }
+`;
+
+/**
+ * @mirror domain/coloringModes.ts:decompToParam
+ * Binary decomposition — two-tone based on escape angle sign.
+ */
+export const decompositionColoringChunk = /* glsl */ `
+float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
+  float angle = atan(z.y, z.x);
+  return angle >= 0.0 ? 0.15 : 0.65;
+}
+float computeLightness(AccumState acc, vec2 z) { return 1.0; }
+`;
+
+/**
+ * @mirror domain/coloringModes.ts:trapToParam
+ * Orbit trap coloring — log-scaled minimum distance to origin.
+ */
+export const orbitTrapColoringChunk = /* glsl */ `
+float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
+  float d = min(sqrt(acc.trapDistSq), 4.0);
+  float logMapped = log(1.0 + d) / log(5.0);
+  float base = mod(smoothVal, ORBIT_TRAP_CYCLE) / ORBIT_TRAP_CYCLE;
+  return mod(logMapped * 0.6 + base * 0.4, 1.0);
+}
+float computeLightness(AccumState acc, vec2 z) { return 1.0; }
+`;
+
+/**
+ * @mirror domain/coloringModes.ts:normalToParam + computeNormalLightness
+ * Normal map / 3D lighting — directional light + distance estimation height.
+ */
+export const normalMapColoringChunk = /* glsl */ `
+float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
+  float base = mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+  float angle = atan(z.y, z.x);
+  float angleNorm = (angle + 3.14159265) / (2.0 * 3.14159265);
+  return mod(base * 0.7 + angleNorm * 0.3, 1.0);
+}
+
+float computeLightness(AccumState acc, vec2 z) {
+  // @mirror domain/coloringModes.ts:computeNormalLightness
+  float zMod = length(z);
+  float dzMod = length(acc.dz);
+  float de = dzMod > 0.0 ? zMod * log(zMod) / dzMod : 0.0;
+  if (de <= 0.0) return 0.5;
+  float dotL = cos(atan(z.y, z.x) - NORMAL_MAP_LIGHT_ANGLE);
+  float logDE = log(1.0 + de * 10.0);
+  float height = min(logDE / 3.0, 1.0);
+  return 0.2 + 1.2 * (dotL * 0.5 + 0.5) * (0.3 + 0.7 * height);
+}
 `;
 
 // ---- Main template ----------------------------------------------------------
@@ -249,11 +350,20 @@ void main() {
   iterate(c, z, iter, escaped, smoothVal, acc);
 
   if (!escaped) {
-    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    if (u_interiorColoring > 0) {
+      float trapDist = sqrt(acc.trapDistSq);
+      float t = min(trapDist, 2.0) / 2.0;
+      vec3 color = paletteLookup(t) * INTERIOR_ATTENUATION;
+      fragColor = vec4(color, 1.0);
+    } else {
+      fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
     return;
   }
 
   float t = mapToParam(smoothVal, acc, z, iter);
-  fragColor = vec4(paletteLookup(t), 1.0);
+  float lightness = computeLightness(acc, z);
+  vec3 color = paletteLookup(t) * lightness;
+  fragColor = vec4(color, 1.0);
 }
 `;
