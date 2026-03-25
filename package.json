@@ -1,6 +1,6 @@
 {
-  "name": "fractal-explorer",
-  "private": true,
+  "name": "fractalnaute",
+  "private": false,
   "version": "1.0.0",
   "type": "module",
   "scripts": {

@@ -1,4 +1,4 @@
-# CLAUDE.md — Conventions pour Claude Code
+# CLAUDE.md — Conventions pour Fractalnaute
 
 Ce fichier documente les conventions, patterns et decisions architecturales du projet.
 

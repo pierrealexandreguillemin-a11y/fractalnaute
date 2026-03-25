@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Fractal Explorer',
-  description: 'Multi-fractal interactive explorer with OKLCH color space',
+  title: 'Fractalnaute',
+  description: 'GPU-accelerated fractal explorer — WebGL 2, 5 fractals × 5 coloring modes, deep zoom to 10⁻¹⁵',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
