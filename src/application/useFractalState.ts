@@ -166,23 +166,48 @@ export interface InitialFractalConfig {
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
   ssaa?: boolean;
+  juliaRe?: number;
+  juliaIm?: number;
+}
+
+/** Apply simple scalar overrides from initial config */
+function applyScalarOverrides(base: FractalState, initial?: InitialFractalConfig): FractalState {
+  if (!initial) return base;
+  return {
+    ...base,
+    ...(initial.theme && { theme: initial.theme }),
+    ...(initial.palette && { palette: initial.palette }),
+    ...(initial.maxIterations !== undefined && { maxIterations: initial.maxIterations }),
+    ...(initial.coloringMode && { coloringMode: initial.coloringMode }),
+    ...(initial.interiorColoring !== undefined && { interiorColoring: initial.interiorColoring }),
+    ...(initial.ssaa !== undefined && { ssaa: initial.ssaa }),
+  };
+}
+
+/** Apply Julia param overrides from initial config */
+function applyJuliaOverrides(base: FractalState, initial?: InitialFractalConfig): FractalState {
+  if (!initial?.juliaRe && initial?.juliaRe !== 0 && !initial?.juliaIm && initial?.juliaIm !== 0) return base;
+  return {
+    ...base,
+    juliaParams: {
+      ...base.juliaParams,
+      ...(initial.juliaRe !== undefined && { juliaRe: initial.juliaRe }),
+      ...(initial.juliaIm !== undefined && { juliaIm: initial.juliaIm }),
+    }
+  };
 }
 
 function buildInitialState(initial?: InitialFractalConfig): FractalState {
-  const base = {
+  const withFractal = {
     ...initialState,
     ...(initial?.fractalType && {
       fractalType: initial.fractalType,
       viewport: getDefaultViewport(initial.fractalType),
     }),
-    ...(initial?.theme && { theme: initial.theme }),
-    ...(initial?.palette && { palette: initial.palette }),
-    ...(initial?.maxIterations !== undefined && { maxIterations: initial.maxIterations }),
-    ...(initial?.coloringMode && { coloringMode: initial.coloringMode }),
-    ...(initial?.interiorColoring !== undefined && { interiorColoring: initial.interiorColoring }),
-    ...(initial?.ssaa !== undefined && { ssaa: initial.ssaa }),
   };
-  return applyViewportOverrides(base, initial);
+  const withScalars = applyScalarOverrides(withFractal, initial);
+  const withJulia = applyJuliaOverrides(withScalars, initial);
+  return applyViewportOverrides(withJulia, initial);
 }
 
 /** Apply viewport coordinate overrides after fractalType default viewport is set */

@@ -22,6 +22,8 @@ interface UrlState {
   coloringMode: ColoringMode;
   interiorColoring: boolean;
   ssaa: boolean;
+  juliaRe: number;
+  juliaIm: number;
 }
 
 const DEBOUNCE_MS = 200;
@@ -101,6 +103,11 @@ function parseBoolParams(
 
   const ssaa = parseBool(params.get('ssaa'));
   if (ssaa !== undefined) result.ssaa = ssaa;
+
+  const jre = parseNum(params.get('jre'));
+  if (jre !== undefined) result.juliaRe = jre;
+  const jim = parseNum(params.get('jim'));
+  if (jim !== undefined) result.juliaIm = jim;
 }
 
 // ── Public pure functions ────────────────────────────────────────
@@ -128,6 +135,8 @@ export function buildHash(state: UrlState): string {
   params.set('c', state.coloringMode);
   params.set('ic', state.interiorColoring ? '1' : '0');
   params.set('ssaa', state.ssaa ? '1' : '0');
+  params.set('jre', formatCoord(state.juliaRe));
+  params.set('jim', formatCoord(state.juliaIm));
   return `#${params.toString()}`;
 }
 
@@ -164,18 +173,16 @@ function extractUrlState(
   palette: PaletteName,
   coloringMode: ColoringMode,
   interiorColoring: boolean,
-  ssaa: boolean
+  ssaa: boolean,
+  juliaRe: number,
+  juliaIm: number
 ): UrlState {
   return {
     centerRe: viewport.centerRe,
     centerIm: viewport.centerIm,
     scale: viewport.scale,
-    fractalType,
-    maxIterations,
-    palette,
-    coloringMode,
-    interiorColoring,
-    ssaa,
+    fractalType, maxIterations, palette, coloringMode,
+    interiorColoring, ssaa, juliaRe, juliaIm,
   };
 }
 
@@ -190,7 +197,9 @@ export function useUrlSync(
   palette: PaletteName,
   coloringMode: ColoringMode,
   interiorColoring: boolean,
-  ssaa: boolean
+  ssaa: boolean,
+  juliaRe: number,
+  juliaIm: number
 ): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -201,7 +210,7 @@ export function useUrlSync(
     timerRef.current = setTimeout(() => {
       const urlState = extractUrlState(
         viewport, fractalType, maxIterations,
-        palette, coloringMode, interiorColoring, ssaa
+        palette, coloringMode, interiorColoring, ssaa, juliaRe, juliaIm
       );
       const newHash = buildHash(urlState);
       const currentHash = window.location.hash;
@@ -215,5 +224,5 @@ export function useUrlSync(
         clearTimeout(timerRef.current);
       }
     };
-  }, [viewport, fractalType, maxIterations, palette, coloringMode, interiorColoring, ssaa]);
+  }, [viewport, fractalType, maxIterations, palette, coloringMode, interiorColoring, ssaa, juliaRe, juliaIm]);
 }

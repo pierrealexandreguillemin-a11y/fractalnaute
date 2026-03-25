@@ -34,7 +34,8 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   // Sync state changes back to URL hash (debounced)
   useUrlSync(
     state.viewport, state.fractalType, state.maxIterations,
-    state.palette, state.coloringMode, state.interiorColoring, state.ssaa
+    state.palette, state.coloringMode, state.interiorColoring, state.ssaa,
+    state.juliaParams.juliaRe ?? -0.7, state.juliaParams.juliaIm ?? 0.27015
   );
 
   const handleJuliaPick = useCallback((re: number, im: number) => {
