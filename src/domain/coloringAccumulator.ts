@@ -91,9 +91,12 @@ export function finalizeEscape(
   distanceEstimate: number;
 } {
   // Catmull-Rom interpolation of stripe history (C1 smooth)
+  // Standard Catmull-Rom: d=0→P1, d=1→P2. P0 and P3 are tangent neighbors.
+  // We interpolate from stripePrev1 (last complete) toward stripeSum (current).
+  // P0=stripePrev2 (tangent before), P3 extrapolated (tangent after).
   const frac = smoothValue - Math.floor(smoothValue);
-  const interpolated = state.count >= 4
-    ? catmullRom(state.stripePrev3, state.stripePrev2, state.stripePrev1, state.stripeSum, frac)
+  const interpolated = state.count >= 3
+    ? catmullRom(state.stripePrev2, state.stripePrev1, state.stripeSum, 2 * state.stripeSum - state.stripePrev1, frac)
     : state.stripePrev1 + frac * (state.stripeSum - state.stripePrev1);
   const stripeValue = state.count > 0 ? interpolated / state.count : 0;
 

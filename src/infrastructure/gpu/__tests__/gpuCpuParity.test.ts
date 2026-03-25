@@ -188,8 +188,9 @@ function catmullRom(s0: number, s1: number, s2: number, s3: number, d: number): 
  */
 function gpuStripeMapToParam(smoothVal: number, acc: GpuAccumState, maxIter: number = 256): number {
   const frac = smoothVal - Math.floor(smoothVal);
-  const interpolated = acc.count >= 4
-    ? catmullRom(acc.stripePrev3, acc.stripePrev2, acc.stripePrev1, acc.stripeSum, frac)
+  const extrapolated = 2 * acc.stripeSum - acc.stripePrev1;
+  const interpolated = acc.count >= 3
+    ? catmullRom(acc.stripePrev2, acc.stripePrev1, acc.stripeSum, extrapolated, frac)
     : acc.stripePrev1 + frac * (acc.stripeSum - acc.stripePrev1);
   const stripeRatio = acc.count > 0 ? interpolated / acc.count : 0;
   // @mirror deep-mandelbrot: stripe amplitude + iteration frequency
@@ -446,18 +447,19 @@ describe('GPU/CPU parity — accumulator', () => {
 
 describe('GPU/CPU parity — stripe coloring', () => {
   const cases = [
-    { smoothVal: 5.7, s: 3.1, s1: 2.3, s2: 1.5, s3: 0.8, count: 5 },
-    { smoothVal: 128.3, s: 64.8, s1: 60.1, s2: 55.0, s3: 50.2, count: 128 },
-    { smoothVal: 0.5, s: 0.8, s1: 0.0, s2: 0.0, s3: 0.0, count: 1 },
-    { smoothVal: 255.99, s: 125.5, s1: 120.0, s2: 115.0, s3: 110.0, count: 255 },
+    { smoothVal: 5.7, s: 3.1, s1: 2.3, s2: 1.5, count: 5 },
+    { smoothVal: 128.3, s: 64.8, s1: 60.1, s2: 55.0, count: 128 },
+    { smoothVal: 0.5, s: 0.8, s1: 0.0, s2: 0.0, count: 1 },
+    { smoothVal: 255.99, s: 125.5, s1: 120.0, s2: 115.0, count: 255 },
   ];
 
   for (const tc of cases) {
     it(`smoothVal=${tc.smoothVal}, count=${tc.count}`, () => {
       // CPU: finalizeEscape computes stripeValue via Catmull-Rom, then stripeToParam maps it
       const frac = tc.smoothVal - Math.floor(tc.smoothVal);
-      const interpolated = tc.count >= 4
-        ? catmullRom(tc.s3, tc.s2, tc.s1, tc.s, frac)
+      const extrapolated = 2 * tc.s - tc.s1;
+      const interpolated = tc.count >= 3
+        ? catmullRom(tc.s2, tc.s1, tc.s, extrapolated, frac)
         : tc.s1 + frac * (tc.s - tc.s1);
       const stripeValue = tc.count > 0 ? interpolated / tc.count : 0;
       const cpuT = mapToColorParam(
@@ -467,7 +469,7 @@ describe('GPU/CPU parity — stripe coloring', () => {
 
       // GPU: inline Catmull-Rom + mapping
       const gpuAcc: GpuAccumState = {
-        stripeSum: tc.s, stripePrev1: tc.s1, stripePrev2: tc.s2, stripePrev3: tc.s3,
+        stripeSum: tc.s, stripePrev1: tc.s1, stripePrev2: tc.s2, stripePrev3: 0,
         trapDistSq: 1, count: tc.count,
       };
       const gpuT = gpuStripeMapToParam(tc.smoothVal, gpuAcc);

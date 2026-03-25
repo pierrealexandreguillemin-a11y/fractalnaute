@@ -107,13 +107,8 @@ void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) { acc.dz = dz; }
 /**
  * @mirror domain/coloringAccumulator.ts
  * Real accumulator: stripe Re(z)·Im(z)/|z|² + orbit trap + derivative.
- * 4-point history for Catmull-Rom interpolation.
- */
-/**
- * @mirror domain/coloringAccumulator.ts
- * Real accumulator: stripe (Re·Im/|z|²) + orbit trap + derivative.
  * 4-point history for Catmull-Rom interpolation at escape.
- * @see https://github.com/munrocket/deep-fractal (reference quality)
+ * @see https://github.com/munrocket/deep-fractal
  */
 export const accumulatorRealChunk = /* glsl */ `
 struct AccumState {
@@ -393,14 +388,16 @@ float catmullRom(float s0, float s1, float s2, float s3, float d) {
 
 float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
   float frac = smoothVal - floor(smoothVal);
-  float interpolated = acc.count >= 4
-    ? catmullRom(acc.stripePrev3, acc.stripePrev2, acc.stripePrev1, acc.stripeSum, frac)
+  // Catmull-Rom: d=0→P1(stripePrev1), d=1→P2(stripeSum). P3 extrapolated.
+  float extrapolated = 2.0 * acc.stripeSum - acc.stripePrev1;
+  float interpolated = acc.count >= 3
+    ? catmullRom(acc.stripePrev2, acc.stripePrev1, acc.stripeSum, extrapolated, frac)
     : acc.stripePrev1 + frac * (acc.stripeSum - acc.stripePrev1);
   float stripeRatio = acc.count > 0 ? interpolated / float(acc.count) : 0.0;
   // @mirror deep-mandelbrot: stripe amplitude + iteration-dependent frequency
   // Produces metallic depth banding instead of flat single-cycle color.
   float amplitude = 0.7 + 2.5 * stripeRatio;
-  float frequency = 50.0 * smoothVal / float(MAX_ITER);
+  float frequency = 50.0 * smoothVal / COLOR_CYCLE_PERIOD;
   return amplitude + frequency;
 }
 float computeLightness(AccumState acc, vec2 z) { return 1.0; }

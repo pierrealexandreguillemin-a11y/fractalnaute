@@ -77,11 +77,11 @@ const UNIFORM_NAMES = [
 
 // ---- Assembly (pure, testable) ----------------------------------------------
 
-function buildDefines(maxIter: number): string {
+function buildDefines(maxIter: number, needsHighBailout: boolean): string {
   return [
     `#define MAX_ITER ${maxIter}`,
     `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
-    `#define BAILOUT_SQ ${STRIPE_BAILOUT_SQ}`,
+    `#define BAILOUT_SQ ${needsHighBailout ? STRIPE_BAILOUT_SQ : '4.0'}`,
     `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
     `#define NORMAL_MAP_LIGHT_ANGLE (${NORMAL_MAP_LIGHT_ANGLE})`,
     `#define INTERIOR_ATTENUATION ${INTERIOR_ATTENUATION}`
@@ -124,13 +124,15 @@ export function assembleFragmentSource(
   const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
   if (!iteration) return null;
 
-  // Stripe mode uses cosine palette (iridescent metallic), others use texture
-  const paletteChunk = coloring === 'stripe' ? cosinePaletteLookupChunk : paletteLookupChunk;
+  // Stripe mode: cosine palette + high bailout for quality
+  const isStripe = coloring === 'stripe';
+  const paletteChunk = isStripe ? cosinePaletteLookupChunk : paletteLookupChunk;
+  const defines = buildDefines(maxIter, isStripe);
 
   const chunks = [
     headerChunk,
-    ...(useDS ? [dsHeaderChunk, buildDefines(maxIter), doubleSingleChunk, screenToComplexDSChunk] :
-               [buildDefines(maxIter)]),
+    ...(useDS ? [dsHeaderChunk, defines, doubleSingleChunk, screenToComplexDSChunk] :
+               [defines]),
     screenToComplexChunk,
     smoothEscapeChunk,
     paletteChunk,
