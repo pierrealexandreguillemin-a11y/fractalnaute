@@ -269,6 +269,67 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
 }
 `;
 
+// ---- DS iteration chunks (double-single precision) -------------------------
+
+/**
+ * Mandelbrot iteration in double-single precision.
+ * z and c carried as vec2(hi,lo) pairs for ~15 digit precision.
+ * Escape test + accumulator use float32 (hi part only).
+ * @mirror mandelbrotIterationChunk (float32 version)
+ */
+export const mandelbrotDSIterationChunk = /* glsl */ `
+void iterate(vec2 c_unused, out vec2 z, out int iter, out bool escaped,
+             out float smoothVal, inout AccumState acc) {
+  // Compute c in double-single from DS uniforms
+  vec2 ds_cre, ds_cim;
+  screenToComplexDS(gl_FragCoord.xy, u_resolution, ds_cre, ds_cim);
+
+  z = vec2(0.0);
+  vec2 dz = vec2(0.0);
+  iter = 0; escaped = false; smoothVal = 0.0;
+
+  // Cardioid/bulb pre-test (float32 — c.hi is sufficient)
+  float cx = ds_cre.x, cy = ds_cim.x;
+  float xmq = cx - 0.25;
+  float cy2 = cy * cy;
+  float q = xmq * xmq + cy2;
+  if (q * (q + xmq) <= 0.25 * cy2) { iter = MAX_ITER; return; }
+  float xp1 = cx + 1.0;
+  if (xp1 * xp1 + cy2 <= 0.0625) { iter = MAX_ITER; return; }
+
+  // DS iteration: z = z² + c
+  vec2 ds_zre = vec2(0.0);
+  vec2 ds_zim = vec2(0.0);
+
+  for (int i = 0; i < MAX_ITER; i++) {
+    // Escape test on float32 hi parts
+    float x2 = ds_zre.x * ds_zre.x;
+    float y2 = ds_zim.x * ds_zim.x;
+    if (x2 + y2 > 4.0) {
+      escaped = true; iter = i;
+      smoothVal = smoothEscape(i, x2 + y2);
+      z = vec2(ds_zre.x, ds_zim.x);
+      return;
+    }
+    // dz = 2*z*dz + 1 (float32 — sufficient for distance estimation)
+    dz = vec2(2.0*(ds_zre.x*dz.x - ds_zim.x*dz.y) + 1.0,
+              2.0*(ds_zre.x*dz.y + ds_zim.x*dz.x));
+    // z_new = z² + c in DS
+    vec2 ds_x2 = ds_sq(ds_zre);
+    vec2 ds_y2 = ds_sq(ds_zim);
+    vec2 ds_xy = ds_mul(ds_zre, ds_zim);
+    ds_zre = ds_add(ds_sub(ds_x2, ds_y2), ds_cre);
+    ds_zim = ds_add(ds_mul_float(ds_xy, 2.0), ds_cim);
+    // Accumulator uses float32 hi parts
+    z = vec2(ds_zre.x, ds_zim.x);
+    updateAccumulator(z, dz, acc);
+  }
+
+  z = vec2(ds_zre.x, ds_zim.x);
+  iter = MAX_ITER;
+}
+`;
+
 // ---- Coloring chunks --------------------------------------------------------
 
 /**

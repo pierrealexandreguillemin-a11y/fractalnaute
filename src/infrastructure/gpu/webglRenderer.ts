@@ -60,16 +60,36 @@ interface CompiledRef {
 
 // ---- Uniform binding helpers ------------------------------------------------
 
-/** Bind center / scale uniforms from viewport state. */
+/**
+ * Split a float64 into float32 hi + lo correction pair.
+ * hi = Math.fround(value), lo = value - hi.
+ * Together hi + lo ≈ value with ~46 bits of precision.
+ */
+function splitDouble(value: number): [number, number] {
+  const hi = Math.fround(value);
+  return [hi, value - hi];
+}
+
+/** Bind center / scale uniforms from viewport state (hi + DS lo corrections). */
 function setCenterAndScale(
   gl: WebGL2RenderingContext,
   locations: Map<string, WebGLUniformLocation>,
   viewport: Viewport
 ): void {
+  const [reHi, reLo] = splitDouble(viewport.centerRe);
+  const [imHi, imLo] = splitDouble(viewport.centerIm);
+  const [scaleHi, scaleLo] = splitDouble(viewport.scale);
+
   const center = locations.get('u_center');
-  if (center) gl.uniform2f(center, viewport.centerRe, viewport.centerIm);
+  if (center) gl.uniform2f(center, reHi, imHi);
   const scale = locations.get('u_scale');
-  if (scale) gl.uniform1f(scale, viewport.scale);
+  if (scale) gl.uniform1f(scale, scaleHi);
+
+  // DS lo corrections (unused by float32 shaders — uniforms default to 0)
+  const centerLo = locations.get('u_centerLo');
+  if (centerLo) gl.uniform2f(centerLo, reLo, imLo);
+  const scaleLoLoc = locations.get('u_scaleLo');
+  if (scaleLoLoc) gl.uniform1f(scaleLoLoc, scaleLo);
 }
 
 /** Bind palette sampler uniform. */

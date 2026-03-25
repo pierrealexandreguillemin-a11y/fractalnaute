@@ -15,7 +15,8 @@ import {
   fullscreenVert,
   headerChunk, screenToComplexChunk, smoothEscapeChunk,
   paletteLookupChunk, accumulatorNoopChunk, accumulatorRealChunk,
-  mandelbrotIterationChunk, juliaIterationChunk,
+  mandelbrotIterationChunk, mandelbrotDSIterationChunk,
+  juliaIterationChunk,
   burningshipIterationChunk, tricornIterationChunk,
   multibrotIterationChunk,
   classicColoringChunk, stripeColoringChunk,
@@ -23,6 +24,9 @@ import {
   normalMapColoringChunk,
   mainChunk
 } from './shaders';
+import {
+  doubleSingleChunk, dsHeaderChunk, screenToComplexDSChunk, DS_UNIFORM_NAMES
+} from './shaders/doubleSingle';
 
 // ---- Types ------------------------------------------------------------------
 
@@ -64,7 +68,11 @@ const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
 
 // ---- Uniform names to cache -------------------------------------------------
 
-const UNIFORM_NAMES = ['u_center', 'u_scale', 'u_resolution', 'u_palette', 'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring'];
+const UNIFORM_NAMES = [
+  'u_center', 'u_scale', 'u_resolution', 'u_palette',
+  'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring',
+  ...DS_UNIFORM_NAMES
+];
 
 // ---- Assembly (pure, testable) ----------------------------------------------
 
@@ -103,18 +111,21 @@ export function assembleFragmentSource(
   maxIter: number,
   interiorColoring: boolean
 ): string | null {
-  const iteration = getIterationChunk(fractal);
   const coloringChunk = getColoringChunk(coloring);
+  if (!coloringChunk) return null;
 
-  if (!iteration || !coloringChunk) return null;
-
-  // @mirror renderBand.ts:needsAccum — same logic: coloring !== 'classic' || interiorColoring
   const needsRealAccum = coloring !== 'classic' || interiorColoring;
   const accumulator = needsRealAccum ? accumulatorRealChunk : accumulatorNoopChunk;
 
-  return [
+  // Mandelbrot uses DS iteration for extended zoom precision
+  const useDS = fractal === 'mandelbrot';
+  const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
+  if (!iteration) return null;
+
+  const chunks = [
     headerChunk,
-    buildDefines(maxIter),
+    ...(useDS ? [dsHeaderChunk, buildDefines(maxIter), doubleSingleChunk, screenToComplexDSChunk] :
+               [buildDefines(maxIter)]),
     screenToComplexChunk,
     smoothEscapeChunk,
     paletteLookupChunk,
@@ -122,7 +133,9 @@ export function assembleFragmentSource(
     iteration,
     coloringChunk,
     mainChunk
-  ].join('\n');
+  ];
+
+  return chunks.join('\n');
 }
 
 // ---- Module-level caches (design debt acknowledged for v1) ------------------
