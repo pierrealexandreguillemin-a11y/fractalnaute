@@ -68,10 +68,18 @@ vec3 paletteLookup(float t) {
 }
 `;
 
+// AccumState struct must match accumulatorRealChunk so main.glsl can use acc.trapDistSq etc.
+// The noop version just skips the per-iteration work (no atan, no sin, no min).
 export const accumulatorNoopChunk = /* glsl */ `
-struct AccumState { float _unused; };
-AccumState initAccumulator() { return AccumState(0.0); }
-void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) {}
+struct AccumState {
+  float stripeSum;
+  float prevStripeSum;
+  float trapDistSq;
+  int count;
+  vec2 dz;
+};
+AccumState initAccumulator() { return AccumState(0.0, 0.0, 1e20, 0, vec2(0.0)); }
+void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) { acc.dz = dz; }
 `;
 
 /**
