@@ -7,7 +7,7 @@
  */
 
 import type {
-  Viewport, ColoringMode, PaletteName, FractalParams
+  Viewport, FractalType, ColoringMode, PaletteName, FractalParams
 } from '../../domain/types';
 import {
   initCompiler, getOrCompile, pollCompilation,
@@ -24,7 +24,7 @@ import type { GPUFramebuffer } from './gpuFramebuffer';
 
 export interface GPURenderOptions {
   viewport: Viewport;
-  fractalType: import('../../domain/types').FractalType;
+  fractalType: FractalType;
   maxIterations: number;
   coloringMode: ColoringMode;
   interiorColoring: boolean;
@@ -263,6 +263,40 @@ const DEFAULT_PALETTE: PaletteName = 'classic';
 /** Default iteration count for eager pre-compilation of the initial shader. */
 const PRECOMPILE_MAX_ITER = 256;
 
+// ---- Idle-time shader pre-compilation ---------------------------------------
+
+/** Fractal variants to pre-compile (classic coloring covers the default). */
+const PRECOMPILE_FRACTALS: FractalType[] = [
+  'julia', 'burningship', 'tricorn', 'multibrot3'
+];
+
+/**
+ * Pre-compile common shader variants during browser idle time.
+ * This eliminates the CPU-fallback stall when switching fractal type.
+ * mandelbrot+classic is already compiled eagerly; this covers the rest.
+ */
+function precompileCommonVariants(gl: WebGL2RenderingContext): void {
+  let index = 0;
+
+  function compileNext(): void {
+    if (index >= PRECOMPILE_FRACTALS.length) return;
+    const fractal = PRECOMPILE_FRACTALS[index]!;
+    getOrCompile(gl, fractal, 'classic', PRECOMPILE_MAX_ITER);
+    index++;
+    scheduleNext();
+  }
+
+  function scheduleNext(): void {
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(compileNext);
+    } else {
+      setTimeout(compileNext, 50);
+    }
+  }
+
+  scheduleNext();
+}
+
 /**
  * Create a WebGL 2 renderer with its own dedicated canvas overlay.
  * Returns null if the browser does not support WebGL 2.
@@ -310,6 +344,7 @@ export function createWebGLRenderer(
 
   const progressive = createProgressiveController(gl);
   getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
+  precompileCommonVariants(gl);
 
   const { onContextLost, onContextRestored } = setupContextHandlers(
     gl, gpuCanvas, progressive, () => currentPalette,
