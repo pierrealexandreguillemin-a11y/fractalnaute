@@ -54,11 +54,16 @@ vec2 screenToComplex(vec2 fragCoord, vec2 center, float scale, vec2 resolution) 
  * CPU: iter + 1 - log(log(zRe2+zIm2)/2 / ln2) / ln2
  * Simplified: iter + 1 - log2(0.5 * log2(mod2))
  * Uses native log2() for clarity and GPU efficiency
- * Note: v2 Multibrot needs logBase=n variant (fractals.ts line 453)
  */
 export const smoothEscapeChunk = /* glsl */ `
 float smoothEscape(int iter, float mod2) {
   return float(iter) + 1.0 - log2(0.5 * log2(mod2));
+}
+
+float smoothEscapeGeneral(int iter, float mod2, float logBase) {
+  float lnBase = log(logBase);
+  float logZn = log(mod2) * 0.5;
+  return float(iter) + 1.0 - log(logZn / lnBase) / lnBase;
 }
 `;
 
@@ -241,7 +246,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
     float mod2 = z.x * z.x + z.y * z.y;
     if (mod2 > 4.0) {
       escaped = true; iter = i;
-      smoothVal = smoothEscape(i, mod2);
+      smoothVal = smoothEscapeGeneral(i, mod2, float(u_power));
       return;
     }
     // z^n via repeated complex multiplication, capture z^(n-1) for derivative

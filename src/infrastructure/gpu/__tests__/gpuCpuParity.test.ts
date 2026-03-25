@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { screenToComplex } from '../../../domain/coordinates';
-import { calculateMandelbrot } from '../../../domain/fractals';
+import { calculateMandelbrot, calculateMultibrot } from '../../../domain/fractals';
 import { mapToColorParam, COLOR_CYCLE_PERIOD } from '../../../domain/coloringModes';
 import { isInCardioid, isInBulb } from '../../../domain/periodicity';
 import type { FractalResult } from '../../../domain/types';
@@ -40,6 +40,17 @@ function gpuScreenToComplex(
  */
 function gpuSmoothEscape(iter: number, mod2: number): number {
   return iter + 1.0 - Math.log2(0.5 * Math.log2(mod2));
+}
+
+/**
+ * GPU smoothEscapeGeneral — mirrors shaders/index.ts:smoothEscapeChunk.
+ * Generalized version for Multibrot with logBase=n.
+ * float(iter) + 1.0 - log(log(mod2)*0.5 / lnBase) / lnBase
+ */
+function gpuSmoothEscapeGeneral(iter: number, mod2: number, logBase: number): number {
+  const lnBase = Math.log(logBase);
+  const logZn = Math.log(mod2) * 0.5;
+  return iter + 1.0 - Math.log(logZn / lnBase) / lnBase;
 }
 
 /**
@@ -122,6 +133,51 @@ describe('GPU/CPU parity — smoothEscape', () => {
       expect(gpuVal).toBeCloseTo(cpuVal, 10);
     });
   }
+});
+
+describe('GPU/CPU parity — smoothEscapeGeneral (Multibrot)', () => {
+  const cases = [
+    { iter: 10, mod2: 5.0, logBase: 3 },
+    { iter: 50, mod2: 10.0, logBase: 4 },
+    { iter: 100, mod2: 20.0, logBase: 5 },
+    { iter: 25, mod2: 6.5, logBase: 3 },
+  ];
+
+  for (const tc of cases) {
+    it(`iter=${tc.iter}, mod2=${tc.mod2}, logBase=${tc.logBase}`, () => {
+      const gpuVal = gpuSmoothEscapeGeneral(tc.iter, tc.mod2, tc.logBase);
+      // CPU smoothEscape with logBase=n: iter + 1 - log(logZn/ln(n))/ln(n)
+      const lnBase = Math.log(tc.logBase);
+      const logZn = Math.log(tc.mod2) / 2;
+      const cpuVal = tc.iter + 1 - Math.log(logZn / lnBase) / lnBase;
+      expect(gpuVal).toBeCloseTo(cpuVal, 10);
+    });
+  }
+
+  it('Multibrot escape uses logBase=n, matching CPU', () => {
+    // Known escaping point for Multibrot n=3
+    const result = calculateMultibrot(1.0, 0.0, 256, { power: 3 });
+    expect(result.escaped).toBe(true);
+
+    // Re-run iteration manually to capture final z
+    let zRe = 0, zIm = 0, iter = 0;
+    while (zRe * zRe + zIm * zIm <= 4 && iter < 256) {
+      let pRe = zRe, pIm = zIm;
+      for (let k = 1; k < 3; k++) {
+        const tmpRe = pRe * zRe - pIm * zIm;
+        const tmpIm = pRe * zIm + pIm * zRe;
+        pRe = tmpRe;
+        pIm = tmpIm;
+      }
+      zRe = pRe + 1.0;
+      zIm = pIm + 0.0;
+      iter++;
+    }
+
+    const mod2 = zRe * zRe + zIm * zIm;
+    const gpuSmooth = gpuSmoothEscapeGeneral(iter, mod2, 3);
+    expect(gpuSmooth).toBeCloseTo(result.smoothValue, 8);
+  });
 });
 
 describe('GPU/CPU parity — classic coloring mapToParam', () => {

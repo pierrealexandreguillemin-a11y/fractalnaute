@@ -8,7 +8,6 @@
 import type { PaletteName } from '../../domain/types';
 import { resolvePalette } from '../../domain/palettes';
 import { oklchToRgb } from '../../domain/color';
-import { createTexture } from 'twgl.js';
 
 const PALETTE_SIZE = 256;
 const COMPONENTS = 4; // RGBA
@@ -46,15 +45,24 @@ export function createPaletteTexture(
 ): WebGLTexture {
   const data = createPaletteData(paletteName);
 
-  return createTexture(gl, {
-    src: data,
-    width: PALETTE_SIZE,
-    height: 1,
-    min: gl.LINEAR,
-    mag: gl.LINEAR,
-    wrap: gl.CLAMP_TO_EDGE,
-    internalFormat: gl.RGBA8,
-  });
+  const tex = gl.createTexture();
+  if (!tex) {
+    throw new Error('Failed to create WebGL palette texture');
+  }
+
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(
+    gl.TEXTURE_2D, 0, gl.RGBA8,
+    PALETTE_SIZE, 1, 0,
+    gl.RGBA, gl.UNSIGNED_BYTE, data
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+
+  return tex;
 }
 
 /**

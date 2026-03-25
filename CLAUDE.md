@@ -96,10 +96,10 @@ grep -r @tradeoff src/
 - Progressive rendering v2: stride-based two-pass (stride 4 preview → stride 1 full-res). Preview in ~3ms, 5% total overhead. Industry-standard approach (Fractint/UltraFractal style).
 - Instant viewport feedback v3 (XaoS-style): CSS transform via useLayoutEffect for instant visual feedback on pan/zoom (<2ms perceived). 80ms debounce, then: pan → pixel-shift + x-range-clipped strip render (2-3 strips, ~5% pixels); zoom → full two-pass re-render. will-change:transform GPU hint. Baseline: 71ms/157ms pan → instant CSS + 80ms debounce + strip render.
 - Advanced coloring: 5 modes (classic, stripe/métal brossé, tessellation/decomposition, orbit trap, normal map/éclairage 3D) + interior toggle. Conditional accumulation (zero Classic overhead measured: 228ms vs 228ms baseline). Stripe +75% overhead (atan2+sin per iter). Harkonen stripe avg, distance estimation (bailout 1e12), orbit trap (log scale), binary decomposition. SRP: coloringAccumulator.ts (observe) + coloringModes.ts (map+dispatch) + palettes.ts (pure lookup). Radix Checkbox, fieldset/legend WCAG 1.3.1, aria-labelledby on all selects, mobile responsive.
-- GPU rendering v4 (WebGL 2 + TWGL): Mandelbrot + Classic coloring via fragment shader.
+- GPU rendering v4 (WebGL 2): Mandelbrot + Classic coloring via fragment shader.
   Measured: 0.04ms @256iter 1920x912 (~5700x vs CPU 228ms). AMD Radeon integrated RDNA2.
   Dual canvas: GPU creates own overlay canvas (pointer-events:none) — single canvas can't have both webgl2 AND 2d context.
-  TWGL.js ~15KB (only createTexture). Composable GLSL chunks as TS string constants (compile-time, zero branching).
+  Raw WebGL 2 (no library). Composable GLSL chunks as TS string constants (compile-time, zero branching).
   Cardioid/bulb pre-test in GLSL. Y-axis negated (-uv.y) for WebGL→canvas convention.
   KHR_parallel_shader_compile async. Palette as 256×1 sRGB texture (gl.LINEAR).
   Progressive FBO infrastructure built but disabled (no measured need).
@@ -135,14 +135,14 @@ grep -r @tradeoff src/
 
 ### Performance options evaluated
 - See docs/performance-history.md for full comparison table
-- GPU (A) DONE — measured ~5700x (0.04ms @256iter). Mandelbrot+Classic only.
+- GPU (A) DONE — measured ~5700x (0.04ms @256iter). All 25 fractal×coloring combinations.
 - WASM (B) only for perturbation ref orbit if JS perf insufficient
 - OffscreenCanvas (C), adaptive debounce (E), pool resize (F) — marginal, unnecessary after GPU
 
 ## Testing
 
 - Framework: vitest (`npm test`)
-- 58 unit tests for domain layer (coloringAccumulator, coloringModes, fractals)
+- 119 unit tests for domain + infrastructure layers (coloringAccumulator, coloringModes, fractals, shaderCompiler, paletteTexture, gpuCpuParity)
 - All pure functions, deterministic, 32ms total
 
 ## Deploy

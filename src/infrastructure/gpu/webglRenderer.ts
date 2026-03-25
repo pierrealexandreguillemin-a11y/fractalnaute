@@ -250,7 +250,7 @@ function createGpuCanvas(
   gpuCanvas.style.pointerEvents = 'none';
   gpuCanvas.style.display = 'none';
 
-  const maybeGl = gpuCanvas.getContext('webgl2', { antialias: false, alpha: false });
+  const maybeGl = gpuCanvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true });
   if (!maybeGl) return null;
 
   container.appendChild(gpuCanvas);
@@ -274,11 +274,16 @@ const PRECOMPILE_FRACTALS: FractalType[] = [
  * Pre-compile common shader variants during browser idle time.
  * This eliminates the CPU-fallback stall when switching fractal type.
  * mandelbrot+classic is already compiled eagerly; this covers the rest.
+ * Accepts an isDestroyed callback to cancel idle work after destroy().
  */
-function precompileCommonVariants(gl: WebGL2RenderingContext): void {
+function precompileCommonVariants(
+  gl: WebGL2RenderingContext,
+  isDestroyed: () => boolean
+): void {
   let index = 0;
 
   function compileNext(): void {
+    if (isDestroyed()) return;
     if (index >= PRECOMPILE_FRACTALS.length) return;
     const fractal = PRECOMPILE_FRACTALS[index]!;
     getOrCompile(gl, fractal, 'classic', PRECOMPILE_MAX_ITER);
@@ -341,10 +346,11 @@ export function createWebGLRenderer(
   let paletteTexture = createPaletteTexture(gl, palette);
   let currentPalette: PaletteName = palette;
   let contextLost = false;
+  let destroyed = false;
 
   const progressive = createProgressiveController(gl);
   getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
-  precompileCommonVariants(gl);
+  precompileCommonVariants(gl, () => destroyed);
 
   const { onContextLost, onContextRestored } = setupContextHandlers(
     gl, gpuCanvas, progressive, () => currentPalette,
@@ -393,6 +399,7 @@ export function createWebGLRenderer(
     },
 
     destroy(): void {
+      destroyed = true;
       progressive.destroy();
       gpuCanvas.removeEventListener('webglcontextlost', onContextLost);
       gpuCanvas.removeEventListener('webglcontextrestored', onContextRestored);

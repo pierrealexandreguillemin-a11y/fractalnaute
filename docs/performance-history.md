@@ -80,7 +80,7 @@ XaoS-style pixel reuse. CSS transform via `useLayoutEffect` for instant visual f
 | Zoom visual feedback | 86ms | <2ms | <2ms (CSS) | **~43x** |
 | Zoom final render | 205ms | 135ms | **0.04ms** (GPU) | **~5125x** |
 
-Note: GPU values are for Mandelbrot + Classic coloring only. Other fractals/coloring modes use CPU Workers fallback.
+Note: GPU values measured on Mandelbrot + Classic. All 25 fractal×coloring combinations are GPU-rendered.
 
 ---
 
@@ -113,9 +113,9 @@ User input (mouse/touch/keyboard)
 | Orbit trap | ~250ms | Log scale mapping |
 | Normal map | ~260ms | DE + angle computation |
 
-### + GPU WebGL 2 (TWGL) — v1 Mandelbrot then v2 All Fractals
+### + GPU WebGL 2 — v1 Mandelbrot then v2 All Fractals
 
-WebGL 2 fragment shader via TWGL.js. All 5 fractals + Classic coloring. Fullscreen triangle (gl_VertexID), palette as 256×1 sRGB texture (gl.LINEAR). Composable GLSL chunks assembled at compile-time. Cardioid/bulb pre-test (Mandelbrot only). Derivative (dz) tracking for future distance estimation. Dedicated GPU canvas overlay (separate from CPU 2d canvas).
+WebGL 2 fragment shader (raw WebGL 2, no library). All 5 fractals + Classic coloring. Fullscreen triangle (gl_VertexID), palette as 256×1 sRGB texture (gl.LINEAR). Composable GLSL chunks assembled at compile-time. Cardioid/bulb pre-test (Mandelbrot only). Derivative (dz) tracking for future distance estimation. Dedicated GPU canvas overlay (separate from CPU 2d canvas).
 
 Measured on AMD Radeon Graphics (integrated RDNA2), 1920×912 @256iter, Playwright + gl.finish() sync.
 
@@ -151,7 +151,7 @@ All 25 fractal×coloring combinations are GPU-rendered. Interior coloring suppor
 
 | Option | Expected Gain | Effort | Status |
 |---|---|---|---|
-| **A. GPU WebGL 2 (TWGL)** | **Measured: ~5700x** (0.04ms @256iter) | High | DONE. Mandelbrot + Classic. Dedicated GPU canvas + cardioid pre-test. |
+| **A. GPU WebGL 2** | **Measured: ~5700x** (0.04ms @256iter) | High | DONE. All 25 fractal×coloring combinations. Dedicated GPU canvas + cardioid pre-test. |
 | **B. WASM (Rust)** | 1.5-2x vs JS CPU | Medium | Only useful for perturbation theory ref orbit, not pixel rendering |
 | **C. OffscreenCanvas** | ~20% — unblocks main thread | Low | Workers use OffscreenCanvas instead of SAB→putImageData |
 | **D. Perturbation theory** | Unlimited deep zoom | High | JS arbitrary precision (Jampary-style). Only ~3 browser implementations exist. |
@@ -160,7 +160,7 @@ All 25 fractal×coloring combinations are GPU-rendered. Interior coloring suppor
 
 ### Recommended path
 
-1. **A (GPU)** — DONE. Measured 228ms → 0.04ms (~5700x). Mandelbrot + Classic only.
+1. **A (GPU)** — DONE. Measured 228ms → 0.04ms (~5700x). All 25 fractal×coloring combinations.
 2. **D (Perturbation)** — after GPU. Deep zoom beyond float64. DeepMandelbrot proves JS-only is viable.
 3. C/E/F become unnecessary once GPU is in place.
 4. B (WASM) only for perturbation ref orbit computation if JS perf is insufficient.

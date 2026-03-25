@@ -65,6 +65,12 @@ describe('shaderCompiler', () => {
       expect(source).toContain('u_power');
     });
 
+    it('Multibrot shader uses smoothEscapeGeneral with u_power logBase', () => {
+      const source = assembleFragmentSource('multibrot3', 'classic', 256, false);
+      expect(source).toContain('smoothEscapeGeneral(');
+      expect(source).toContain('float(u_power)');
+    });
+
     it('BurningShip shader uses abs(z) before squaring', () => {
       const source = assembleFragmentSource('burningship', 'classic', 256, false);
       expect(source).toContain('abs(z)');
