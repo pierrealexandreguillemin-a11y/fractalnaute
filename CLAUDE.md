@@ -110,8 +110,13 @@ grep -r @tradeoff src/
   Derivative (dz) tracking in all shaders for future distance estimation.
   Measured: 0.025-0.050ms @256iter all fractals (3500-7000x vs CPU).
 
-### Next: GPU v3 (coloring modes) & Deep zoom
-- GPU v3: port 5 coloring modes to GLSL (stripe, decomposition, orbitTrap, normalMap) + real accumulator + interior coloring
+- GPU v3 (all 5 coloring modes): stripe, decomposition, orbitTrap, normalMap ported to GLSL.
+  Real accumulator (stripe avg + orbit trap + dz). Interior coloring (orbit trap + attenuation).
+  Distance estimation for normalMap lighting. All 25 fractal×coloring combinations GPU-rendered.
+  Constants DRY: STRIPE_DENSITY, ORBIT_TRAP_CYCLE, NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION from domain.
+  Verified via Playwright screenshots (5/5 modes correct, 0 console errors).
+
+### Next: Quality & Deep zoom
 - Precision: float32 (zoom cap ~10^7). Double-single vec2 extends to ~10^15.
 
 ### Future: Deep zoom (perturbation theory)
