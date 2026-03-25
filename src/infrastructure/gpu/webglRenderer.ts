@@ -307,7 +307,8 @@ export function createWebGLRenderer(
       progressive.cancelPending();
       pollCompilation(gl);
       const compiled = getOrCompile(
-        gl, options.fractalType, options.coloringMode, options.maxIterations
+        gl, options.fractalType, options.coloringMode, options.maxIterations,
+        options.interiorColoring
       );
       if (!compiled) return false;
       if (progressive.shouldUseProgressive(options.maxIterations)) {

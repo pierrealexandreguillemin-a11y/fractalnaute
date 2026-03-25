@@ -26,7 +26,7 @@ import {
 
 // ---- Types ------------------------------------------------------------------
 
-type ShaderKey = `${FractalType}_${ColoringMode}_${number}`;
+type ShaderKey = `${FractalType}_${ColoringMode}_${number}_${boolean}`;
 
 interface CompiledProgram {
   program: WebGLProgram;
@@ -50,13 +50,9 @@ const ITERATION_CHUNKS: Partial<Record<FractalType, string>> = {
   multibrot3: multibrotIterationChunk,
 };
 
-const ACCUMULATOR_CHUNKS: Partial<Record<ColoringMode, string>> = {
-  classic: accumulatorNoopChunk,
-  stripe: accumulatorRealChunk,
-  decomposition: accumulatorRealChunk,
-  orbitTrap: accumulatorRealChunk,
-  normalMap: accumulatorRealChunk,
-};
+// Accumulator selection is now inline in assembleFragmentSource
+// based on coloring mode AND interiorColoring flag.
+// @mirror renderBand.ts:needsAccum — same logic: coloring !== 'classic' || interiorColoring
 
 const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
   classic: classicColoringChunk,
@@ -87,35 +83,34 @@ function getIterationChunk(fractal: FractalType): string | null {
   return ITERATION_CHUNKS[fractal] ?? null;
 }
 
-function getAccumulatorChunk(coloring: ColoringMode): string | null {
-  return ACCUMULATOR_CHUNKS[coloring] ?? null;
-}
-
 function getColoringChunk(coloring: ColoringMode): string | null {
   return COLORING_CHUNKS[coloring] ?? null;
+}
+
+/** Check if a fractal+coloring combination has GPU support. */
+export function isGpuSupported(fractal: FractalType, coloring: ColoringMode): boolean {
+  return getIterationChunk(fractal) !== null
+    && getColoringChunk(coloring) !== null;
 }
 
 /**
  * Assemble a complete fragment shader source from chunks.
  * Pure function — no WebGL dependency, fully testable.
  */
-/** Check if a fractal+coloring combination has GPU support. */
-export function isGpuSupported(fractal: FractalType, coloring: ColoringMode): boolean {
-  return getIterationChunk(fractal) !== null
-    && getAccumulatorChunk(coloring) !== null
-    && getColoringChunk(coloring) !== null;
-}
-
 export function assembleFragmentSource(
   fractal: FractalType,
   coloring: ColoringMode,
-  maxIter: number
+  maxIter: number,
+  interiorColoring: boolean
 ): string | null {
   const iteration = getIterationChunk(fractal);
-  const accumulator = getAccumulatorChunk(coloring);
   const coloringChunk = getColoringChunk(coloring);
 
-  if (!iteration || !accumulator || !coloringChunk) return null;
+  if (!iteration || !coloringChunk) return null;
+
+  // @mirror renderBand.ts:needsAccum — same logic: coloring !== 'classic' || interiorColoring
+  const needsRealAccum = coloring !== 'classic' || interiorColoring;
+  const accumulator = needsRealAccum ? accumulatorRealChunk : accumulatorNoopChunk;
 
   return [
     headerChunk,
@@ -148,9 +143,10 @@ export function initCompiler(gl: WebGL2RenderingContext): void {
 function makeShaderKey(
   fractal: FractalType,
   coloring: ColoringMode,
-  maxIter: number
+  maxIter: number,
+  interiorColoring: boolean
 ): ShaderKey {
-  return `${fractal}_${coloring}_${maxIter}`;
+  return `${fractal}_${coloring}_${maxIter}_${interiorColoring}`;
 }
 
 function createShader(
@@ -230,16 +226,17 @@ export function getOrCompile(
   gl: WebGL2RenderingContext,
   fractal: FractalType,
   coloring: ColoringMode,
-  maxIter: number
+  maxIter: number,
+  interiorColoring: boolean = false
 ): CompiledProgram | null {
-  const key = makeShaderKey(fractal, coloring, maxIter);
+  const key = makeShaderKey(fractal, coloring, maxIter, interiorColoring);
   const existing = cache.get(key);
   if (existing) return existing;
 
   // Already pending — don't double-submit
   if (pendingCompiles.some(p => p.key === key)) return null;
 
-  const fragSource = assembleFragmentSource(fractal, coloring, maxIter);
+  const fragSource = assembleFragmentSource(fractal, coloring, maxIter, interiorColoring);
   if (!fragSource) return null; // Unsupported combination — graceful fallback to CPU
 
   const vert = createShader(gl, gl.VERTEX_SHADER, fullscreenVert);
