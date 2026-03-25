@@ -5,14 +5,69 @@
  * the same outputs as the CPU domain functions for known inputs.
  * Catches formula transcription errors without needing a browser.
  *
+ * Known GPU/CPU divergences (intentional, documented here):
+ * - Bailout: GPU uses 4.0, CPU accumulate path uses 1e12 (better DE quality)
+ * - trapDistSq init: GPU 1e20, CPU Infinity (GPU float has no Inf literal)
+ * - PI precision: GPU GLSL uses 3.14159265 (~8 digits), CPU uses Math.PI (~15)
+ * These don't affect formula parity tests (both sides run in float64 here).
+ *
  * @mirror infrastructure/gpu/shaders/index.ts
  */
 import { describe, it, expect } from 'vitest';
 import { screenToComplex } from '../../../domain/coordinates';
 import { calculateMandelbrot, calculateMultibrot } from '../../../domain/fractals';
-import { mapToColorParam, COLOR_CYCLE_PERIOD } from '../../../domain/coloringModes';
+import {
+  mapToColorParam, COLOR_CYCLE_PERIOD, ORBIT_TRAP_CYCLE,
+  NORMAL_MAP_LIGHT_ANGLE, computeNormalLightness, mapInteriorToParam
+} from '../../../domain/coloringModes';
+import {
+  initAccumulator, updateAccumulator, finalizeEscape, STRIPE_DENSITY
+} from '../../../domain/coloringAccumulator';
 import { isInCardioid, isInBulb } from '../../../domain/periodicity';
 import type { FractalResult } from '../../../domain/types';
+
+// ---- Test helpers -----------------------------------------------------------
+
+/** Factory for escaped FractalResult with sensible defaults */
+function makeEscapedResult(overrides: Partial<FractalResult> = {}): FractalResult {
+  return {
+    iterations: 50, escaped: true, smoothValue: 10.5,
+    stripeValue: 0, decompAngle: 0, orbitTrapDist: 1, distanceEstimate: 0,
+    ...overrides,
+  };
+}
+
+/**
+ * Run Mandelbrot iteration with both CPU and GPU accumulators (bailout=4).
+ * Shared helper — eliminates duplicated iteration loops in end-to-end tests.
+ */
+function iterateMandelbrot(cRe: number, cIm: number) {
+  const gpuAcc = gpuInitAccumulator();
+  const cpuAcc = initAccumulator();
+  let zRe = 0, zIm = 0, iter = 0;
+  let dzRe = 0, dzIm = 0;
+
+  while (zRe * zRe + zIm * zIm <= 4 && iter < 256) {
+    const newDzRe = 2 * (zRe * dzRe - zIm * dzIm) + 1;
+    const newDzIm = 2 * (zRe * dzIm + zIm * dzRe);
+    dzRe = newDzRe; dzIm = newDzIm;
+
+    const newIm = 2 * zRe * zIm + cIm;
+    const newRe = zRe * zRe - zIm * zIm + cRe;
+    zRe = newRe; zIm = newIm;
+
+    updateAccumulator(cpuAcc, zRe, zIm);
+    gpuUpdateAccumulator(zRe, zIm, gpuAcc);
+    iter++;
+  }
+
+  const mod2 = zRe * zRe + zIm * zIm;
+  return {
+    zRe, zIm, dzRe, dzIm, iter,
+    smoothVal: gpuSmoothEscape(iter, mod2),
+    gpuAcc, cpuAcc,
+  };
+}
 
 // ---- GPU-equivalent helpers (replicate GLSL in TypeScript) ------------------
 
@@ -80,11 +135,91 @@ function gpuIsInBulb(cRe: number, cIm: number): boolean {
   return xp1 * xp1 + cIm * cIm <= 0.0625;
 }
 
+// ---- GPU-equivalent helpers for coloring modes ------------------------------
+
+/** GPU accumulator state — mirrors AccumState struct in accumulatorRealChunk */
+interface GpuAccumState {
+  stripeSum: number;
+  prevStripeSum: number;
+  trapDistSq: number;
+  count: number;
+}
+
+/** @mirror shaders/index.ts:accumulatorRealChunk — initAccumulator */
+function gpuInitAccumulator(): GpuAccumState {
+  return { stripeSum: 0, prevStripeSum: 0, trapDistSq: 1e20, count: 0 };
+}
+
+/** @mirror shaders/index.ts:accumulatorRealChunk — updateAccumulator */
+function gpuUpdateAccumulator(zRe: number, zIm: number, acc: GpuAccumState): void {
+  const arg = Math.atan2(zIm, zRe);
+  acc.prevStripeSum = acc.stripeSum;
+  acc.stripeSum += 0.5 * Math.sin(STRIPE_DENSITY * arg) + 0.5;
+  acc.count++;
+
+  const distSq = zRe * zRe + zIm * zIm;
+  if (distSq < acc.trapDistSq) {
+    acc.trapDistSq = distSq;
+  }
+}
+
+/**
+ * @mirror shaders/index.ts:stripeColoringChunk — mapToParam
+ * GPU does finalization + mapping in one step (no separate finalizeEscape).
+ */
+function gpuStripeMapToParam(smoothVal: number, acc: GpuAccumState): number {
+  const frac = smoothVal - Math.floor(smoothVal);
+  const rawLerped = acc.prevStripeSum + frac * (acc.stripeSum - acc.prevStripeSum);
+  const stripeVal = acc.count > 0 ? rawLerped / acc.count : 0;
+  const base = (smoothVal % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+  return (base + stripeVal * 0.5) % 1;
+}
+
+/** @mirror shaders/index.ts:decompositionColoringChunk — mapToParam */
+function gpuDecompMapToParam(zRe: number, zIm: number): number {
+  const angle = Math.atan2(zIm, zRe);
+  return angle >= 0 ? 0.15 : 0.65;
+}
+
+/** @mirror shaders/index.ts:orbitTrapColoringChunk — mapToParam */
+function gpuTrapMapToParam(smoothVal: number, trapDistSq: number): number {
+  const d = Math.min(Math.sqrt(trapDistSq), 4);
+  const logMapped = Math.log(1 + d) / Math.log(5);
+  const base = (smoothVal % ORBIT_TRAP_CYCLE) / ORBIT_TRAP_CYCLE;
+  return (logMapped * 0.6 + base * 0.4) % 1;
+}
+
+/** @mirror shaders/index.ts:normalMapColoringChunk — mapToParam */
+function gpuNormalMapToParam(smoothVal: number, zRe: number, zIm: number): number {
+  const base = (smoothVal % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+  const angle = Math.atan2(zIm, zRe);
+  const angleNorm = (angle + Math.PI) / (2 * Math.PI);
+  return (base * 0.7 + angleNorm * 0.3) % 1;
+}
+
+/** @mirror shaders/index.ts:normalMapColoringChunk — computeLightness */
+function gpuComputeNormalLightness(
+  zRe: number, zIm: number, dzRe: number, dzIm: number
+): number {
+  const zMod = Math.sqrt(zRe * zRe + zIm * zIm);
+  const dzMod = Math.sqrt(dzRe * dzRe + dzIm * dzIm);
+  const de = dzMod > 0 ? zMod * Math.log(zMod) / dzMod : 0;
+  if (de <= 0) return 0.5;
+  const dotL = Math.cos(Math.atan2(zIm, zRe) - NORMAL_MAP_LIGHT_ANGLE);
+  const logDE = Math.log(1 + de * 10);
+  const height = Math.min(logDE / 3, 1);
+  return 0.2 + 1.2 * (dotL * 0.5 + 0.5) * (0.3 + 0.7 * height);
+}
+
+/** @mirror shaders/index.ts:mainChunk — interior coloring branch */
+function gpuInteriorParam(trapDistSq: number): number {
+  const trapDist = Math.sqrt(trapDistSq);
+  return Math.min(trapDist, 2) / 2;
+}
+
 // ---- Tests ------------------------------------------------------------------
 
 describe('GPU/CPU parity — screenToComplex', () => {
-  // CPU uses pixel-corner (x,y), GPU uses pixel-center gl_FragCoord.
-  // We feed both the same convention (pixel-center) and verify parity.
   const cases = [
     { x: 960, y: 456, cRe: -0.5, cIm: 0.0, scale: 2.8, w: 1920, h: 912 },
     { x: 0, y: 0, cRe: -0.5, cIm: 0.0, scale: 2.8, w: 1920, h: 912 },
@@ -94,18 +229,14 @@ describe('GPU/CPU parity — screenToComplex', () => {
 
   for (const tc of cases) {
     it(`pixel (${tc.x}, ${tc.y})`, () => {
-      // CPU: pixel-corner convention
       const cpu = screenToComplex(tc.x, tc.y, tc.w, tc.h, {
         centerRe: tc.cRe, centerIm: tc.cIm, scale: tc.scale,
       });
-
-      // GPU: gl_FragCoord uses pixel-center, Y flipped from bottom
       const glFragX = tc.x + 0.5;
       const glFragY = tc.h - tc.y - 0.5;
       const gpu = gpuScreenToComplex(
         glFragX, glFragY, tc.cRe, tc.cIm, tc.scale, tc.w, tc.h,
       );
-
       // Difference is exactly half-pixel offset (sub-pixel, expected)
       const halfPixelRe = 0.5 / tc.w * tc.scale * (tc.w / tc.h);
       const halfPixelIm = 0.5 / tc.h * tc.scale;
@@ -146,7 +277,6 @@ describe('GPU/CPU parity — smoothEscapeGeneral (Multibrot)', () => {
   for (const tc of cases) {
     it(`iter=${tc.iter}, mod2=${tc.mod2}, logBase=${tc.logBase}`, () => {
       const gpuVal = gpuSmoothEscapeGeneral(tc.iter, tc.mod2, tc.logBase);
-      // CPU smoothEscape with logBase=n: iter + 1 - log(logZn/ln(n))/ln(n)
       const lnBase = Math.log(tc.logBase);
       const logZn = Math.log(tc.mod2) / 2;
       const cpuVal = tc.iter + 1 - Math.log(logZn / lnBase) / lnBase;
@@ -155,11 +285,9 @@ describe('GPU/CPU parity — smoothEscapeGeneral (Multibrot)', () => {
   }
 
   it('Multibrot escape uses logBase=n, matching CPU', () => {
-    // Known escaping point for Multibrot n=3
     const result = calculateMultibrot(1.0, 0.0, 256, { power: 3 });
     expect(result.escaped).toBe(true);
 
-    // Re-run iteration manually to capture final z
     let zRe = 0, zIm = 0, iter = 0;
     while (zRe * zRe + zIm * zIm <= 4 && iter < 256) {
       let pRe = zRe, pIm = zIm;
@@ -184,12 +312,7 @@ describe('GPU/CPU parity — classic coloring mapToParam', () => {
   it('produces same t for given smoothValues', () => {
     const smoothValues = [0.5, 42.7, 128.3, 255.9, 300.1];
     for (const sv of smoothValues) {
-      const result: FractalResult = {
-        iterations: 42, escaped: true, smoothValue: sv,
-        stripeValue: 0, decompAngle: 0, orbitTrapDist: 1, distanceEstimate: 0,
-      };
-      const cpuT = mapToColorParam(result, 'classic');
-      // GPU: mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD
+      const cpuT = mapToColorParam(makeEscapedResult({ smoothValue: sv }), 'classic');
       const gpuT = (sv % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
       expect(gpuT).toBeCloseTo(cpuT, 10);
     }
@@ -206,7 +329,6 @@ describe('GPU/CPU parity — cardioid/bulb pre-test', () => {
   for (const p of cardioidPoints) {
     it(`cardioid agrees at (${p.re}, ${p.im})`, () => {
       expect(gpuIsInCardioid(p.re, p.im)).toBe(isInCardioid(p.re, p.im));
-      // Both should detect interior
       const result = calculateMandelbrot(p.re, p.im, 256, {});
       expect(result.escaped).toBe(false);
     });
@@ -223,7 +345,6 @@ describe('GPU/CPU parity — cardioid/bulb pre-test', () => {
   }
 
   it('exterior point rejected by both', () => {
-    // (2, 0) is clearly outside
     expect(gpuIsInCardioid(2.0, 0.0)).toBe(false);
     expect(isInCardioid(2.0, 0.0)).toBe(false);
     expect(gpuIsInBulb(2.0, 0.0)).toBe(false);
@@ -232,8 +353,6 @@ describe('GPU/CPU parity — cardioid/bulb pre-test', () => {
 });
 
 describe('GPU/CPU parity — Mandelbrot iteration agreement', () => {
-  // Known-escaping points: verify CPU iteration + smoothEscape matches
-  // the GPU formula applied to the same final z values.
   const escapingPoints = [
     { cRe: 0.5, cIm: 0.5 },
     { cRe: -2.0, cIm: 0.5 },
@@ -257,8 +376,264 @@ describe('GPU/CPU parity — Mandelbrot iteration agreement', () => {
 
       const mod2 = zRe2 + zIm2;
       const gpuSmooth = gpuSmoothEscape(iter, mod2);
-      // CPU smoothEscape uses the same final z
       expect(gpuSmooth).toBeCloseTo(result.smoothValue, 8);
+    });
+  }
+});
+
+// ---- Coloring mode parity tests ---------------------------------------------
+
+describe('GPU/CPU parity — accumulator', () => {
+  const zSequence = [
+    { re: 0.3, im: 0.5 },
+    { re: -0.2, im: 0.8 },
+    { re: 1.1, im: -0.3 },
+    { re: 0.05, im: 0.05 },
+    { re: -1.5, im: 1.2 },
+  ];
+
+  it('per-iteration stripeSum and count match', () => {
+    const cpuAcc = initAccumulator();
+    const gpuAcc = gpuInitAccumulator();
+
+    for (const z of zSequence) {
+      updateAccumulator(cpuAcc, z.re, z.im);
+      gpuUpdateAccumulator(z.re, z.im, gpuAcc);
+
+      expect(gpuAcc.stripeSum).toBeCloseTo(cpuAcc.stripeSum, 12);
+      expect(gpuAcc.prevStripeSum).toBeCloseTo(cpuAcc.prevStripeSum, 12);
+      expect(gpuAcc.count).toBe(cpuAcc.count);
+    }
+  });
+
+  it('trapDistSq tracks minimum identically', () => {
+    const cpuAcc = initAccumulator();
+    const gpuAcc = gpuInitAccumulator();
+
+    for (const z of zSequence) {
+      updateAccumulator(cpuAcc, z.re, z.im);
+      gpuUpdateAccumulator(z.re, z.im, gpuAcc);
+    }
+
+    // CPU starts at Infinity, GPU at 1e20 — both converge to same min
+    // (any real |z|^2 < 1e20 and < Infinity)
+    expect(gpuAcc.trapDistSq).toBeCloseTo(cpuAcc.trapDistSq, 12);
+  });
+});
+
+describe('GPU/CPU parity — stripe coloring', () => {
+  const cases = [
+    { smoothVal: 5.7, prevStripe: 2.3, stripe: 3.1, count: 5 },
+    { smoothVal: 128.3, prevStripe: 60.1, stripe: 64.8, count: 128 },
+    { smoothVal: 0.5, prevStripe: 0.0, stripe: 0.8, count: 1 },
+    { smoothVal: 255.99, prevStripe: 120.0, stripe: 125.5, count: 255 },
+  ];
+
+  for (const tc of cases) {
+    it(`smoothVal=${tc.smoothVal}, count=${tc.count}`, () => {
+      // CPU: finalizeEscape computes stripeValue, then stripeToParam maps it
+      const frac = tc.smoothVal - Math.floor(tc.smoothVal);
+      const rawLerped = tc.prevStripe + frac * (tc.stripe - tc.prevStripe);
+      const stripeValue = tc.count > 0 ? rawLerped / tc.count : 0;
+      const cpuT = mapToColorParam(
+        makeEscapedResult({ smoothValue: tc.smoothVal, stripeValue }),
+        'stripe',
+      );
+
+      // GPU: inline finalization + mapping in one step
+      const gpuAcc: GpuAccumState = {
+        stripeSum: tc.stripe, prevStripeSum: tc.prevStripe,
+        trapDistSq: 1, count: tc.count,
+      };
+      const gpuT = gpuStripeMapToParam(tc.smoothVal, gpuAcc);
+
+      expect(gpuT).toBeCloseTo(cpuT, 12);
+    });
+  }
+
+  it('count=0 edge case: both fall back to classic base', () => {
+    const smoothVal = 42.7;
+    const cpuT = mapToColorParam(
+      makeEscapedResult({ smoothValue: smoothVal, stripeValue: 0 }),
+      'stripe',
+    );
+    const gpuAcc: GpuAccumState = {
+      stripeSum: 0, prevStripeSum: 0, trapDistSq: 1e20, count: 0,
+    };
+    const gpuT = gpuStripeMapToParam(smoothVal, gpuAcc);
+
+    // Both should produce pure classic base (stripeVal=0)
+    const expectedBase = (smoothVal % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+    expect(gpuT).toBeCloseTo(expectedBase, 12);
+    expect(cpuT).toBeCloseTo(expectedBase, 12);
+  });
+
+  it('end-to-end with shared iteration (GPU bailout=4)', () => {
+    // Tests full accumulator → finalize → map pipeline parity
+    const r = iterateMandelbrot(0.5, 0.5);
+
+    const escape = finalizeEscape(r.cpuAcc, r.zRe, r.zIm, r.dzRe, r.dzIm, r.smoothVal);
+    const cpuT = mapToColorParam(
+      makeEscapedResult({ iterations: r.iter, smoothValue: r.smoothVal, ...escape }),
+      'stripe',
+    );
+    const gpuT = gpuStripeMapToParam(r.smoothVal, r.gpuAcc);
+
+    expect(gpuT).toBeCloseTo(cpuT, 10);
+  });
+});
+
+describe('GPU/CPU parity — decomposition coloring', () => {
+  // All four quadrants + axis-aligned boundary cases
+  const cases = [
+    { zRe: 1.5, zIm: 0.3, desc: 'Q1 (positive angle)' },
+    { zRe: -1.2, zIm: 0.8, desc: 'Q2 (positive angle)' },
+    { zRe: -0.5, zIm: -1.0, desc: 'Q3 (negative angle)' },
+    { zRe: 2.0, zIm: -0.1, desc: 'Q4 (negative angle)' },
+    { zRe: 1.0, zIm: 0.0, desc: 'positive x-axis (angle=0, >= 0)' },
+    { zRe: -1.0, zIm: 0.0, desc: 'negative x-axis (angle=PI, >= 0)' },
+  ];
+
+  for (const tc of cases) {
+    it(tc.desc, () => {
+      const decompAngle = Math.atan2(tc.zIm, tc.zRe);
+      const cpuT = mapToColorParam(makeEscapedResult({ decompAngle }), 'decomposition');
+      const gpuT = gpuDecompMapToParam(tc.zRe, tc.zIm);
+      expect(gpuT).toBe(cpuT);
+    });
+  }
+});
+
+describe('GPU/CPU parity — orbit trap coloring', () => {
+  const cases = [
+    { smoothVal: 42.7, trapDistSq: 0.5 },
+    { smoothVal: 10.0, trapDistSq: 0.01 },
+    { smoothVal: 200.3, trapDistSq: 4.0 },
+    { smoothVal: 63.9, trapDistSq: 25.0 }, // clamped to d=4
+    { smoothVal: 1.0, trapDistSq: 1e-6 },  // very close orbit
+  ];
+
+  for (const tc of cases) {
+    it(`smoothVal=${tc.smoothVal}, trapDistSq=${tc.trapDistSq}`, () => {
+      const cpuT = mapToColorParam(
+        makeEscapedResult({
+          smoothValue: tc.smoothVal,
+          orbitTrapDist: Math.sqrt(tc.trapDistSq),
+        }),
+        'orbitTrap',
+      );
+      const gpuT = gpuTrapMapToParam(tc.smoothVal, tc.trapDistSq);
+      expect(gpuT).toBeCloseTo(cpuT, 12);
+    });
+  }
+
+  it('end-to-end with shared iteration (trapDistSq from accumulator)', () => {
+    const r = iterateMandelbrot(0.5, 0.5);
+
+    const escape = finalizeEscape(r.cpuAcc, r.zRe, r.zIm, r.dzRe, r.dzIm, r.smoothVal);
+    const cpuT = mapToColorParam(
+      makeEscapedResult({ iterations: r.iter, smoothValue: r.smoothVal, ...escape }),
+      'orbitTrap',
+    );
+    const gpuT = gpuTrapMapToParam(r.smoothVal, r.gpuAcc.trapDistSq);
+
+    expect(gpuT).toBeCloseTo(cpuT, 10);
+  });
+});
+
+describe('GPU/CPU parity — normal map coloring', () => {
+  const zCases = [
+    { zRe: 2.1, zIm: 0.5, dzRe: 3.0, dzIm: 1.5, smoothVal: 10.5 },
+    { zRe: -1.8, zIm: 1.2, dzRe: 5.0, dzIm: -2.0, smoothVal: 50.3 },
+    { zRe: 3.0, zIm: -0.1, dzRe: 8.0, dzIm: 0.5, smoothVal: 100.7 },
+    { zRe: 1.5, zIm: 1.5, dzRe: 2.0, dzIm: 2.0, smoothVal: 255.0 },
+  ];
+
+  for (const tc of zCases) {
+    it(`mapToParam at z=(${tc.zRe}, ${tc.zIm})`, () => {
+      const decompAngle = Math.atan2(tc.zIm, tc.zRe);
+      const cpuT = mapToColorParam(
+        makeEscapedResult({ smoothValue: tc.smoothVal, decompAngle }),
+        'normalMap',
+      );
+      const gpuT = gpuNormalMapToParam(tc.smoothVal, tc.zRe, tc.zIm);
+      expect(gpuT).toBeCloseTo(cpuT, 12);
+    });
+  }
+
+  for (const tc of zCases) {
+    it(`computeLightness at z=(${tc.zRe}, ${tc.zIm}), dz=(${tc.dzRe}, ${tc.dzIm})`, () => {
+      const decompAngle = Math.atan2(tc.zIm, tc.zRe);
+      const zMod = Math.sqrt(tc.zRe * tc.zRe + tc.zIm * tc.zIm);
+      const dzMod = Math.sqrt(tc.dzRe * tc.dzRe + tc.dzIm * tc.dzIm);
+      const distanceEstimate = dzMod > 0 ? zMod * Math.log(zMod) / dzMod : 0;
+      const cpuL = computeNormalLightness(
+        makeEscapedResult({ smoothValue: tc.smoothVal, decompAngle, distanceEstimate }),
+        NORMAL_MAP_LIGHT_ANGLE,
+      );
+      const gpuL = gpuComputeNormalLightness(tc.zRe, tc.zIm, tc.dzRe, tc.dzIm);
+      expect(gpuL).toBeCloseTo(cpuL, 12);
+    });
+  }
+
+  it('computeLightness returns 0.5 when DE <= 0', () => {
+    const cpuL = computeNormalLightness(
+      makeEscapedResult({ decompAngle: 0.5, distanceEstimate: -1 }),
+      NORMAL_MAP_LIGHT_ANGLE,
+    );
+    expect(cpuL).toBe(0.5);
+    // GPU: zMod=0.5 < 1 → log(0.5) < 0 → de < 0 → returns 0.5
+    expect(gpuComputeNormalLightness(0.5, 0.0, 1.0, 0.0)).toBe(0.5);
+  });
+
+  it('computeLightness returns 0.5 when dz = (0,0)', () => {
+    const cpuL = computeNormalLightness(
+      makeEscapedResult({ decompAngle: 0.3, distanceEstimate: 0 }),
+      NORMAL_MAP_LIGHT_ANGLE,
+    );
+    expect(cpuL).toBe(0.5);
+    // GPU: dzMod=0 → de=0 → de<=0 branch
+    expect(gpuComputeNormalLightness(2.0, 0.3, 0.0, 0.0)).toBe(0.5);
+  });
+
+  it('end-to-end with shared iteration (mapToParam + computeLightness)', () => {
+    // Normal map is the most complex mode — tests full pipeline with real dz
+    const r = iterateMandelbrot(0.5, 0.5);
+
+    const escape = finalizeEscape(r.cpuAcc, r.zRe, r.zIm, r.dzRe, r.dzIm, r.smoothVal);
+    const cpuResult = makeEscapedResult({
+      iterations: r.iter, smoothValue: r.smoothVal, ...escape,
+    });
+    const cpuT = mapToColorParam(cpuResult, 'normalMap');
+    const cpuL = computeNormalLightness(cpuResult, NORMAL_MAP_LIGHT_ANGLE);
+
+    const gpuT = gpuNormalMapToParam(r.smoothVal, r.zRe, r.zIm);
+    const gpuL = gpuComputeNormalLightness(r.zRe, r.zIm, r.dzRe, r.dzIm);
+
+    expect(gpuT).toBeCloseTo(cpuT, 10);
+    expect(gpuL).toBeCloseTo(cpuL, 10);
+  });
+});
+
+describe('GPU/CPU parity — interior coloring', () => {
+  const cases = [
+    { trapDistSq: 0.25, desc: 'small trap distance' },
+    { trapDistSq: 1.0, desc: 'unit distance' },
+    { trapDistSq: 4.0, desc: 'at clamp boundary (d=2)' },
+    { trapDistSq: 16.0, desc: 'beyond clamp (d=4, clamped to 2)' },
+    { trapDistSq: 0.001, desc: 'very close orbit' },
+  ];
+
+  for (const tc of cases) {
+    it(tc.desc, () => {
+      const orbitTrapDist = Math.sqrt(tc.trapDistSq);
+      const cpuResult: FractalResult = {
+        iterations: 256, escaped: false, smoothValue: 0,
+        stripeValue: 0, decompAngle: 0, orbitTrapDist, distanceEstimate: 0,
+      };
+      const cpuT = mapInteriorToParam(cpuResult);
+      const gpuT = gpuInteriorParam(tc.trapDistSq);
+      expect(gpuT).toBeCloseTo(cpuT, 12);
     });
   }
 });
