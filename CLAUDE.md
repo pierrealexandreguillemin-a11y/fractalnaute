@@ -116,12 +116,13 @@ grep -r @tradeoff src/
   Constants DRY: STRIPE_DENSITY, ORBIT_TRAP_CYCLE, NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION from domain.
   Verified via Playwright screenshots (5/5 modes correct, 0 console errors).
 
-### Next: Quality & Deep zoom
-- Precision: float32 (zoom cap ~10^7). Double-single vec2 extends to ~10^15.
-
-### Future: Deep zoom (perturbation theory)
-- JS arbitrary precision ref orbit (Jampary-style) + float32 GPU delta iterations
-- Only ~3 browser implementations exist — competitive advantage
+### Next (ordre logique)
+1. Parity tests coloring modes (stripe, decomp, orbitTrap, normalMap) — prouver la correction
+2. UI: render time + indicateur GPU/CPU dans status bar — feedback utilisateur
+3. Progressive FBO avec timer query réel — protection freeze GPU intégré @1024+ iter
+4. SSAA 2x2 optionnel — qualité anti-aliasing (toggle)
+5. Double-single emulation (vec2) — zoom float32 10^-7 → 10^-15
+6. Perturbation theory (CPU ref orbit + GPU delta) — zoom 10^-238, ~3 impls browser existent
 - Research: docs/research-deep-mandelbrot.md
 
 ### GPU gotchas (lecons apprises)
