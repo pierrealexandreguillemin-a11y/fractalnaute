@@ -117,10 +117,10 @@ grep -r @tradeoff src/
   Verified via Playwright screenshots (5/5 modes correct, 0 console errors).
 
 ### Next (ordre logique)
-1. Parity tests coloring modes (stripe, decomp, orbitTrap, normalMap) — prouver la correction
-2. UI: render time + indicateur GPU/CPU dans status bar — feedback utilisateur
-3. Progressive FBO avec timer query réel — protection freeze GPU intégré @1024+ iter
-4. SSAA 2x2 optionnel — qualité anti-aliasing (toggle)
+1. ~~Parity tests coloring modes~~ DONE — 34 tests: accumulator, stripe, decomp, orbitTrap, normalMap, interior
+2. ~~UI: render time + GPU/CPU indicator~~ DONE — InfoPanel shows render time + GPU/CPU badge
+3. ~~Progressive FBO + timer query~~ DONE — adaptive heuristic (>16ms → FBO preview), EXT_disjoint_timer_query_webgl2, conservative @2048+ iter
+4. ~~SSAA 2x2~~ DONE — GPU 2x FBO → GL_LINEAR downsample, toggle UI, composes with progressive
 5. Double-single emulation (vec2) — zoom float32 10^-7 → 10^-15
 6. Perturbation theory (CPU ref orbit + GPU delta) — zoom 10^-238, ~3 impls browser existent
 - Research: docs/research-deep-mandelbrot.md
@@ -133,6 +133,8 @@ grep -r @tradeoff src/
 - GLSL string constants en TypeScript (pas de raw loader) — compatible Turbopack sans config.
 - Shader compilation async (KHR_parallel_shader_compile): premier render tombe sur CPU, GPU prend le relais ensuite.
 - assembleFragmentSource retourne null (pas throw) pour fallback gracieux vers CPU.
+- EXT_disjoint_timer_query_webgl2: async result (available next frame). Check GPU_DISJOINT_EXT before reading. Not available on all browsers (Safari). Fallback: conservative threshold at 2048 iter.
+- Progressive FBO: quarter-res preview → blit → RAF → full-res. Prevents browser freeze at high iterations. Self-adaptive via measured GPU time.
 
 ### Performance options evaluated
 - See docs/performance-history.md for full comparison table
@@ -143,8 +145,8 @@ grep -r @tradeoff src/
 ## Testing
 
 - Framework: vitest (`npm test`)
-- 119 unit tests for domain + infrastructure layers (coloringAccumulator, coloringModes, fractals, shaderCompiler, paletteTexture, gpuCpuParity)
-- All pure functions, deterministic, 32ms total
+- 155 unit tests for domain + infrastructure layers (coloringAccumulator, coloringModes, fractals, shaderCompiler, paletteTexture, gpuCpuParity)
+- All pure functions, deterministic, ~112ms total
 
 ## Deploy
 
