@@ -53,9 +53,15 @@ export function mapToColorParam(
   }
 }
 
+/**
+ * @mirror deep-mandelbrot: stripe amplitude + iteration frequency.
+ * stripeValue = Catmull-Rom interpolated Re(z)·Im(z)/|z|² average.
+ * Cosine palette wraps via sin(), so unbounded t is fine.
+ */
 function stripeToParam(result: FractalResult): number {
-  const base = (result.smoothValue % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
-  return (base + result.stripeValue * 0.5) % 1;
+  const amplitude = 0.7 + 2.5 * result.stripeValue;
+  const frequency = 50.0 * result.smoothValue / COLOR_CYCLE_PERIOD;
+  return amplitude + frequency;
 }
 
 function decompToParam(result: FractalResult): number {
@@ -134,12 +140,31 @@ export function getColorForResult(
 
   const t = mapToColorParam(result, coloringMode);
 
+  if (coloringMode === 'stripe') {
+    return cosinePaletteColor(t);
+  }
+
   if (coloringMode === 'normalMap') {
     const lightness = computeNormalLightness(result, NORMAL_MAP_LIGHT_ANGLE);
     return lookupPaletteColorWithLightness(palette, t, lightness);
   }
 
   return lookupPaletteColor(palette, t);
+}
+
+/**
+ * Cosine palette — Inigo Quilez style, produces iridescent metallic colors.
+ * Phase offsets (4.0, 4.6, 5.2) tuned for copper/bronze metallic.
+ * @mirror infrastructure/gpu/shaders/index.ts:cosinePaletteLookupChunk
+ * @see https://iquilezles.org/articles/palettes/
+ */
+function cosinePaletteColor(t: number): RGB {
+  const tau = 6.28318;
+  return [
+    Math.round(255 * (0.5 + 0.5 * Math.sin(tau * t + 4.0))),
+    Math.round(255 * (0.5 + 0.5 * Math.sin(tau * t + 4.6))),
+    Math.round(255 * (0.5 + 0.5 * Math.sin(tau * t + 5.2))),
+  ];
 }
 
 // ---- Labels & registry ------------------------------------------------------

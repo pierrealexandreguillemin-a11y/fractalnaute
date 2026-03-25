@@ -90,9 +90,9 @@ describe('shaderCompiler', () => {
 
     // ---- Coloring #defines --------------------------------------------------
 
-    it('injects STRIPE_DENSITY define from domain constant', () => {
+    it('injects BAILOUT_SQ define from domain constant', () => {
       const source = assembleFragmentSource('mandelbrot', 'stripe', 256, false);
-      expect(source).toContain('#define STRIPE_DENSITY 5.0');
+      expect(source).toContain('#define BAILOUT_SQ 300000');
     });
 
     it('injects ORBIT_TRAP_CYCLE define from domain constant', () => {
@@ -116,7 +116,8 @@ describe('shaderCompiler', () => {
       const source = assembleFragmentSource('mandelbrot', 'stripe', 256, false);
       expect(source).not.toBeNull();
       expect(source).toContain('acc.stripeSum');
-      expect(source).toContain('acc.prevStripeSum');
+      expect(source).toContain('acc.stripePrev1');
+      expect(source).toContain('catmullRom');
       expect(source).toContain('float mapToParam(');
       expect(source).toContain('float computeLightness(');
     });
@@ -172,22 +173,22 @@ describe('shaderCompiler', () => {
       const source = assembleFragmentSource('mandelbrot', 'classic', 256, true);
       expect(source).not.toBeNull();
       // Real accumulator tracks trapDistSq via min()
-      expect(source).toContain('if (distSq < acc.trapDistSq)');
+      expect(source).toContain('if (zz < acc.trapDistSq)');
     });
 
     it('uses noop accumulator for classic + interiorColoring=false', () => {
       const source = assembleFragmentSource('mandelbrot', 'classic', 256, false);
       expect(source).not.toBeNull();
       // Noop accumulator does NOT track trapDistSq
-      expect(source).not.toContain('if (distSq < acc.trapDistSq)');
+      expect(source).not.toContain('if (zz < acc.trapDistSq)');
     });
 
     it('uses real accumulator for non-classic regardless of interior flag', () => {
       for (const mode of ALL_COLORING_MODES.filter(m => m !== 'classic')) {
         const withInterior = assembleFragmentSource('mandelbrot', mode, 256, true);
         const noInterior = assembleFragmentSource('mandelbrot', mode, 256, false);
-        expect(withInterior).toContain('if (distSq < acc.trapDistSq)');
-        expect(noInterior).toContain('if (distSq < acc.trapDistSq)');
+        expect(withInterior).toContain('if (zz < acc.trapDistSq)');
+        expect(noInterior).toContain('if (zz < acc.trapDistSq)');
       }
     });
   });

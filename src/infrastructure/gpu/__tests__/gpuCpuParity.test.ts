@@ -21,7 +21,7 @@ import {
   NORMAL_MAP_LIGHT_ANGLE, computeNormalLightness, mapInteriorToParam
 } from '../../../domain/coloringModes';
 import {
-  initAccumulator, updateAccumulator, finalizeEscape, STRIPE_DENSITY
+  initAccumulator, updateAccumulator, finalizeEscape
 } from '../../../domain/coloringAccumulator';
 import { isInCardioid, isInBulb } from '../../../domain/periodicity';
 import type { FractalResult } from '../../../domain/types';
@@ -140,39 +140,62 @@ function gpuIsInBulb(cRe: number, cIm: number): boolean {
 /** GPU accumulator state — mirrors AccumState struct in accumulatorRealChunk */
 interface GpuAccumState {
   stripeSum: number;
-  prevStripeSum: number;
+  stripePrev1: number;
+  stripePrev2: number;
+  stripePrev3: number;
   trapDistSq: number;
   count: number;
 }
 
 /** @mirror shaders/index.ts:accumulatorRealChunk — initAccumulator */
 function gpuInitAccumulator(): GpuAccumState {
-  return { stripeSum: 0, prevStripeSum: 0, trapDistSq: 1e20, count: 0 };
+  return { stripeSum: 0, stripePrev1: 0, stripePrev2: 0, stripePrev3: 0, trapDistSq: 1e20, count: 0 };
 }
 
 /** @mirror shaders/index.ts:accumulatorRealChunk — updateAccumulator */
 function gpuUpdateAccumulator(zRe: number, zIm: number, acc: GpuAccumState): void {
-  const arg = Math.atan2(zIm, zRe);
-  acc.prevStripeSum = acc.stripeSum;
-  acc.stripeSum += 0.5 * Math.sin(STRIPE_DENSITY * arg) + 0.5;
+  acc.stripePrev3 = acc.stripePrev2;
+  acc.stripePrev2 = acc.stripePrev1;
+  acc.stripePrev1 = acc.stripeSum;
+  const zz = zRe * zRe + zIm * zIm;
+  if (zz > 0) {
+    acc.stripeSum += zRe * zIm / zz;
+  }
   acc.count++;
 
-  const distSq = zRe * zRe + zIm * zIm;
-  if (distSq < acc.trapDistSq) {
-    acc.trapDistSq = distSq;
+  if (zz < acc.trapDistSq) {
+    acc.trapDistSq = zz;
   }
+}
+
+/**
+ * Catmull-Rom cubic interpolation — mirrors GLSL catmullRom in stripeColoringChunk.
+ */
+function catmullRom(s0: number, s1: number, s2: number, s3: number, d: number): number {
+  const d2 = d * d, d3 = d * d2;
+  return 0.5 * (
+    s0 * (d3 - d2) +
+    s1 * (d + 4 * d2 - 3 * d3) +
+    s2 * (2 - 5 * d2 + 3 * d3) +
+    s3 * (-d + 2 * d2 - d3)
+  );
 }
 
 /**
  * @mirror shaders/index.ts:stripeColoringChunk — mapToParam
  * GPU does finalization + mapping in one step (no separate finalizeEscape).
+ * Stripe as primary signal with Catmull-Rom interpolation.
  */
-function gpuStripeMapToParam(smoothVal: number, acc: GpuAccumState): number {
+function gpuStripeMapToParam(smoothVal: number, acc: GpuAccumState, maxIter: number = 256): number {
   const frac = smoothVal - Math.floor(smoothVal);
-  const rawLerped = acc.prevStripeSum + frac * (acc.stripeSum - acc.prevStripeSum);
-  const stripeVal = acc.count > 0 ? rawLerped / acc.count : 0;
-  const base = (smoothVal % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
-  return (base + stripeVal * 0.5) % 1;
+  const interpolated = acc.count >= 4
+    ? catmullRom(acc.stripePrev3, acc.stripePrev2, acc.stripePrev1, acc.stripeSum, frac)
+    : acc.stripePrev1 + frac * (acc.stripeSum - acc.stripePrev1);
+  const stripeRatio = acc.count > 0 ? interpolated / acc.count : 0;
+  // @mirror deep-mandelbrot: stripe amplitude + iteration frequency
+  const amplitude = 0.7 + 2.5 * stripeRatio;
+  const frequency = 50.0 * smoothVal / maxIter;
+  return amplitude + frequency;
 }
 
 /** @mirror shaders/index.ts:decompositionColoringChunk — mapToParam */
@@ -401,7 +424,7 @@ describe('GPU/CPU parity — accumulator', () => {
       gpuUpdateAccumulator(z.re, z.im, gpuAcc);
 
       expect(gpuAcc.stripeSum).toBeCloseTo(cpuAcc.stripeSum, 12);
-      expect(gpuAcc.prevStripeSum).toBeCloseTo(cpuAcc.prevStripeSum, 12);
+      expect(gpuAcc.stripePrev1).toBeCloseTo(cpuAcc.stripePrev1, 12);
       expect(gpuAcc.count).toBe(cpuAcc.count);
     }
   });
@@ -423,52 +446,55 @@ describe('GPU/CPU parity — accumulator', () => {
 
 describe('GPU/CPU parity — stripe coloring', () => {
   const cases = [
-    { smoothVal: 5.7, prevStripe: 2.3, stripe: 3.1, count: 5 },
-    { smoothVal: 128.3, prevStripe: 60.1, stripe: 64.8, count: 128 },
-    { smoothVal: 0.5, prevStripe: 0.0, stripe: 0.8, count: 1 },
-    { smoothVal: 255.99, prevStripe: 120.0, stripe: 125.5, count: 255 },
+    { smoothVal: 5.7, s: 3.1, s1: 2.3, s2: 1.5, s3: 0.8, count: 5 },
+    { smoothVal: 128.3, s: 64.8, s1: 60.1, s2: 55.0, s3: 50.2, count: 128 },
+    { smoothVal: 0.5, s: 0.8, s1: 0.0, s2: 0.0, s3: 0.0, count: 1 },
+    { smoothVal: 255.99, s: 125.5, s1: 120.0, s2: 115.0, s3: 110.0, count: 255 },
   ];
 
   for (const tc of cases) {
     it(`smoothVal=${tc.smoothVal}, count=${tc.count}`, () => {
-      // CPU: finalizeEscape computes stripeValue, then stripeToParam maps it
+      // CPU: finalizeEscape computes stripeValue via Catmull-Rom, then stripeToParam maps it
       const frac = tc.smoothVal - Math.floor(tc.smoothVal);
-      const rawLerped = tc.prevStripe + frac * (tc.stripe - tc.prevStripe);
-      const stripeValue = tc.count > 0 ? rawLerped / tc.count : 0;
+      const interpolated = tc.count >= 4
+        ? catmullRom(tc.s3, tc.s2, tc.s1, tc.s, frac)
+        : tc.s1 + frac * (tc.s - tc.s1);
+      const stripeValue = tc.count > 0 ? interpolated / tc.count : 0;
       const cpuT = mapToColorParam(
         makeEscapedResult({ smoothValue: tc.smoothVal, stripeValue }),
         'stripe',
       );
 
-      // GPU: inline finalization + mapping in one step
+      // GPU: inline Catmull-Rom + mapping
       const gpuAcc: GpuAccumState = {
-        stripeSum: tc.stripe, prevStripeSum: tc.prevStripe,
+        stripeSum: tc.s, stripePrev1: tc.s1, stripePrev2: tc.s2, stripePrev3: tc.s3,
         trapDistSq: 1, count: tc.count,
       };
       const gpuT = gpuStripeMapToParam(tc.smoothVal, gpuAcc);
 
-      expect(gpuT).toBeCloseTo(cpuT, 12);
+      expect(gpuT).toBeCloseTo(cpuT, 10);
     });
   }
 
-  it('count=0 edge case: both fall back to classic base', () => {
+  it('count=0 edge case: both return amplitude+frequency baseline', () => {
     const smoothVal = 42.7;
     const cpuT = mapToColorParam(
       makeEscapedResult({ smoothValue: smoothVal, stripeValue: 0 }),
       'stripe',
     );
     const gpuAcc: GpuAccumState = {
-      stripeSum: 0, prevStripeSum: 0, trapDistSq: 1e20, count: 0,
+      stripeSum: 0, stripePrev1: 0, stripePrev2: 0, stripePrev3: 0,
+      trapDistSq: 1e20, count: 0,
     };
     const gpuT = gpuStripeMapToParam(smoothVal, gpuAcc);
 
-    // Both should produce pure classic base (stripeVal=0)
-    const expectedBase = (smoothVal % COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
-    expect(gpuT).toBeCloseTo(expectedBase, 12);
-    expect(cpuT).toBeCloseTo(expectedBase, 12);
+    // amplitude=0.7, frequency=50*42.7/256
+    const expected = 0.7 + 50.0 * smoothVal / 256;
+    expect(gpuT).toBeCloseTo(expected, 10);
+    expect(cpuT).toBeCloseTo(expected, 10);
   });
 
-  it('end-to-end with shared iteration (GPU bailout=4)', () => {
+  it('end-to-end with shared iteration', () => {
     // Tests full accumulator → finalize → map pipeline parity
     const r = iterateMandelbrot(0.5, 0.5);
 

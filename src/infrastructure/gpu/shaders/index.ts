@@ -73,49 +73,77 @@ vec3 paletteLookup(float t) {
 }
 `;
 
+/**
+ * Cosine palette for stripe mode — Inigo Quilez style.
+ * Produces iridescent/metallic colors without texture lookup.
+ * Phase offsets (4.0, 4.6, 5.2) tuned for copper/bronze metallic.
+ * @see https://iquilezles.org/articles/palettes/
+ * @see https://github.com/munrocket/deep-fractal (color_scheme 0)
+ */
+export const cosinePaletteLookupChunk = /* glsl */ `
+vec3 paletteLookup(float t) {
+  return 0.5 + 0.5 * sin(6.28318 * t + vec3(4.0, 4.6, 5.2));
+}
+`;
+
 // AccumState struct must match accumulatorRealChunk so main.glsl can use acc.trapDistSq etc.
 // The noop version just skips the per-iteration work (no atan, no sin, no min).
 export const accumulatorNoopChunk = /* glsl */ `
 struct AccumState {
   float stripeSum;
-  float prevStripeSum;
+  float stripePrev1;
+  float stripePrev2;
+  float stripePrev3;
   float trapDistSq;
   int count;
   vec2 dz;
 };
-AccumState initAccumulator() { return AccumState(0.0, 0.0, 1e20, 0, vec2(0.0)); }
+AccumState initAccumulator() { return AccumState(0.0, 0.0, 0.0, 0.0, 1e20, 0, vec2(0.0)); }
 void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) { acc.dz = dz; }
 `;
 
 /**
  * @mirror domain/coloringAccumulator.ts
- * Real accumulator: stripe average + orbit trap + derivative tracking.
- * STRIPE_DENSITY injected as #define from domain constant (DRY).
+ * Real accumulator: stripe Re(z)·Im(z)/|z|² + orbit trap + derivative.
+ * 4-point history for Catmull-Rom interpolation.
+ */
+/**
+ * @mirror domain/coloringAccumulator.ts
+ * Real accumulator: stripe (Re·Im/|z|²) + orbit trap + derivative.
+ * 4-point history for Catmull-Rom interpolation at escape.
+ * @see https://github.com/munrocket/deep-fractal (reference quality)
  */
 export const accumulatorRealChunk = /* glsl */ `
 struct AccumState {
   float stripeSum;
-  float prevStripeSum;
+  float stripePrev1;
+  float stripePrev2;
+  float stripePrev3;
   float trapDistSq;
   int count;
   vec2 dz;
 };
 
 AccumState initAccumulator() {
-  return AccumState(0.0, 0.0, 1e20, 0, vec2(0.0));
+  return AccumState(0.0, 0.0, 0.0, 0.0, 1e20, 0, vec2(0.0));
 }
 
 void updateAccumulator(vec2 z, vec2 dz, inout AccumState acc) {
   // @mirror domain/coloringAccumulator.ts:updateAccumulator
-  float arg = atan(z.y, z.x);
-  acc.prevStripeSum = acc.stripeSum;
-  acc.stripeSum += 0.5 * sin(STRIPE_DENSITY * arg) + 0.5;
+  // Shift history for Catmull-Rom
+  acc.stripePrev3 = acc.stripePrev2;
+  acc.stripePrev2 = acc.stripePrev1;
+  acc.stripePrev1 = acc.stripeSum;
+  // Stripe: Re(z)·Im(z)/|z|² (deep-mandelbrot formula, 2-fold metallic)
+  float zz = z.x * z.x + z.y * z.y;
+  if (zz > 0.0) {
+    acc.stripeSum += z.x * z.y / zz;
+  }
   acc.count++;
   acc.dz = dz;
 
-  float distSq = z.x * z.x + z.y * z.y;
-  if (distSq < acc.trapDistSq) {
-    acc.trapDistSq = distSq;
+  if (zz < acc.trapDistSq) {
+    acc.trapDistSq = zz;
   }
 }
 `;
@@ -144,7 +172,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x;
     float y2_iter = z.y * z.y;
-    if (x2 + y2_iter > 4.0) {
+    if (x2 + y2_iter > BAILOUT_SQ) {
       escaped = true; iter = i;
       smoothVal = smoothEscape(i, x2 + y2_iter);
       return;
@@ -170,7 +198,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x, y2 = z.y * z.y;
-    if (x2 + y2 > 4.0) {
+    if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
       smoothVal = smoothEscape(i, x2 + y2);
       return;
@@ -195,7 +223,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   for (int i = 0; i < MAX_ITER; i++) {
     z = abs(z);
     float x2 = z.x * z.x, y2 = z.y * z.y;
-    if (x2 + y2 > 4.0) {
+    if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
       smoothVal = smoothEscape(i, x2 + y2);
       return;
@@ -219,7 +247,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x, y2 = z.y * z.y;
-    if (x2 + y2 > 4.0) {
+    if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
       smoothVal = smoothEscape(i, x2 + y2);
       return;
@@ -244,7 +272,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     float mod2 = z.x * z.x + z.y * z.y;
-    if (mod2 > 4.0) {
+    if (mod2 > BAILOUT_SQ) {
       escaped = true; iter = i;
       smoothVal = smoothEscapeGeneral(i, mod2, float(u_power));
       return;
@@ -305,7 +333,7 @@ void iterate(vec2 c_unused, out vec2 z, out int iter, out bool escaped,
     // Escape test on float32 hi parts
     float x2 = ds_zre.x * ds_zre.x;
     float y2 = ds_zim.x * ds_zim.x;
-    if (x2 + y2 > 4.0) {
+    if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
       smoothVal = smoothEscape(i, x2 + y2);
       z = vec2(ds_zre.x, ds_zim.x);
@@ -345,15 +373,33 @@ float computeLightness(AccumState acc, vec2 z) { return 1.0; }
 
 /**
  * @mirror domain/coloringModes.ts:stripeToParam
- * Harkonen stripe average coloring — lerps between prev/current stripe sum.
+ * Stripe coloring: Re(z)·Im(z)/|z|² with Catmull-Rom interpolation.
+ * Stripe is the PRIMARY color signal (deep-mandelbrot style).
+ * @see https://github.com/munrocket/deep-fractal
  */
 export const stripeColoringChunk = /* glsl */ `
+// Catmull-Rom cubic interpolation — C1 continuous across iteration boundaries
+float catmullRom(float s0, float s1, float s2, float s3, float d) {
+  float d2 = d * d, d3 = d * d2;
+  return 0.5 * (
+    s0 * (d3 - d2) +
+    s1 * (d + 4.0 * d2 - 3.0 * d3) +
+    s2 * (2.0 - 5.0 * d2 + 3.0 * d3) +
+    s3 * (-d + 2.0 * d2 - d3)
+  );
+}
+
 float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
   float frac = smoothVal - floor(smoothVal);
-  float rawLerped = acc.prevStripeSum + frac * (acc.stripeSum - acc.prevStripeSum);
-  float stripeVal = acc.count > 0 ? rawLerped / float(acc.count) : 0.0;
-  float base = mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
-  return mod(base + stripeVal * 0.5, 1.0);
+  float interpolated = acc.count >= 4
+    ? catmullRom(acc.stripePrev3, acc.stripePrev2, acc.stripePrev1, acc.stripeSum, frac)
+    : acc.stripePrev1 + frac * (acc.stripeSum - acc.stripePrev1);
+  float stripeRatio = acc.count > 0 ? interpolated / float(acc.count) : 0.0;
+  // @mirror deep-mandelbrot: stripe amplitude + iteration-dependent frequency
+  // Produces metallic depth banding instead of flat single-cycle color.
+  float amplitude = 0.7 + 2.5 * stripeRatio;
+  float frequency = 50.0 * smoothVal / float(MAX_ITER);
+  return amplitude + frequency;
 }
 float computeLightness(AccumState acc, vec2 z) { return 1.0; }
 `;

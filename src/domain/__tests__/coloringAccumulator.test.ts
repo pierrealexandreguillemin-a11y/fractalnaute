@@ -11,7 +11,9 @@ describe('initAccumulator', () => {
   it('returns correct initial state', () => {
     const acc = initAccumulator();
     expect(acc.stripeSum).toBe(0);
-    expect(acc.prevStripeSum).toBe(0);
+    expect(acc.stripePrev1).toBe(0);
+    expect(acc.stripePrev2).toBe(0);
+    expect(acc.stripePrev3).toBe(0);
     expect(acc.trapDistSq).toBe(Infinity);
     expect(acc.count).toBe(0);
   });
@@ -47,25 +49,24 @@ describe('updateAccumulator', () => {
     expect(acc.trapDistSq).toBe(0);
   });
 
-  it('stripe sum changes with different z angles', () => {
-    // z at angle 0 (positive real axis)
+  it('stripe sum changes with different z values', () => {
+    // Re(z)·Im(z)/|z|² — depends on angle (sin(2θ)/2)
     const acc1 = initAccumulator();
-    updateAccumulator(acc1, 1, 0);
+    updateAccumulator(acc1, 1, 1); // 45° → 1*1/2 = 0.5
     const sum1 = acc1.stripeSum;
+    expect(sum1).toBeCloseTo(0.5, 10);
 
-    // z at angle PI/2 (positive imaginary axis)
     const acc2 = initAccumulator();
-    updateAccumulator(acc2, 0, 1);
+    updateAccumulator(acc2, 1, -1); // -45° → 1*(-1)/2 = -0.5
     const sum2 = acc2.stripeSum;
+    expect(sum2).toBeCloseTo(-0.5, 10);
 
-    // Different angles produce different stripe sums
-    // atan2(0,1) = 0, atan2(1,0) = PI/2 — sin at different frequencies
     expect(sum2).not.toBe(sum1);
   });
 });
 
 describe('finalizeEscape', () => {
-  it('returns stripeValue in [0,1]', () => {
+  it('returns finite stripeValue from Catmull-Rom interpolation', () => {
     const acc = initAccumulator();
     // Simulate several iterations
     updateAccumulator(acc, 1, 0.5);
@@ -75,8 +76,9 @@ describe('finalizeEscape', () => {
     updateAccumulator(acc, 0.8, -1.9);
 
     const result = finalizeEscape(acc, 10, 10, 5, 5, 5.3);
-    expect(result.stripeValue).toBeGreaterThanOrEqual(0);
-    expect(result.stripeValue).toBeLessThanOrEqual(1);
+    // Re(z)·Im(z)/|z|² average — ranges roughly [-0.5, 0.5]
+    expect(Number.isFinite(result.stripeValue)).toBe(true);
+    expect(Math.abs(result.stripeValue)).toBeLessThan(1);
   });
 
   it('returns valid decompAngle (atan2 range)', () => {

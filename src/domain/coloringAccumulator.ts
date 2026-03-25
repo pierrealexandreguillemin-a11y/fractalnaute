@@ -3,6 +3,10 @@
  * DOMAIN LAYER - Coloring Accumulator
  * Stripe average + orbit trap tracking during fractal iteration.
  * Derivative is NOT here — it's fractal-specific, inlined in calculators.
+ *
+ * Stripe formula: Re(z)·Im(z)/|z|² (2-fold geometric, matches deep-mandelbrot)
+ * History: 4 running-sum snapshots for Catmull-Rom C1 interpolation at escape.
+ * @see https://github.com/munrocket/deep-fractal (reference implementation)
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -11,40 +15,65 @@ import { INTERIOR_COLORING_DEFAULTS } from './types';
 /** Mutable state tracked during iteration */
 export interface AccumulatorState {
   stripeSum: number;
-  prevStripeSum: number;
+  stripePrev1: number;
+  stripePrev2: number;
+  stripePrev3: number;
   trapDistSq: number;
   count: number;
 }
 
 /**
- * Stripe frequency parameter — higher values create finer stripes.
- * Standard value from Harkonen stripe average coloring.
- * @see https://www.math.univ-toulouse.fr/~music/Research/stripeAverage.pdf
+ * High bailout for stripe quality — smooth iteration converges better
+ * and stripe average gets more data. Matches deep-mandelbrot's 3e5.
+ * @see https://github.com/munrocket/deep-fractal
  */
-export const STRIPE_DENSITY = 5;
+export const STRIPE_BAILOUT_SQ = 300000.0;
 
 export function initAccumulator(): AccumulatorState {
-  return { stripeSum: 0, prevStripeSum: 0, trapDistSq: Infinity, count: 0 };
+  return { stripeSum: 0, stripePrev1: 0, stripePrev2: 0, stripePrev3: 0, trapDistSq: Infinity, count: 0 };
 }
 
 /**
  * Update per iteration — called inside the hot loop.
- * Only stripe average + orbit trap. No derivative (fractal-specific).
+ * Stripe: Re(z)·Im(z)/|z|² (geometric 2-fold symmetric, produces metallic look).
+ * Orbit trap: tracks minimum |z|² for orbit trap coloring.
  */
 export function updateAccumulator(
   state: AccumulatorState,
   zRe: number,
   zIm: number
 ): void {
-  const arg = Math.atan2(zIm, zRe);
-  state.prevStripeSum = state.stripeSum;
-  state.stripeSum += 0.5 * Math.sin(STRIPE_DENSITY * arg) + 0.5;
+  // Shift history for Catmull-Rom
+  state.stripePrev3 = state.stripePrev2;
+  state.stripePrev2 = state.stripePrev1;
+  state.stripePrev1 = state.stripeSum;
+
+  // Stripe: z.x * z.y / |z|² (deep-mandelbrot formula)
+  const zz = zRe * zRe + zIm * zIm;
+  if (zz > 0) {
+    state.stripeSum += zRe * zIm / zz;
+  }
   state.count++;
 
-  const distSq = zRe * zRe + zIm * zIm;
-  if (distSq < state.trapDistSq) {
-    state.trapDistSq = distSq;
+  if (zz < state.trapDistSq) {
+    state.trapDistSq = zz;
   }
+}
+
+/**
+ * Catmull-Rom cubic interpolation — C1 continuous across iteration boundaries.
+ * Uses 4 points: s0 (oldest), s1, s2, s3 (newest), parameter d in [0,1].
+ * @see deep-mandelbrot interpolate() function
+ */
+function catmullRom(s0: number, s1: number, s2: number, s3: number, d: number): number {
+  const d2 = d * d;
+  const d3 = d * d2;
+  return 0.5 * (
+    s0 * (d3 - d2) +
+    s1 * (d + 4 * d2 - 3 * d3) +
+    s2 * (2 - 5 * d2 + 3 * d3) +
+    s3 * (-d + 2 * d2 - d3)
+  );
 }
 
 /** Finalize for escaped points */
@@ -61,12 +90,14 @@ export function finalizeEscape(
   orbitTrapDist: number;
   distanceEstimate: number;
 } {
+  // Catmull-Rom interpolation of stripe history (C1 smooth)
   const frac = smoothValue - Math.floor(smoothValue);
-  const rawLerped = state.prevStripeSum + frac * (state.stripeSum - state.prevStripeSum);
-  const stripeValue = state.count > 0 ? rawLerped / state.count : 0;
+  const interpolated = state.count >= 4
+    ? catmullRom(state.stripePrev3, state.stripePrev2, state.stripePrev1, state.stripeSum, frac)
+    : state.stripePrev1 + frac * (state.stripeSum - state.stripePrev1);
+  const stripeValue = state.count > 0 ? interpolated / state.count : 0;
 
   const decompAngle = Math.atan2(zIm, zRe);
-
   const orbitTrapDist = Math.sqrt(state.trapDistSq);
 
   const zMod = Math.sqrt(zRe * zRe + zIm * zIm);

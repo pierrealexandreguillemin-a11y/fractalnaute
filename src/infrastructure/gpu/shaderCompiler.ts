@@ -10,11 +10,12 @@ import {
   COLOR_CYCLE_PERIOD, ORBIT_TRAP_CYCLE,
   NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION
 } from '../../domain/coloringModes';
-import { STRIPE_DENSITY } from '../../domain/coloringAccumulator';
+import { STRIPE_BAILOUT_SQ } from '../../domain/coloringAccumulator';
 import {
   fullscreenVert,
   headerChunk, screenToComplexChunk, smoothEscapeChunk,
-  paletteLookupChunk, accumulatorNoopChunk, accumulatorRealChunk,
+  paletteLookupChunk, cosinePaletteLookupChunk,
+  accumulatorNoopChunk, accumulatorRealChunk,
   mandelbrotIterationChunk, mandelbrotDSIterationChunk,
   juliaIterationChunk,
   burningshipIterationChunk, tricornIterationChunk,
@@ -80,7 +81,7 @@ function buildDefines(maxIter: number): string {
   return [
     `#define MAX_ITER ${maxIter}`,
     `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
-    `#define STRIPE_DENSITY ${STRIPE_DENSITY}.0`,
+    `#define BAILOUT_SQ ${STRIPE_BAILOUT_SQ}`,
     `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
     `#define NORMAL_MAP_LIGHT_ANGLE (${NORMAL_MAP_LIGHT_ANGLE})`,
     `#define INTERIOR_ATTENUATION ${INTERIOR_ATTENUATION}`
@@ -123,13 +124,16 @@ export function assembleFragmentSource(
   const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
   if (!iteration) return null;
 
+  // Stripe mode uses cosine palette (iridescent metallic), others use texture
+  const paletteChunk = coloring === 'stripe' ? cosinePaletteLookupChunk : paletteLookupChunk;
+
   const chunks = [
     headerChunk,
     ...(useDS ? [dsHeaderChunk, buildDefines(maxIter), doubleSingleChunk, screenToComplexDSChunk] :
                [buildDefines(maxIter)]),
     screenToComplexChunk,
     smoothEscapeChunk,
-    paletteLookupChunk,
+    paletteChunk,
     accumulator,
     iteration,
     coloringChunk,
