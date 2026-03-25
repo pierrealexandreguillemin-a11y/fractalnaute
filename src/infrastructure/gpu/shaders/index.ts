@@ -82,7 +82,9 @@ vec3 paletteLookup(float t) {
  */
 export const cosinePaletteLookupChunk = /* glsl */ `
 vec3 paletteLookup(float t) {
-  return 0.5 + 0.5 * sin(6.28318 * t + vec3(4.0, 4.6, 5.2));
+  // @mirror deep-mandelbrot: sin(t + offsets), NO 2π multiplier.
+  // The amplitude+frequency from mapToParam already provides sufficient phase range.
+  return 0.5 + 0.5 * sin(t + vec3(4.0, 4.6, 5.2));
 }
 `;
 

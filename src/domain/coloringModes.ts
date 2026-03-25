@@ -159,11 +159,11 @@ export function getColorForResult(
  * @see https://iquilezles.org/articles/palettes/
  */
 function cosinePaletteColor(t: number): RGB {
-  const tau = 6.28318;
+  // @mirror deep-mandelbrot: sin(t + offsets), NO 2π multiplier.
   return [
-    Math.round(255 * (0.5 + 0.5 * Math.sin(tau * t + 4.0))),
-    Math.round(255 * (0.5 + 0.5 * Math.sin(tau * t + 4.6))),
-    Math.round(255 * (0.5 + 0.5 * Math.sin(tau * t + 5.2))),
+    Math.round(255 * Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sin(t + 4.0)))),
+    Math.round(255 * Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sin(t + 4.6)))),
+    Math.round(255 * Math.max(0, Math.min(1, 0.5 + 0.5 * Math.sin(t + 5.2)))),
   ];
 }
 
