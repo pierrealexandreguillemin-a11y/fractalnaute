@@ -116,23 +116,48 @@ grep -r @tradeoff src/
   Constants DRY: STRIPE_DENSITY, ORBIT_TRAP_CYCLE, NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION from domain.
   Verified via Playwright screenshots (5/5 modes correct, 0 console errors).
 
-### Next (ordre logique)
-1. ~~Parity tests coloring modes~~ DONE — 34 tests: accumulator, stripe, decomp, orbitTrap, normalMap, interior
-2. ~~UI: render time + GPU/CPU indicator~~ DONE — InfoPanel shows render time + GPU/CPU badge
-3. ~~Progressive FBO + timer query~~ DONE — adaptive heuristic (>16ms → FBO preview), EXT_disjoint_timer_query_webgl2, conservative @2048+ iter
-4. ~~SSAA 2x2~~ DONE — GPU 2x FBO → GL_LINEAR downsample, toggle UI, composes with progressive
-5. ~~Double-single emulation~~ DONE — Mandelbrot DS iteration (vec2 hi+lo), Veltkamp split, zoom 10^-15
-6. Perturbation theory (CPU ref orbit + GPU delta) — zoom 10^-60+
-   - Precision ladder: DS (10^-15) → DD (10^-30) → Jampary/QD (10^-60+)
-   - Reference: mandelbrot.page (DD/QD, 2025), deep-mandelbrot (Jampary), Ambrose (BigFloat, 10^-238)
-   - Architecture: CPU Worker arbitrary precision ref orbit → GPU float32 delta iteration
-   - Glitch detection: detect bad reference points, auto re-reference
-   - Research: docs/research-deep-mandelbrot.md, docs/competitive-analysis.md
-7. Histogram coloring — uniform color distribution via iteration CDF (two-pass)
-   - Reference: mandelbrot.page (HCL histogram), eliminates banding completely
-8. Progressive infinite refinement — start low iter, keep doubling in background
-   - Reference: mandelbrot.page (progressive + cycle detection)
-9. Video export — deep zoom animation recording + download
+### Done
+1. ~~Parity tests coloring modes~~ — 34 tests GPU/CPU formula parity
+2. ~~UI: render time + GPU/CPU indicator~~ — InfoPanel badge
+3. ~~Progressive FBO + timer query~~ — adaptive >16ms, EXT_disjoint_timer_query_webgl2
+4. ~~SSAA 2x2~~ — GPU 2x FBO, toggle, composes with progressive
+5. ~~Double-single emulation~~ — Mandelbrot DS (vec2 hi+lo), zoom 10^-15
+6. ~~Stripe rewrite~~ — deep-mandelbrot quality (Re·Im/|z|², Catmull-Rom, cosine palette, bailout 300K)
+7. ~~P0 UX~~ — URL state, touch pinch, responsive mobile, adaptive debounce
+
+### Next (ordre par gain de performance)
+
+| # | Feature | Gain | Effort | Reference |
+|---|---|---|---|---|
+| 1 | **Perturbation theory** | Zoom ×10^45 (10^-15 → 10^-60+) | 6 sem | mandelbrot.page, deep-mandelbrot |
+| 2 | **Progressive infinite** | Perceived speed ×∞ (instant + refine) | 2 sem | mandelbrot.page |
+| 3 | **Histogram coloring** | Banding → 0 (uniform CDF distribution) | 1 sem | mandelbrot.page (HCL) |
+| 4 | **Video export** | Feature (zoom animation download) | 2 sem | mandelbrot.page |
+
+#### 1. Perturbation theory — zoom 10^-60+ (IMPERATIF)
+- Precision ladder: DS (10^-15) → DD (10^-30) → Jampary/QD (10^-60+)
+- Architecture: CPU Worker arbitrary precision ref orbit → GPU float32 delta iteration
+- Reference point: logarithmic grid search (12×12, 15 iter) — deep-mandelbrot
+- Glitch detection: bad reference → artefacts aux mini-Mandelbrots → auto re-reference
+- From scratch si besoin. ~3 impls browser existent (munrocket, davidbau, Ambrose)
+- Research: docs/research-deep-mandelbrot.md, docs/competitive-analysis.md
+
+#### 2. Progressive infinite refinement
+- Start at low maxIter (64), render instant, keep doubling in background (128→256→512→...)
+- Combined with cycle detection for early termination of converged pixels
+- User sees result in <100ms that keeps improving while idle
+- Reference: mandelbrot.page — progressive + cycle detection
+
+#### 3. Histogram coloring
+- Two-pass: count iteration histogram → build CDF → map colors uniformly
+- Eliminates ALL banding regardless of maxIter or palette
+- HCL color space (perceptually uniform, compatible with our OKLCH approach)
+- Reference: mandelbrot.page
+
+#### 4. Video export
+- Record zoom path → render frames → download as MP4/WebM
+- Canvas.captureStream() + MediaRecorder API
+- Pre-computed zoom path with smooth interpolation
 
 ### GPU gotchas (lecons apprises)
 - Canvas context exclusif: un canvas ne peut avoir qu'UN type de context (webgl2 OU 2d). Solution: dual canvas overlay.
