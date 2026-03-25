@@ -97,8 +97,9 @@ function getColoringChunk(coloring: ColoringMode): string | null {
 
 /** Check if a fractal+coloring combination has GPU support. */
 export function isGpuSupported(fractal: FractalType, coloring: ColoringMode): boolean {
-  return getIterationChunk(fractal) !== null
-    && getColoringChunk(coloring) !== null;
+  // Mandelbrot uses DS iteration (not in ITERATION_CHUNKS)
+  const hasIteration = fractal === 'mandelbrot' || getIterationChunk(fractal) !== null;
+  return hasIteration && getColoringChunk(coloring) !== null;
 }
 
 /**

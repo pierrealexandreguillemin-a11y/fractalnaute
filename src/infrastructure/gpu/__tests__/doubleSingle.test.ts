@@ -7,13 +7,7 @@
  * @mirror infrastructure/gpu/webglRenderer.ts:splitDouble
  */
 import { describe, it, expect } from 'vitest';
-
-// ---- CPU mirror of splitDouble (from webglRenderer.ts) ----------------------
-
-function splitDouble(value: number): [number, number] {
-  const hi = Math.fround(value);
-  return [hi, value - hi];
-}
+import { splitDouble } from '../shaders/doubleSingle';
 
 // ---- TypeScript mirrors of GLSL DS functions --------------------------------
 

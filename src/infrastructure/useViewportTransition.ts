@@ -173,7 +173,7 @@ export function useViewportTransition(deps: TransitionDeps) {
   const depsRef = useRef(deps);
   useLayoutEffect(() => { depsRef.current = deps; });
 
-  const paramsKey = `${deps.fractalType}|${deps.maxIterations}|${deps.palette}|${deps.coloringMode}|${deps.interiorColoring}|${JSON.stringify(deps.params)}`;
+  const paramsKey = `${deps.fractalType}|${deps.maxIterations}|${deps.palette}|${deps.coloringMode}|${deps.interiorColoring}|${deps.ssaa}|${JSON.stringify(deps.params)}`;
 
   // CSS transform: applied synchronously before paint
   useLayoutEffect(() => {
@@ -199,7 +199,9 @@ export function useViewportTransition(deps: TransitionDeps) {
     canvas.style.transform = transform;
     canvas.style.transformOrigin = '50% 50%';
 
-    const debounce = deps.lastRenderTime > 0 && deps.lastRenderTime < FAST_RENDER_THRESHOLD_MS
+    // Read lastRenderTime from ref (not deps) to avoid re-triggering the effect
+    const lrt = depsRef.current.lastRenderTime;
+    const debounce = lrt > 0 && lrt < FAST_RENDER_THRESHOLD_MS
       ? DEBOUNCE_FAST_MS
       : DEBOUNCE_DEFAULT_MS;
 
@@ -224,7 +226,7 @@ export function useViewportTransition(deps: TransitionDeps) {
         debounceRef.current = null;
       }
     };
-  }, [canvasRef, deps.viewport, deps.lastRenderTime, paramsKey]);
+  }, [canvasRef, deps.viewport, paramsKey]);
 
   // GPU compositor hint
   useEffect(() => {

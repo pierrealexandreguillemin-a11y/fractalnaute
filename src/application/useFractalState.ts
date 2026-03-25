@@ -186,7 +186,7 @@ function applyScalarOverrides(base: FractalState, initial?: InitialFractalConfig
 
 /** Apply Julia param overrides from initial config */
 function applyJuliaOverrides(base: FractalState, initial?: InitialFractalConfig): FractalState {
-  if (!initial?.juliaRe && initial?.juliaRe !== 0 && !initial?.juliaIm && initial?.juliaIm !== 0) return base;
+  if (initial?.juliaRe === undefined && initial?.juliaIm === undefined) return base;
   return {
     ...base,
     juliaParams: {

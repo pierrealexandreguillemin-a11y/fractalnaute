@@ -117,3 +117,13 @@ void screenToComplexDS(vec2 fragCoord, vec2 resolution,
 
 /** DS uniform names to add to the cache list */
 export const DS_UNIFORM_NAMES = ['u_centerLo', 'u_scaleLo'];
+
+/**
+ * Split a float64 into float32 hi + lo correction pair.
+ * hi = Math.fround(value), lo = value - hi.
+ * Together hi + lo ≈ value with ~46 bits of precision.
+ */
+export function splitDouble(value: number): [number, number] {
+  const hi = Math.fround(value);
+  return [hi, value - hi];
+}

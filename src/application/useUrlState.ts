@@ -7,12 +7,12 @@
  */
 
 import { useEffect, useRef, useMemo } from 'react';
-import type { FractalType, PaletteName, ColoringMode, Viewport } from '../domain';
+import type { FractalType, PaletteName, ColoringMode } from '../domain';
 import { getFractalTypeNames, getPaletteNames, COLORING_MODES } from '../domain';
 import type { InitialFractalConfig } from './useFractalState';
 
 /** URL-serializable subset of state */
-interface UrlState {
+export interface UrlState {
   centerRe: number;
   centerIm: number;
   scale: number;
@@ -103,7 +103,13 @@ function parseBoolParams(
 
   const ssaa = parseBool(params.get('ssaa'));
   if (ssaa !== undefined) result.ssaa = ssaa;
+}
 
+/** Parse Julia set parameters from URLSearchParams */
+function parseJuliaParams(
+  params: URLSearchParams,
+  result: Partial<InitialFractalConfig>
+): void {
   const jre = parseNum(params.get('jre'));
   if (jre !== undefined) result.juliaRe = jre;
   const jim = parseNum(params.get('jim'));
@@ -120,6 +126,7 @@ export function parseHash(hash: string): Partial<InitialFractalConfig> {
   parseViewportParams(params, result);
   parseDiscreteParams(params, result);
   parseBoolParams(params, result);
+  parseJuliaParams(params, result);
   return result;
 }
 
@@ -165,41 +172,11 @@ export function useUrlInitialConfig(): Partial<InitialFractalConfig> {
   }, []);
 }
 
-/** Extract URL-serializable fields from full state */
-function extractUrlState(
-  viewport: Viewport,
-  fractalType: FractalType,
-  maxIterations: number,
-  palette: PaletteName,
-  coloringMode: ColoringMode,
-  interiorColoring: boolean,
-  ssaa: boolean,
-  juliaRe: number,
-  juliaIm: number
-): UrlState {
-  return {
-    centerRe: viewport.centerRe,
-    centerIm: viewport.centerIm,
-    scale: viewport.scale,
-    fractalType, maxIterations, palette, coloringMode,
-    interiorColoring, ssaa, juliaRe, juliaIm,
-  };
-}
-
 /**
  * Sync state changes to URL hash via history.replaceState.
  * Debounced to avoid spamming the browser history API.
  */
-export function useUrlSync(
-  viewport: Viewport,
-  fractalType: FractalType,
-  maxIterations: number,
-  palette: PaletteName,
-  coloringMode: ColoringMode,
-  interiorColoring: boolean,
-  ssaa: boolean,
-  juliaRe: number,
-  juliaIm: number
+export function useUrlSync(urlState: UrlState
 ): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -208,10 +185,6 @@ export function useUrlSync(
       clearTimeout(timerRef.current);
     }
     timerRef.current = setTimeout(() => {
-      const urlState = extractUrlState(
-        viewport, fractalType, maxIterations,
-        palette, coloringMode, interiorColoring, ssaa, juliaRe, juliaIm
-      );
       const newHash = buildHash(urlState);
       const currentHash = window.location.hash;
       if (currentHash !== newHash) {
@@ -224,5 +197,8 @@ export function useUrlSync(
         clearTimeout(timerRef.current);
       }
     };
-  }, [viewport, fractalType, maxIterations, palette, coloringMode, interiorColoring, ssaa, juliaRe, juliaIm]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- urlState fields are stable values
+  }, [urlState.centerRe, urlState.centerIm, urlState.scale, urlState.fractalType,
+      urlState.maxIterations, urlState.palette, urlState.coloringMode,
+      urlState.interiorColoring, urlState.ssaa, urlState.juliaRe, urlState.juliaIm]);
 }

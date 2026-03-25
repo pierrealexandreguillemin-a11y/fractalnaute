@@ -32,11 +32,19 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   const { state, stats, actions } = useFractalState(mergedConfig);
 
   // Sync state changes back to URL hash (debounced)
-  useUrlSync(
-    state.viewport, state.fractalType, state.maxIterations,
-    state.palette, state.coloringMode, state.interiorColoring, state.ssaa,
-    state.juliaParams.juliaRe ?? -0.7, state.juliaParams.juliaIm ?? 0.27015
-  );
+  useUrlSync({
+    centerRe: state.viewport.centerRe,
+    centerIm: state.viewport.centerIm,
+    scale: state.viewport.scale,
+    fractalType: state.fractalType,
+    maxIterations: state.maxIterations,
+    palette: state.palette,
+    coloringMode: state.coloringMode,
+    interiorColoring: state.interiorColoring,
+    ssaa: state.ssaa,
+    juliaRe: state.juliaParams.juliaRe ?? -0.7,
+    juliaIm: state.juliaParams.juliaIm ?? 0.27015,
+  });
 
   const handleJuliaPick = useCallback((re: number, im: number) => {
     actions.setJuliaParams({ juliaRe: re, juliaIm: im });

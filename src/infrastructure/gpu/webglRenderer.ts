@@ -20,6 +20,7 @@ import {
   PREVIEW_SCALE, SSAA_SCALE
 } from './gpuFramebuffer';
 import type { GPUFramebuffer } from './gpuFramebuffer';
+import { splitDouble } from './shaders/doubleSingle';
 
 // ---- Public types -----------------------------------------------------------
 
@@ -59,16 +60,6 @@ interface CompiledRef {
 }
 
 // ---- Uniform binding helpers ------------------------------------------------
-
-/**
- * Split a float64 into float32 hi + lo correction pair.
- * hi = Math.fround(value), lo = value - hi.
- * Together hi + lo ≈ value with ~46 bits of precision.
- */
-function splitDouble(value: number): [number, number] {
-  const hi = Math.fround(value);
-  return [hi, value - hi];
-}
 
 /** Bind center / scale uniforms from viewport state (hi + DS lo corrections). */
 function setCenterAndScale(
@@ -310,8 +301,8 @@ function createProgressiveController(
     },
 
     resetState(): void {
-      // Called after context loss — old GL handles are already invalid,
-      // so we null refs without calling destroyFBO (which would be a no-op).
+      // Called after context loss — old GL handles are invalid.
+      // GL calls on a lost context are spec-guaranteed no-ops.
       tq.lastGpuTimeMs = 0;
       destroyTimerQuery(gl, tq);
       previewFBO = null;
