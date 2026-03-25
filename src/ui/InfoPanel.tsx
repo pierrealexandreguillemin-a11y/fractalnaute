@@ -24,9 +24,9 @@ function formatRenderTime(ms: number): string {
 export const InfoPanel: React.FC<InfoPanelProps> = ({ stats }) => (
   <div
     className={cn(
-      'absolute bottom-4 left-4 z-10 px-4 py-2',
+      'absolute bottom-14 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto z-10 px-3 py-1.5 sm:px-4 sm:py-2',
       GLASS_PANEL,
-      'text-[11px] font-mono text-muted-foreground'
+      'text-[9px] sm:text-[11px] font-mono text-muted-foreground'
     )}
   >
     <div className="flex gap-4 flex-wrap items-center">

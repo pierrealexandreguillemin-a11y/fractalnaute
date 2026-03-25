@@ -68,7 +68,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         aria-label="Afficher les contrôles"
         className={cn(
           CONTROLS_PANEL,
-          'absolute top-4 right-4 w-11 h-11 z-100',
+          'absolute bottom-2 right-2 sm:bottom-auto sm:top-4 sm:right-4 w-11 h-11 z-100',
           'text-foreground cursor-pointer flex items-center justify-center'
         )}
       >
@@ -97,7 +97,9 @@ const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void 
   <div
     className={cn(
       CONTROLS_PANEL,
-      'absolute top-2 right-2 p-3 min-w-[220px] max-h-[calc(100vh-16px)] sm:top-4 sm:right-4 sm:p-4 sm:min-w-[260px] sm:max-h-[calc(100vh-32px)]',
+      'absolute bottom-0 left-0 right-0 p-3 min-w-0 max-h-[60vh]',
+      'sm:bottom-auto sm:left-auto sm:top-4 sm:right-4 sm:p-4 sm:min-w-[260px] sm:max-h-[calc(100vh-32px)]',
+      'sm:rounded-2xl rounded-t-2xl rounded-b-none',
       'overflow-y-auto text-foreground z-100'
     )}
   >
