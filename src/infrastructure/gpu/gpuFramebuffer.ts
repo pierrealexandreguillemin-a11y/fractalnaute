@@ -1,12 +1,15 @@
 /**
  * ===============================================================================
  * INFRASTRUCTURE LAYER - GPU Framebuffer
- * Quarter-resolution FBO for progressive GPU rendering (preview pass)
+ * Scaled FBOs for progressive preview (1/4) and SSAA (2x) rendering.
  * ===============================================================================
  */
 
 /** Preview renders at 1/N of canvas resolution (each dimension). 4 = 1/16 pixels. */
-const PREVIEW_SCALE_DIVISOR = 4;
+export const PREVIEW_SCALE = 0.25;
+
+/** SSAA renders at Nx canvas resolution (each dimension). 2 = 4x pixels. */
+export const SSAA_SCALE = 2;
 
 // ---- Types ------------------------------------------------------------------
 
@@ -17,16 +20,20 @@ export interface GPUFramebuffer {
   height: number;
 }
 
-// ---- FBO lifecycle ----------------------------------------------------------
+// ---- Generic FBO lifecycle --------------------------------------------------
 
-/** Create a quarter-resolution framebuffer object for preview rendering. */
-export function createQuarterFBO(
-  gl: WebGL2RenderingContext
-): GPUFramebuffer {
-  const width = Math.max(1, Math.floor(gl.drawingBufferWidth / PREVIEW_SCALE_DIVISOR));
-  const height = Math.max(1, Math.floor(gl.drawingBufferHeight / PREVIEW_SCALE_DIVISOR));
+/** Create a framebuffer at `scale` × canvas resolution. Returns null if size exceeds GPU limits. */
+export function createScaledFBO(
+  gl: WebGL2RenderingContext,
+  scale: number
+): GPUFramebuffer | null {
+  const maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+  const width = Math.max(1, Math.floor(gl.drawingBufferWidth * scale));
+  const height = Math.max(1, Math.floor(gl.drawingBufferHeight * scale));
+  if (width > maxSize || height > maxSize) return null;
 
-  const texture = gl.createTexture()!;
+  const texture = gl.createTexture();
+  if (!texture) return null;
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(
     gl.TEXTURE_2D, 0, gl.RGBA8,
@@ -36,35 +43,36 @@ export function createQuarterFBO(
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-  const fbo = gl.createFramebuffer()!;
+  const fbo = gl.createFramebuffer();
+  if (!fbo) { gl.deleteTexture(texture); return null; }
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
   gl.framebufferTexture2D(
     gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
     gl.TEXTURE_2D, texture, 0
   );
 
-  // Restore default bindings
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.bindTexture(gl.TEXTURE_2D, null);
 
   return { fbo, texture, width, height };
 }
 
-/** Resize the quarter FBO if the canvas size changed, else return existing. */
-export function resizeQuarterFBO(
+/** Resize FBO if canvas size changed for given scale, else return existing. Returns null if GPU limits exceeded. */
+export function resizeScaledFBO(
   gl: WebGL2RenderingContext,
-  existing: GPUFramebuffer
-): GPUFramebuffer {
-  const newWidth = Math.max(1, Math.floor(gl.drawingBufferWidth / PREVIEW_SCALE_DIVISOR));
-  const newHeight = Math.max(1, Math.floor(gl.drawingBufferHeight / PREVIEW_SCALE_DIVISOR));
+  existing: GPUFramebuffer,
+  scale: number
+): GPUFramebuffer | null {
+  const newWidth = Math.max(1, Math.floor(gl.drawingBufferWidth * scale));
+  const newHeight = Math.max(1, Math.floor(gl.drawingBufferHeight * scale));
   if (newWidth === existing.width && newHeight === existing.height) {
     return existing;
   }
   destroyFBO(gl, existing);
-  return createQuarterFBO(gl);
+  return createScaledFBO(gl, scale);
 }
 
-/** Blit a quarter-res FBO to the full-size default framebuffer (canvas). */
+/** Blit FBO to the default framebuffer (canvas) with GL_LINEAR filtering. */
 export function blitFBOToCanvas(
   gl: WebGL2RenderingContext,
   fbo: GPUFramebuffer

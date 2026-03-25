@@ -7,7 +7,7 @@
  */
 
 import { useRef, useLayoutEffect, useCallback, useEffect } from 'react';
-import type { Viewport, FractalType, PaletteName, FractalParams, ColoringMode } from '../domain/types';
+import type { Viewport, FractalType, PaletteName, FractalParams, ColoringMode, RenderBackend } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import type { WebGLRenderer } from './gpu';
 import { renderFractal } from './renderer';
@@ -32,9 +32,10 @@ interface TransitionDeps {
   params: FractalParams;
   coloringMode: ColoringMode;
   interiorColoring: boolean;
+  ssaa: boolean;
   cancelRenderRef: React.MutableRefObject<(() => void) | null>;
   onRenderStartRef: React.MutableRefObject<(() => void) | undefined>;
-  onRenderCompleteRef: React.MutableRefObject<((t: number) => void) | undefined>;
+  onRenderCompleteRef: React.MutableRefObject<((t: number, backend: RenderBackend) => void) | undefined>;
 }
 
 /** Full re-render — cancel previous, reset transform, dispatch two-pass workers */
@@ -61,9 +62,10 @@ function doRenderFull(
     params: deps.params,
     coloringMode: deps.coloringMode,
     interiorColoring: deps.interiorColoring,
-    onComplete: (renderTime) => {
+    ssaa: deps.ssaa,
+    onComplete: (renderTime, backend) => {
       cancelRenderRef.current = null;
-      onRenderCompleteRef.current?.(renderTime);
+      onRenderCompleteRef.current?.(renderTime, backend);
     }
   });
 }
@@ -106,7 +108,7 @@ function doRenderPanStrips(
 
   const strips = computeExposedStrips(dx, dy, canvas.width, canvas.height);
   if (strips.length === 0) {
-    onRenderCompleteRef.current?.(0);
+    onRenderCompleteRef.current?.(0, 'cpu');
     return;
   }
 
@@ -119,9 +121,9 @@ function doRenderPanStrips(
     params: deps.params,
     coloringMode: deps.coloringMode,
     interiorColoring: deps.interiorColoring,
-    onComplete: (renderTime) => {
+    onComplete: (renderTime, backend) => {
       cancelRenderRef.current = null;
-      onRenderCompleteRef.current?.(renderTime);
+      onRenderCompleteRef.current?.(renderTime, backend);
     }
   }, strips);
 }

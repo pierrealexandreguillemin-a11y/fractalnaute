@@ -48,8 +48,9 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
     params: state.juliaParams,
     coloringMode: state.coloringMode,
     interiorColoring: state.interiorColoring,
+    ssaa: state.ssaa,
     onRenderStart: () => actions.setRendering(true),
-    onRenderComplete: (renderTime: number) => actions.setRendering(false, renderTime)
+    onRenderComplete: (renderTime, backend) => actions.setRendering(false, renderTime, backend)
   });
 
   // Sync theme to <html> for Radix portals (dropdowns teleport to <body>)

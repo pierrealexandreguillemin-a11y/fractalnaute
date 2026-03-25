@@ -17,7 +17,8 @@ export type {
   FractalParams,
   FractalTypeConfig,
   JuliaPreset,
-  RenderStats
+  RenderStats,
+  RenderBackend
 } from './types';
 
 export { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, INTERIOR_COLORING_DEFAULTS } from './types';

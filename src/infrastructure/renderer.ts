@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
+import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode, RenderBackend } from '../domain';
 import type { WorkerPool } from './workerPool';
 import type { WebGLRenderer } from './gpu';
 import { renderWithPool } from './renderCoordinator';
@@ -19,8 +19,9 @@ export interface RenderOptions {
   params: FractalParams;
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
+  ssaa?: boolean;
   onProgress?: (progress: number) => void;
-  onComplete?: (renderTime: number) => void;
+  onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
 /**
@@ -43,12 +44,13 @@ export function renderFractal(
       maxIterations: options.maxIterations,
       coloringMode: options.coloringMode ?? 'classic',
       interiorColoring: options.interiorColoring ?? false,
-      fractalParams: options.params
+      fractalParams: options.params,
+      ssaa: options.ssaa
     });
     if (rendered) {
       gpuRenderer.setVisible(true);
       const elapsed = performance.now() - startTime;
-      options.onComplete?.(elapsed);
+      options.onComplete?.(elapsed, 'gpu');
       return () => { gpuRenderer.cancelPending(); };
     }
     // GPU not ready (compiling) — hide GPU canvas, fall through to CPU
@@ -111,7 +113,7 @@ function renderFallback(
     if (currentY < height) {
       requestAnimationFrame(renderChunk);
     } else {
-      onComplete?.(performance.now() - startTime);
+      onComplete?.(performance.now() - startTime, 'cpu');
     }
   };
 

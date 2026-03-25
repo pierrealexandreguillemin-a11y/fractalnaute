@@ -17,8 +17,10 @@ import { LABEL_CLASS } from './shared';
 interface ColoringSectionProps {
   coloringMode: ColoringMode;
   interiorColoring: boolean;
+  ssaa: boolean;
   onColoringModeChange: (mode: ColoringMode) => void;
   onInteriorColoringChange: (enabled: boolean) => void;
+  onSSAAChange: (enabled: boolean) => void;
 }
 
 const COLORING_MODES = Object.keys(COLORING_MODE_LABELS) as ColoringMode[];
@@ -33,8 +35,8 @@ const MODE_DESCRIPTIONS: Record<ColoringMode, string> = {
 };
 
 export const ColoringSection: React.FC<ColoringSectionProps> = ({
-  coloringMode, interiorColoring,
-  onColoringModeChange, onInteriorColoringChange
+  coloringMode, interiorColoring, ssaa,
+  onColoringModeChange, onInteriorColoringChange, onSSAAChange
 }) => (
   <fieldset className="border-0 p-0 m-0">
     <legend className={LABEL_CLASS}>Coloration</legend>
@@ -69,6 +71,20 @@ export const ColoringSection: React.FC<ColoringSectionProps> = ({
         className="text-sm text-foreground cursor-pointer select-none"
       >
         Colorer l&apos;intérieur
+      </label>
+    </div>
+
+    <div className="flex items-center gap-2 mb-3.5">
+      <Checkbox
+        id="ssaa"
+        checked={ssaa}
+        onCheckedChange={(checked) => onSSAAChange(checked === true)}
+      />
+      <label
+        htmlFor="ssaa"
+        className="text-sm text-foreground cursor-pointer select-none"
+      >
+        Anti-aliasing 2x (SSAA)
       </label>
     </div>
   </fieldset>

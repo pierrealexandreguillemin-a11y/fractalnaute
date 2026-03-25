@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode } from '../domain';
+import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode, RenderBackend } from '../domain';
 import { createWorkerPool, type WorkerPool } from './workerPool';
 import { isWebGL2Available, createWebGLRenderer } from './gpu';
 import type { WebGLRenderer } from './gpu';
@@ -24,8 +24,9 @@ interface UseRendererOptions {
   params: FractalParams;
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
+  ssaa?: boolean;
   onRenderStart?: () => void;
-  onRenderComplete?: (renderTime: number) => void;
+  onRenderComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
 /**
@@ -35,7 +36,7 @@ interface UseRendererOptions {
 export function useRenderer({
   canvasRef, containerRef,
   fractalType, viewport, maxIterations, palette, params,
-  coloringMode = 'classic', interiorColoring = false,
+  coloringMode = 'classic', interiorColoring = false, ssaa = false,
   onRenderStart, onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
@@ -90,7 +91,7 @@ export function useRenderer({
   const { forceFullRender } = useViewportTransition({
     canvasRef, poolRef, gpuRef,
     fractalType, viewport, maxIterations, palette, params,
-    coloringMode, interiorColoring,
+    coloringMode, interiorColoring, ssaa,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
 

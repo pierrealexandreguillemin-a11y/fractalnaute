@@ -15,8 +15,9 @@ import {
 } from './shaderCompiler';
 import { createPaletteTexture, updatePaletteTexture } from './paletteTexture';
 import {
-  createQuarterFBO, resizeQuarterFBO,
-  blitFBOToCanvas, destroyFBO
+  createScaledFBO, resizeScaledFBO,
+  blitFBOToCanvas, destroyFBO,
+  PREVIEW_SCALE, SSAA_SCALE
 } from './gpuFramebuffer';
 import type { GPUFramebuffer } from './gpuFramebuffer';
 
@@ -29,6 +30,7 @@ export interface GPURenderOptions {
   coloringMode: ColoringMode;
   interiorColoring: boolean;
   fractalParams: FractalParams;
+  ssaa?: boolean;
 }
 
 export interface WebGLRenderer {
@@ -122,18 +124,28 @@ function renderToTarget(
 
 // ---- Progressive rendering heuristic ----------------------------------------
 
+/** GPU frame budget — one vsync at 60Hz */
+const GPU_FRAME_BUDGET_MS = 16;
+
 /**
- * Progressive rendering is disabled: no measured evidence that GPU frames
- * exceed 16ms with cardioid/bulb pre-test at typical resolutions.
- * To re-enable: implement EXT_disjoint_timer_query_webgl2 measurement,
- * confirm >16ms frames, then add workload-based heuristic here.
+ * Iteration threshold for conservative progressive on FIRST render
+ * (no GPU timing measurement available yet). Adaptive after first frame.
+ */
+const CONSERVATIVE_ITER_THRESHOLD = 2048;
+
+/**
+ * Decide whether the next frame should use progressive FBO rendering.
+ * Data-driven: uses measured GPU time from previous frame via timer query.
+ * Falls back to conservative threshold on first render at high iterations.
  */
 function needsProgressiveRender(
-  _gl: WebGL2RenderingContext,
-  _maxIterations: number,
-  _hasTimerQuery: boolean,
-  _lastGpuTimeMs: number
+  maxIterations: number,
+  lastGpuTimeMs: number
 ): boolean {
+  // Measured: previous frame exceeded 16ms budget → go progressive
+  if (lastGpuTimeMs > GPU_FRAME_BUDGET_MS) return true;
+  // No measurement yet + high iterations → conservative progressive
+  if (lastGpuTimeMs === 0 && maxIterations >= CONSERVATIVE_ITER_THRESHOLD) return true;
   return false;
 }
 
@@ -141,26 +153,68 @@ function needsProgressiveRender(
 
 interface ProgressiveController {
   cancelPending(): void;
-  renderProgressive(
-    compiled: CompiledRef,
-    options: GPURenderOptions,
-    vao: WebGLVertexArrayObject | null,
-    paletteTexture: WebGLTexture
-  ): void;
+  renderDirect(compiled: CompiledRef, options: GPURenderOptions, vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture): void;
+  renderProgressive(compiled: CompiledRef, options: GPURenderOptions, vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture): void;
   shouldUseProgressive(maxIterations: number): boolean;
+  pollTimerQuery(): void;
   destroy(): void;
   resetState(): void;
 }
 
+// ---- GPU timer query wrapper ------------------------------------------------
+
+interface TimerQueryState {
+  ext: EXT_disjoint_timer_query_webgl2 | null;
+  pending: WebGLQuery | null;
+  lastGpuTimeMs: number;
+}
+
+function createTimerQueryState(gl: WebGL2RenderingContext): TimerQueryState {
+  const ext = gl.getExtension(
+    'EXT_disjoint_timer_query_webgl2'
+  ) as EXT_disjoint_timer_query_webgl2 | null;
+  return { ext, pending: null, lastGpuTimeMs: 0 };
+}
+
+function beginTimerQuery(gl: WebGL2RenderingContext, tq: TimerQueryState): void {
+  if (!tq.ext || tq.pending) return;
+  tq.pending = gl.createQuery();
+  if (tq.pending) gl.beginQuery(tq.ext.TIME_ELAPSED_EXT, tq.pending);
+}
+
+function endTimerQuery(gl: WebGL2RenderingContext, tq: TimerQueryState): void {
+  if (!tq.ext || !tq.pending) return;
+  gl.endQuery(tq.ext.TIME_ELAPSED_EXT);
+}
+
+function pollTimerQuery(gl: WebGL2RenderingContext, tq: TimerQueryState): void {
+  if (!tq.pending) return;
+  const available = gl.getQueryParameter(tq.pending, gl.QUERY_RESULT_AVAILABLE) as boolean;
+  if (!available) return;
+  if (tq.ext) {
+    const disjoint = gl.getParameter(tq.ext.GPU_DISJOINT_EXT) as boolean;
+    if (!disjoint) {
+      const ns = gl.getQueryParameter(tq.pending, gl.QUERY_RESULT) as number;
+      tq.lastGpuTimeMs = ns / 1_000_000;
+    }
+  }
+  gl.deleteQuery(tq.pending);
+  tq.pending = null;
+}
+
+function destroyTimerQuery(gl: WebGL2RenderingContext, tq: TimerQueryState): void {
+  if (tq.pending) { gl.deleteQuery(tq.pending); tq.pending = null; }
+}
+
+// ---- Progressive controller -------------------------------------------------
+
 function createProgressiveController(
   gl: WebGL2RenderingContext
 ): ProgressiveController {
-  let lastGpuTimeMs = 0;
-  let quarterFBO: GPUFramebuffer | null = null;
+  let previewFBO: GPUFramebuffer | null = null;
+  let ssaaFBO: GPUFramebuffer | null = null;
   let pendingFullResRAF: number | null = null;
-  const timerQueryExt = gl.getExtension(
-    'EXT_disjoint_timer_query_webgl2'
-  ) as EXT_disjoint_timer_query_webgl2 | null;
+  const tq = createTimerQueryState(gl);
 
   function cancelPending(): void {
     if (pendingFullResRAF !== null) {
@@ -170,63 +224,78 @@ function createProgressiveController(
   }
 
   function canvasTarget(): DrawTarget {
-    return {
-      fbo: null,
-      width: gl.drawingBufferWidth,
-      height: gl.drawingBufferHeight
-    };
+    return { fbo: null, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
   }
 
-  function scheduleFullRes(
-    compiled: CompiledRef,
-    options: GPURenderOptions,
-    vao: WebGLVertexArrayObject | null,
-    paletteTexture: WebGLTexture
+  /** Render to canvas, optionally via SSAA 2x FBO. Falls back to direct if FBO unavailable. */
+  function renderWithSSAA(
+    compiled: CompiledRef, options: GPURenderOptions,
+    vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture
   ): void {
-    const start = performance.now();
-    pendingFullResRAF = requestAnimationFrame(() => {
-      pendingFullResRAF = null;
-      gl.bindVertexArray(vao);
-      renderToTarget(
-        gl, canvasTarget(), compiled, options.viewport, paletteTexture,
-        options.fractalParams, options.interiorColoring
-      );
-      lastGpuTimeMs = performance.now() - start;
-    });
+    gl.bindVertexArray(vao);
+    if (options.ssaa) {
+      ssaaFBO = ssaaFBO ? resizeScaledFBO(gl, ssaaFBO, SSAA_SCALE) : createScaledFBO(gl, SSAA_SCALE);
+      if (ssaaFBO) {
+        const target: DrawTarget = { fbo: ssaaFBO.fbo, width: ssaaFBO.width, height: ssaaFBO.height };
+        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+        blitFBOToCanvas(gl, ssaaFBO);
+        return;
+      }
+      // FBO creation failed (exceeds MAX_TEXTURE_SIZE or VRAM) — fall through to direct
+    }
+    renderToTarget(gl, canvasTarget(), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
   }
 
   return {
     cancelPending,
+    pollTimerQuery: () => pollTimerQuery(gl, tq),
 
     shouldUseProgressive(maxIterations: number): boolean {
-      return needsProgressiveRender(
-        gl, maxIterations, timerQueryExt !== null, lastGpuTimeMs
-      );
+      return needsProgressiveRender(maxIterations, tq.lastGpuTimeMs);
+    },
+
+    renderDirect(compiled, options, vao, paletteTexture): void {
+      beginTimerQuery(gl, tq);
+      renderWithSSAA(compiled, options, vao, paletteTexture);
+      endTimerQuery(gl, tq);
     },
 
     renderProgressive(compiled, options, vao, paletteTexture): void {
-      quarterFBO = quarterFBO
-        ? resizeQuarterFBO(gl, quarterFBO)
-        : createQuarterFBO(gl);
-      const fboTarget: DrawTarget = {
-        fbo: quarterFBO.fbo,
-        width: quarterFBO.width,
-        height: quarterFBO.height
-      };
+      // Preview: quarter-res (no SSAA — speed over quality)
+      previewFBO = previewFBO ? resizeScaledFBO(gl, previewFBO, PREVIEW_SCALE) : createScaledFBO(gl, PREVIEW_SCALE);
       gl.bindVertexArray(vao);
-      renderToTarget(gl, fboTarget, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
-      blitFBOToCanvas(gl, quarterFBO);
-      scheduleFullRes(compiled, options, vao, paletteTexture);
+      if (previewFBO) {
+        const target: DrawTarget = { fbo: previewFBO.fbo, width: previewFBO.width, height: previewFBO.height };
+        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+        blitFBOToCanvas(gl, previewFBO);
+      } else {
+        // FBO unavailable — render direct as preview
+        renderToTarget(gl, canvasTarget(), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+      }
+      // Full-res on next frame (with SSAA if enabled).
+      // cancelPending() at the top of render() prevents stale callbacks.
+      pendingFullResRAF = requestAnimationFrame(() => {
+        pendingFullResRAF = null;
+        beginTimerQuery(gl, tq);
+        renderWithSSAA(compiled, options, vao, paletteTexture);
+        endTimerQuery(gl, tq);
+      });
     },
 
     destroy(): void {
       cancelPending();
-      if (quarterFBO) destroyFBO(gl, quarterFBO);
+      destroyTimerQuery(gl, tq);
+      if (previewFBO) destroyFBO(gl, previewFBO);
+      if (ssaaFBO) destroyFBO(gl, ssaaFBO);
     },
 
     resetState(): void {
-      lastGpuTimeMs = 0;
-      quarterFBO = null;
+      // Called after context loss — old GL handles are already invalid,
+      // so we null refs without calling destroyFBO (which would be a no-op).
+      tq.lastGpuTimeMs = 0;
+      destroyTimerQuery(gl, tq);
+      previewFBO = null;
+      ssaaFBO = null;
     }
   };
 }
@@ -362,6 +431,7 @@ export function createWebGLRenderer(
     render(options: GPURenderOptions): boolean {
       if (contextLost) return false;
       progressive.cancelPending();
+      progressive.pollTimerQuery();
       pollCompilation(gl);
       const compiled = getOrCompile(
         gl, options.fractalType, options.coloringMode, options.maxIterations,
@@ -371,13 +441,7 @@ export function createWebGLRenderer(
       if (progressive.shouldUseProgressive(options.maxIterations)) {
         progressive.renderProgressive(compiled, options, emptyVAO, paletteTexture);
       } else {
-        gl.bindVertexArray(emptyVAO);
-        renderToTarget(
-          gl,
-          { fbo: null, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
-          compiled, options.viewport, paletteTexture, options.fractalParams,
-          options.interiorColoring
-        );
+        progressive.renderDirect(compiled, options, emptyVAO, paletteTexture);
       }
       return true;
     },
@@ -415,8 +479,6 @@ export function createWebGLRenderer(
       return hasCompiledProgram();
     },
 
-    getCanvas(): HTMLCanvasElement {
-      return gpuCanvas;
-    }
+    getCanvas(): HTMLCanvasElement { return gpuCanvas; }
   };
 }

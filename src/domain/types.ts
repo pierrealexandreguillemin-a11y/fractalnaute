@@ -119,6 +119,9 @@ export interface JuliaPreset {
   im: number;
 }
 
+/** Which rendering backend produced the last frame */
+export type RenderBackend = 'gpu' | 'cpu';
+
 /** Render statistics */
 export interface RenderStats {
   fractalType: FractalType;
@@ -127,6 +130,7 @@ export interface RenderStats {
   centerRe: number;
   centerIm: number;
   renderTime: number;
+  renderBackend: RenderBackend | null;
 }
 
 /** Default Julia parameters */

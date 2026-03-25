@@ -13,7 +13,8 @@ import type {
   ColoringMode,
   Viewport,
   FractalParams,
-  RenderStats
+  RenderStats,
+  RenderBackend
 } from '../domain';
 import {
   DEFAULT_JULIA_PARAMS,
@@ -37,6 +38,8 @@ interface FractalState {
   isRendering: boolean;
   isPickingJulia: boolean;
   renderTime: number;
+  renderBackend: RenderBackend | null;
+  ssaa: boolean;
 }
 
 /** Action types */
@@ -49,10 +52,11 @@ type FractalAction =
   | { type: 'SET_THEME'; theme: ThemeName }
   | { type: 'SET_ITERATIONS'; maxIterations: number }
   | { type: 'SET_JULIA_PARAMS'; params: FractalParams }
-  | { type: 'SET_RENDERING'; isRendering: boolean; renderTime?: number }
+  | { type: 'SET_RENDERING'; isRendering: boolean; renderTime?: number; renderBackend?: RenderBackend }
   | { type: 'SET_PICKING_JULIA'; isPickingJulia: boolean }
   | { type: 'SET_COLORING_MODE'; mode: ColoringMode }
-  | { type: 'SET_INTERIOR_COLORING'; enabled: boolean };
+  | { type: 'SET_INTERIOR_COLORING'; enabled: boolean }
+  | { type: 'SET_SSAA'; enabled: boolean };
 
 /** Initial state */
 const initialState: FractalState = {
@@ -66,8 +70,23 @@ const initialState: FractalState = {
   juliaParams: { ...DEFAULT_JULIA_PARAMS },
   isRendering: false,
   isPickingJulia: false,
-  renderTime: 0
+  renderTime: 0,
+  renderBackend: null,
+  ssaa: false
 };
+
+/** Handle SET_RENDERING — extracted to stay under complexity limit */
+function applySetRendering(
+  state: FractalState,
+  action: { isRendering: boolean; renderTime?: number; renderBackend?: RenderBackend }
+): FractalState {
+  return {
+    ...state,
+    isRendering: action.isRendering,
+    renderTime: action.renderTime ?? state.renderTime,
+    renderBackend: action.renderBackend ?? state.renderBackend
+  };
+}
 
 /** State reducer */
 function fractalReducer(state: FractalState, action: FractalAction): FractalState {
@@ -116,11 +135,7 @@ function fractalReducer(state: FractalState, action: FractalAction): FractalStat
       return { ...state, juliaParams: { ...state.juliaParams, ...action.params } };
 
     case 'SET_RENDERING':
-      return {
-        ...state,
-        isRendering: action.isRendering,
-        renderTime: action.renderTime ?? state.renderTime
-      };
+      return applySetRendering(state, action);
 
     case 'SET_PICKING_JULIA':
       return { ...state, isPickingJulia: action.isPickingJulia };
@@ -130,6 +145,9 @@ function fractalReducer(state: FractalState, action: FractalAction): FractalStat
 
     case 'SET_INTERIOR_COLORING':
       return { ...state, interiorColoring: action.enabled };
+
+    case 'SET_SSAA':
+      return { ...state, ssaa: action.enabled };
 
     default:
       return state;
@@ -196,8 +214,8 @@ export function useFractalState(initial?: InitialFractalConfig) {
     dispatch({ type: 'SET_JULIA_PARAMS', params });
   }, []);
 
-  const setRendering = useCallback((isRendering: boolean, renderTime?: number) => {
-    dispatch({ type: 'SET_RENDERING', isRendering, renderTime });
+  const setRendering = useCallback((isRendering: boolean, renderTime?: number, renderBackend?: RenderBackend) => {
+    dispatch({ type: 'SET_RENDERING', isRendering, renderTime, renderBackend });
   }, []);
 
   const setPickingJulia = useCallback((isPickingJulia: boolean) => {
@@ -212,6 +230,10 @@ export function useFractalState(initial?: InitialFractalConfig) {
     dispatch({ type: 'SET_INTERIOR_COLORING', enabled });
   }, []);
 
+  const setSSAA = useCallback((enabled: boolean) => {
+    dispatch({ type: 'SET_SSAA', enabled });
+  }, []);
+
   // Computed stats
   const stats: RenderStats = useMemo(() => {
     const config = getFractalConfig(state.fractalType);
@@ -221,9 +243,10 @@ export function useFractalState(initial?: InitialFractalConfig) {
       zoomLevel: getZoomLevel(state.viewport, config.defaultView.scale),
       centerRe: state.viewport.centerRe,
       centerIm: state.viewport.centerIm,
-      renderTime: state.renderTime
+      renderTime: state.renderTime,
+      renderBackend: state.renderBackend
     };
-  }, [state.fractalType, state.viewport, state.renderTime]);
+  }, [state.fractalType, state.viewport, state.renderTime, state.renderBackend]);
 
   return {
     state,
@@ -240,7 +263,8 @@ export function useFractalState(initial?: InitialFractalConfig) {
       setRendering,
       setPickingJulia,
       setColoringMode,
-      setInteriorColoring
+      setInteriorColoring,
+      setSSAA
     }
   };
 }

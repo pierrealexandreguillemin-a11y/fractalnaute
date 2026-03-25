@@ -7,7 +7,7 @@
  */
 
 import type {
-  FractalType, PaletteName, FractalParams, Viewport, ColoringMode
+  FractalType, PaletteName, FractalParams, Viewport, ColoringMode, RenderBackend
 } from '../domain/types';
 import type { WorkerPool } from './workerPool';
 import type { ExposedStrip } from './viewportTransform';
@@ -24,7 +24,7 @@ export interface CoordinatorRenderOptions {
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
   onProgress?: (progress: number) => void;
-  onComplete?: (renderTime: number) => void;
+  onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
 /** Preview stride — 1/16 of pixels computed, filled as 4x4 blocks */
@@ -175,7 +175,7 @@ export function renderWithPool(
     pool.resetCancel();
     activeCleanup = dispatchPass(session, 1, renderId, () => {
       onProgress?.(1);
-      onComplete?.(performance.now() - startTime);
+      onComplete?.(performance.now() - startTime, 'cpu');
     });
   });
 
@@ -244,7 +244,7 @@ export function renderStripsWithPool(
       if (completedStrips === strips.length) {
         cleanup();
         onProgress?.(1);
-        onComplete?.(performance.now() - startTime);
+        onComplete?.(performance.now() - startTime, 'cpu');
       }
     };
 

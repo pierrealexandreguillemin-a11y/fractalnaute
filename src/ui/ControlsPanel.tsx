@@ -28,6 +28,8 @@ interface ControlsPanelProps {
   onPickJulia: () => void;
   onColoringModeChange: (mode: ColoringMode) => void;
   onInteriorColoringChange: (enabled: boolean) => void;
+  ssaa: boolean;
+  onSSAAChange: (enabled: boolean) => void;
   onReset: () => void;
   onExport: () => void;
 }
@@ -85,10 +87,10 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
 /** Expanded panel body — extracted for max-lines-per-function compliance */
 const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void }> = ({
   fractalType, theme, palette, maxIterations,
-  coloringMode, interiorColoring,
+  coloringMode, interiorColoring, ssaa,
   juliaParams, isPickingJulia,
   onFractalTypeChange, onThemeChange, onPaletteChange,
-  onIterationsChange, onColoringModeChange, onInteriorColoringChange,
+  onIterationsChange, onColoringModeChange, onInteriorColoringChange, onSSAAChange,
   onJuliaParamsChange, onPickJulia,
   onReset, onExport, onCollapse
 }) => (
@@ -128,8 +130,10 @@ const ControlsPanelBody: React.FC<ControlsPanelProps & { onCollapse: () => void 
     <ColoringSection
       coloringMode={coloringMode}
       interiorColoring={interiorColoring}
+      ssaa={ssaa}
       onColoringModeChange={onColoringModeChange}
       onInteriorColoringChange={onInteriorColoringChange}
+      onSSAAChange={onSSAAChange}
     />
 
     <div className="h-px bg-border my-3" />
