@@ -211,8 +211,9 @@ function finalizePending(
   ) as boolean;
 
   if (!linked) {
+    const fragLog = gl.getShaderInfoLog(pending.fragShader) ?? '';
     const log = gl.getProgramInfoLog(pending.program) ?? 'unknown error';
-    console.error(`Shader link failed [${pending.key}]: ${log}`);
+    console.error(`Shader link failed [${pending.key}]: ${log} | frag: ${fragLog}`);
     gl.deleteProgram(pending.program);
     cleanupShaders(gl, pending);
     return false;
@@ -251,7 +252,7 @@ export function getOrCompile(
   if (pendingCompiles.some(p => p.key === key)) return null;
 
   const fragSource = assembleFragmentSource(fractal, coloring, maxIter, interiorColoring);
-  if (!fragSource) return null; // Unsupported combination — graceful fallback to CPU
+  if (!fragSource) return null;
 
   const vert = createShader(gl, gl.VERTEX_SHADER, fullscreenVert);
   const frag = createShader(gl, gl.FRAGMENT_SHADER, fragSource);

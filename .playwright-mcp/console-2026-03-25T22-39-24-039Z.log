@@ -1,0 +1,137 @@
+[     291ms] [WARNING] [RENDER] gpu=false, ready=undefined @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     312ms] [WARNING] [GPU] Compiling shader: mandelbrot_classic_256_false (6019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     574ms] [WARNING] [GPU] Compiling shader: julia_classic_256_false (3041 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     584ms] [WARNING] [GPU] Compiling shader: burningship_classic_256_false (3019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     602ms] [WARNING] [GPU] Compiling shader: tricorn_classic_256_false (3026 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     618ms] [WARNING] [GPU] Compiling shader: multibrot3_classic_256_false (3291 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   45097ms] [WARNING] [RENDER] gpu=false, ready=undefined @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   45113ms] [WARNING] [GPU] Compiling shader: mandelbrot_classic_256_false (6019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   45151ms] ReferenceError: scheduleGpuReadyRender is not defined
+    at useRenderer.useEffect (http://localhost:3000/_next/static/chunks/_05q.xfe._.js?id=%255Bproject%255D%252Fsrc%252Finfrastructure%252FuseRenderer.ts+%255Bapp-client%255D+%2528ecmascript%2529:59:17)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:15087:22)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:965:74)
+    at commitHookEffectListMount (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:7255:167)
+    at commitHookPassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:7290:60)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8689:33)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8693:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8693:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8693:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8688:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+    at recursivelyTraversePassiveMountEffects (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8676:316)
+    at commitPassiveMountOnFiber (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:8750:17)
+[   45333ms] [WARNING] [GPU] Compiling shader: julia_classic_256_false (3041 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   45346ms] [WARNING] [GPU] Compiling shader: burningship_classic_256_false (3019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   45363ms] [WARNING] [GPU] Compiling shader: tricorn_classic_256_false (3026 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   45378ms] [WARNING] [GPU] Compiling shader: multibrot3_classic_256_false (3291 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53100ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53143ms] [WARNING] [RENDER] gpu=false, ready=undefined @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53159ms] [WARNING] [GPU] Compiling shader: mandelbrot_classic_256_false (6019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53285ms] [WARNING] [GPU] pollCompilation: 1 pending, parallelExt=true @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53290ms] [WARNING] [GPU] Shader compiled: mandelbrot_classic_256_false (7 uniforms) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53492ms] [WARNING] [RENDER] gpu=false, ready=undefined @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53513ms] [WARNING] [GPU] Compiling shader: mandelbrot_classic_256_false (6019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53668ms] [WARNING] [GPU] pollCompilation: 1 pending, parallelExt=true @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53670ms] [WARNING] [GPU] Shader compiled: mandelbrot_classic_256_false (7 uniforms) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53749ms] [WARNING] [GPU] Compiling shader: julia_classic_256_false (3041 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53762ms] [WARNING] [GPU] Compiling shader: burningship_classic_256_false (3019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53778ms] [WARNING] [GPU] Compiling shader: tricorn_classic_256_false (3026 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   53794ms] [WARNING] [GPU] Compiling shader: multibrot3_classic_256_false (3291 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   62677ms] [ERROR] ./src/infrastructure/useRenderer.ts:117:4
+Expression expected
+  115 |     coloringMode, interiorColoring, ssaa, lastRenderTime,
+  116 |     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
+> 117 |   });
+      |    ^
+  118 |
+  119 |   // Keep GPU palette texture in sync with React state
+  120 |   useEffect(() => {
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/infrastructure/useRenderer.ts [Client Component Browser]
+    ./src/useFractalExplorer.ts [Client Component Browser]
+    ./src/FractalExplorer.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/infrastructure/useRenderer.ts [Client Component SSR]
+    ./src/useFractalExplorer.ts [Client Component SSR]
+    ./src/FractalExplorer.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[   62736ms] [ERROR] ./src/infrastructure/useRenderer.ts:117:4
+Expression expected
+  115 |     coloringMode, interiorColoring, ssaa, lastRenderTime,
+  116 |     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
+> 117 |   });
+      |    ^
+  118 |
+  119 |   // Keep GPU palette texture in sync with React state
+  120 |   useEffect(() => {
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/infrastructure/useRenderer.ts [Client Component Browser]
+    ./src/useFractalExplorer.ts [Client Component Browser]
+    ./src/FractalExplorer.tsx [Client Component Browser]
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/infrastructure/useRenderer.ts [Client Component SSR]
+    ./src/useFractalExplorer.ts [Client Component SSR]
+    ./src/FractalExplorer.tsx [Client Component SSR]
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component] @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[   84091ms] [WARNING] [RENDER] gpu=false, ready=undefined @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84108ms] [WARNING] [GPU] Compiling shader: mandelbrot_classic_256_false (6019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84225ms] [WARNING] [GPU] pollCompilation: 1 pending, parallelExt=true @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84227ms] [WARNING] [GPU] Shader compiled: mandelbrot_classic_256_false (7 uniforms) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84227ms] [WARNING] [RENDER] gpu=true, ready=true @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84322ms] [WARNING] [GPU] Compiling shader: julia_classic_256_false (3041 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84332ms] [WARNING] [GPU] Compiling shader: burningship_classic_256_false (3019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84349ms] [WARNING] [GPU] Compiling shader: tricorn_classic_256_false (3026 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   84365ms] [WARNING] [GPU] Compiling shader: multibrot3_classic_256_false (3291 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431

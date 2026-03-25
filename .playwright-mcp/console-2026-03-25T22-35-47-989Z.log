@@ -1,0 +1,5 @@
+[     351ms] [WARNING] [GPU] Compiling shader: mandelbrot_classic_256_false (6019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     621ms] [WARNING] [GPU] Compiling shader: julia_classic_256_false (3041 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     630ms] [WARNING] [GPU] Compiling shader: burningship_classic_256_false (3019 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     647ms] [WARNING] [GPU] Compiling shader: tricorn_classic_256_false (3026 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     664ms] [WARNING] [GPU] Compiling shader: multibrot3_classic_256_false (3291 chars) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431

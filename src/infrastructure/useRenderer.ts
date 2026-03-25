@@ -14,6 +14,23 @@ import type { WebGLRenderer } from './gpu';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
 import { useViewportTransition } from './useViewportTransition';
 
+/** Poll GPU readiness and trigger re-render when shaders finish compiling */
+function scheduleGpuReadyRender(
+  gpuRef: React.RefObject<WebGLRenderer | null>,
+  forceRenderRef: React.MutableRefObject<(() => void) | null>
+): void {
+  let attempts = 0;
+  const check = () => {
+    if (++attempts > 60 || !gpuRef.current) return; // ~1s max
+    if (gpuRef.current.isReady()) {
+      forceRenderRef.current?.();
+      return;
+    }
+    requestAnimationFrame(check);
+  };
+  requestAnimationFrame(check);
+}
+
 interface UseRendererOptions {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   containerRef: React.RefObject<HTMLElement | null>;
@@ -55,16 +72,19 @@ export function useRenderer({
   }, [onRenderStart, onRenderComplete]);
 
   // Pool + GPU lifecycle: create on mount, destroy on unmount
+  const forceRenderRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     poolRef.current = createWorkerPool(); // null if SAB unavailable
     const container = containerRef.current;
     const canvas = canvasRef.current;
     if (container && isWebGL2Available()) {
       gpuRef.current = createWebGLRenderer(container, initialPaletteRef.current);
-      // Sync GPU canvas size immediately — useLayoutEffect resize already ran
       if (canvas) {
         gpuRef.current?.resize(canvas.width, canvas.height);
       }
+      // GPU renderer created after first CPU render — schedule GPU re-render
+      // when shader compilation completes (async via KHR_parallel_shader_compile)
+      scheduleGpuReadyRender(gpuRef, forceRenderRef);
     }
     return () => {
       gpuRef.current?.destroy();
@@ -96,6 +116,11 @@ export function useRenderer({
     coloringMode, interiorColoring, ssaa, lastRenderTime,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
+
+  // Wire forceRenderRef so GPU-ready callback can trigger re-render
+  useEffect(() => {
+    forceRenderRef.current = forceFullRender;
+  }, [forceFullRender]);
 
   // Keep GPU palette texture in sync with React state
   useEffect(() => {
