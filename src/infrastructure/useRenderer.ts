@@ -110,7 +110,9 @@ export function useRenderer({
   }, [handleResize, forceFullRender]);
 
   const exportImage = useCallback(() => {
-    const canvas = canvasRef.current;
+    // Export GPU canvas if GPU is active, otherwise CPU canvas
+    const gpu = gpuRef.current;
+    const canvas = gpu?.isReady() ? gpu.getCanvas() : canvasRef.current;
     if (!canvas) return;
     downloadCanvas(canvas, fractalType);
   }, [canvasRef, fractalType]);

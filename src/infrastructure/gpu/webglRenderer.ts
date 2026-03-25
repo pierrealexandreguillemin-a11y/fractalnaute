@@ -39,6 +39,8 @@ export interface WebGLRenderer {
   setVisible(visible: boolean): void;
   destroy(): void;
   isReady(): boolean;
+  /** Get the GPU canvas element for export/screenshot. */
+  getCanvas(): HTMLCanvasElement;
 }
 
 // ---- Internal draw types ----------------------------------------------------
@@ -265,6 +267,30 @@ const PRECOMPILE_MAX_ITER = 256;
  * Create a WebGL 2 renderer with its own dedicated canvas overlay.
  * Returns null if the browser does not support WebGL 2.
  */
+function setupContextHandlers(
+  gl: WebGL2RenderingContext,
+  gpuCanvas: HTMLCanvasElement,
+  progressive: ProgressiveController,
+  getCurrentPalette: () => PaletteName,
+  setPaletteTexture: (tex: WebGLTexture) => void,
+  setContextLost: (v: boolean) => void
+): { onContextLost: (e: Event) => void; onContextRestored: () => void } {
+  const onContextLost = (e: Event): void => {
+    e.preventDefault();
+    setContextLost(true);
+  };
+  const onContextRestored = (): void => {
+    setContextLost(false);
+    progressive.resetState();
+    initCompiler(gl);
+    setPaletteTexture(createPaletteTexture(gl, getCurrentPalette()));
+    getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
+  };
+  gpuCanvas.addEventListener('webglcontextlost', onContextLost);
+  gpuCanvas.addEventListener('webglcontextrestored', onContextRestored);
+  return { onContextLost, onContextRestored };
+}
+
 export function createWebGLRenderer(
   container: HTMLElement,
   initialPalette?: PaletteName
@@ -285,21 +311,11 @@ export function createWebGLRenderer(
   const progressive = createProgressiveController(gl);
   getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
 
-  const onContextLost = (e: Event): void => {
-    e.preventDefault();
-    contextLost = true;
-  };
-
-  const onContextRestored = (): void => {
-    contextLost = false;
-    progressive.resetState();
-    initCompiler(gl);
-    paletteTexture = createPaletteTexture(gl, currentPalette);
-    getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
-  };
-
-  gpuCanvas.addEventListener('webglcontextlost', onContextLost);
-  gpuCanvas.addEventListener('webglcontextrestored', onContextRestored);
+  const { onContextLost, onContextRestored } = setupContextHandlers(
+    gl, gpuCanvas, progressive, () => currentPalette,
+    (tex: WebGLTexture) => { paletteTexture = tex; },
+    (v: boolean) => { contextLost = v; }
+  );
 
   return {
     render(options: GPURenderOptions): boolean {
@@ -355,6 +371,10 @@ export function createWebGLRenderer(
       if (contextLost) return false;
       pollCompilation(gl);
       return hasCompiledProgram();
+    },
+
+    getCanvas(): HTMLCanvasElement {
+      return gpuCanvas;
     }
   };
 }
