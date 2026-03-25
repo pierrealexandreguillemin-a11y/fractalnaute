@@ -129,6 +129,22 @@ Measured on AMD Radeon Graphics (integrated RDNA2), 1920×912 @256iter, Playwrig
 
 Note: times are drawArrays+finish (GPU sync). Total wall-clock includes React dispatch + debounce (80ms) + uniform setup (~0.01ms). All sub-0.05ms.
 
+### + GPU v3 — All Coloring Modes
+
+All 5 coloring modes ported to GLSL. Real accumulator (stripe avg, orbit trap, dz). Interior coloring via orbit trap + attenuation. Distance estimation for normalMap lighting.
+
+Measured on Mandelbrot @256iter 1920×912, AMD Radeon integrated RDNA2.
+
+| Mode | GPU (ms) | CPU (ms) | Gain | Notes |
+|---|---|---|---|---|
+| **Classic** | 0.030 | 228 | **~7600x** | Noop accumulator |
+| **Stripe** | 0.040 | 400 | **~10000x** | atan2 + sin per iteration |
+| **Decomposition** | 0.035 | 230 | **~6571x** | atan2 at escape |
+| **Orbit Trap** | 0.035 | 250 | **~7143x** | log + min tracking |
+| **Normal Map** | 0.050 | 260 | **~5200x** | DE + cos lighting |
+
+All 25 fractal×coloring combinations are GPU-rendered. Interior coloring support included.
+
 ---
 
 ## Performance Improvement Options
