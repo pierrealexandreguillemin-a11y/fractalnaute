@@ -121,7 +121,7 @@ grep -r @tradeoff src/
 2. ~~UI: render time + GPU/CPU indicator~~ DONE — InfoPanel shows render time + GPU/CPU badge
 3. ~~Progressive FBO + timer query~~ DONE — adaptive heuristic (>16ms → FBO preview), EXT_disjoint_timer_query_webgl2, conservative @2048+ iter
 4. ~~SSAA 2x2~~ DONE — GPU 2x FBO → GL_LINEAR downsample, toggle UI, composes with progressive
-5. Double-single emulation (vec2) — zoom float32 10^-7 → 10^-15
+5. ~~Double-single emulation~~ DONE — Mandelbrot DS iteration (vec2 hi+lo), Veltkamp split, zoom 10^-15
 6. Perturbation theory (CPU ref orbit + GPU delta) — zoom 10^-238, ~3 impls browser existent
 - Research: docs/research-deep-mandelbrot.md
 
