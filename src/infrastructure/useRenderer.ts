@@ -25,6 +25,7 @@ interface UseRendererOptions {
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
   ssaa?: boolean;
+  lastRenderTime?: number;
   onRenderStart?: () => void;
   onRenderComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
@@ -37,6 +38,7 @@ export function useRenderer({
   canvasRef, containerRef,
   fractalType, viewport, maxIterations, palette, params,
   coloringMode = 'classic', interiorColoring = false, ssaa = false,
+  lastRenderTime = 0,
   onRenderStart, onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
@@ -91,7 +93,7 @@ export function useRenderer({
   const { forceFullRender } = useViewportTransition({
     canvasRef, poolRef, gpuRef,
     fractalType, viewport, maxIterations, palette, params,
-    coloringMode, interiorColoring, ssaa,
+    coloringMode, interiorColoring, ssaa, lastRenderTime,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
 

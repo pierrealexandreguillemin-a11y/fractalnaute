@@ -18,8 +18,10 @@ import {
   computeExposedStrips, shiftPixelBuffer
 } from './viewportTransform';
 
-/** Debounce delay — short enough to feel responsive, long enough to batch rapid inputs */
-const DEBOUNCE_MS = 80;
+/** Adaptive debounce: fast GPU renders get shorter delay for snappier interaction */
+const DEBOUNCE_FAST_MS = 40;
+const DEBOUNCE_DEFAULT_MS = 80;
+const FAST_RENDER_THRESHOLD_MS = 1;
 
 interface TransitionDeps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -33,6 +35,7 @@ interface TransitionDeps {
   coloringMode: ColoringMode;
   interiorColoring: boolean;
   ssaa: boolean;
+  lastRenderTime: number;
   cancelRenderRef: React.MutableRefObject<(() => void) | null>;
   onRenderStartRef: React.MutableRefObject<(() => void) | undefined>;
   onRenderCompleteRef: React.MutableRefObject<((t: number, backend: RenderBackend) => void) | undefined>;
@@ -155,7 +158,7 @@ function resetTransform(canvas: HTMLCanvasElement): void {
  * Hook: instant CSS feedback on viewport changes + debounced render.
  *
  * - useLayoutEffect applies CSS transform synchronously before browser paint (~1-2ms)
- * - After 80ms of no input, dispatches real render (pan strips or full)
+ * - Adaptive debounce: 40ms when last render was fast (<1ms, typical GPU), 80ms otherwise
  * - will-change: transform hints GPU compositor layer
  */
 export function useViewportTransition(deps: TransitionDeps) {
@@ -196,6 +199,10 @@ export function useViewportTransition(deps: TransitionDeps) {
     canvas.style.transform = transform;
     canvas.style.transformOrigin = '50% 50%';
 
+    const debounce = deps.lastRenderTime > 0 && deps.lastRenderTime < FAST_RENDER_THRESHOLD_MS
+      ? DEBOUNCE_FAST_MS
+      : DEBOUNCE_DEFAULT_MS;
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
@@ -209,7 +216,7 @@ export function useViewportTransition(deps: TransitionDeps) {
       } else {
         doRenderFull(d, prevViewportRef);
       }
-    }, DEBOUNCE_MS);
+    }, debounce);
 
     return () => {
       if (debounceRef.current) {
@@ -217,7 +224,7 @@ export function useViewportTransition(deps: TransitionDeps) {
         debounceRef.current = null;
       }
     };
-  }, [canvasRef, deps.viewport, paramsKey]);
+  }, [canvasRef, deps.viewport, deps.lastRenderTime, paramsKey]);
 
   // GPU compositor hint
   useEffect(() => {
