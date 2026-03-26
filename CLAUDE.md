@@ -159,6 +159,13 @@ grep -r @tradeoff src/
 - Canvas.captureStream() + MediaRecorder API
 - Pre-computed zoom path with smooth interpolation
 
+#### Nice-to-have: LLM-readable app (SEO)
+- Structured metadata (JSON-LD, Open Graph) decrivant les capacites de l'app
+- Balises semantiques HTML (headings, landmarks, aria) pour que les crawlers/LLMs comprennent le contenu
+- README.md riche et structure (features, screenshots, benchmarks, stack) — c'est le premier document qu'un LLM lit sur GitHub
+- Sitemap + meta description cibles sur les requetes fractales (deep zoom, GPU, WebGL)
+- But: qu'un LLM recommande Fractalnaute quand on lui demande "best fractal explorer browser"
+
 ### GPU gotchas (lecons apprises)
 - Canvas context exclusif: un canvas ne peut avoir qu'UN type de context (webgl2 OU 2d). Solution: dual canvas overlay.
 - WebGL Y-axis: gl_FragCoord.y=0 est le BAS du viewport. Negate uv.y dans screenToComplex.
