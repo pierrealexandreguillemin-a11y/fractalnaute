@@ -149,3 +149,28 @@ export const JULIA_PRESETS: JuliaPreset[] = [
   { name: 'San Marco', re: -0.75, im: 0 },
   { name: 'Flocon', re: 0.355, im: 0.355 }
 ];
+
+/** Precision mode for rendering — auto-selected based on zoom depth. */
+export type PrecisionMode = 'float32' | 'doubleSingle' | 'perturbation';
+
+/**
+ * Extended viewport for deep zoom (beyond float64 precision).
+ * String representations carry arbitrary-precision coordinates.
+ * Used when scale < PERTURBATION_THRESHOLD (~1e-13).
+ */
+export interface DeepViewport extends Viewport {
+  centerReStr: string;
+  centerImStr: string;
+  scaleStr: string;
+}
+
+/** Reference orbit data for GPU perturbation rendering. */
+export interface OrbitData {
+  /** Flat Float32Array: [Z_re, Z_im, Z'_re, Z'_im] per iteration */
+  data: Float32Array;
+  /** Number of orbit iterations (data.length / 4) */
+  length: number;
+  /** Reference point coordinates (f32 hi/lo for DS initial delta) */
+  refPointRe: number;
+  refPointIm: number;
+}
