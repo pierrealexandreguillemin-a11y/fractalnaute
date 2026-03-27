@@ -18,6 +18,17 @@ use wasm_bindgen::prelude::*;
 /// `control_buf`: `Int32Array` backed by `SharedArrayBuffer`
 ///   `[cancel_flag, progress]`
 ///
+/// **Cancel/progress limitation:** The `control_buf` values are read once at call start.
+/// Runtime cancellation (JS writing to SAB while WASM runs) requires WASM shared memory
+/// (`+atomics` flag + WebAssembly.Memory({shared: true})), which adds build complexity.
+///
+/// Current cancel strategy (handled in orbit.worker.ts, Task 3):
+/// - Worker.terminate() for immediate cancel (re-instantiates WASM, ~50ms)
+/// - Progress polling via periodic postMessage between chunked WASM calls
+///
+/// The AtomicI32 parameters in orbit.rs enable unit testing of cancel/progress logic.
+/// Runtime SAB integration is a future optimization.
+///
 /// # Errors
 ///
 /// Returns `JsValue` error if coordinate parsing or precision scaling fails.

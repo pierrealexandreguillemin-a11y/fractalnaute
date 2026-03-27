@@ -112,11 +112,7 @@ pub fn to_f64(val: &BigFloat) -> f64 {
 #[allow(clippy::cast_possible_truncation)]
 pub fn to_f32(val: &BigFloat) -> f32 {
     let f = to_f64(val) as f32;
-    if f.is_finite() || to_f64(val) == 0.0 {
-        f
-    } else {
-        0.0_f32
-    }
+    if f.is_finite() { f } else { 0.0_f32 }
 }
 
 /// Extract the top 64 bits from a mantissa word array.
