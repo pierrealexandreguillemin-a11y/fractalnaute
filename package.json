@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "prebuild": "npm run wasm:build",
-    "wasm:build": "cd wasm && wasm-pack build --target web --release",
+    "wasm:build": "cd wasm && wasm-pack build --target web --release && cd .. && npm run wasm:copy",
+    "wasm:copy": "cp -r wasm/pkg public/wasm",
     "wasm:dev": "cd wasm && wasm-pack build --target web --dev"
   },
   "lint-staged": {
