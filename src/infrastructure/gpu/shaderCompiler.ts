@@ -5,7 +5,7 @@
  * ===============================================================================
  */
 
-import type { FractalType, ColoringMode } from '../../domain/types';
+import type { FractalType, ColoringMode, PrecisionMode } from '../../domain/types';
 import {
   COLOR_CYCLE_PERIOD, ORBIT_TRAP_CYCLE,
   NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION
@@ -28,10 +28,15 @@ import {
 import {
   doubleSingleChunk, dsHeaderChunk, screenToComplexDSChunk, DS_UNIFORM_NAMES
 } from './shaders/doubleSingle';
+import {
+  perturbationHeaderChunk, orbitLookupChunk,
+  mandelbrotPerturbationChunk, juliaPerturbationChunk,
+  PERTURBATION_UNIFORM_NAMES
+} from './shaders/perturbation';
 
 // ---- Types ------------------------------------------------------------------
 
-type ShaderKey = `${FractalType}_${ColoringMode}_${number}_${boolean}`;
+type ShaderKey = `${FractalType}_${ColoringMode}_${number}_${boolean}_${PrecisionMode}`;
 
 interface CompiledProgram {
   program: WebGLProgram;
@@ -72,7 +77,8 @@ const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
 const UNIFORM_NAMES = [
   'u_center', 'u_scale', 'u_resolution', 'u_palette',
   'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring',
-  ...DS_UNIFORM_NAMES
+  ...DS_UNIFORM_NAMES,
+  ...PERTURBATION_UNIFORM_NAMES
 ];
 
 // ---- Assembly (pure, testable) ----------------------------------------------
@@ -97,7 +103,14 @@ function getColoringChunk(coloring: ColoringMode): string | null {
 }
 
 /** Check if a fractal+coloring combination has GPU support. */
-export function isGpuSupported(fractal: FractalType, coloring: ColoringMode): boolean {
+export function isGpuSupported(
+  fractal: FractalType, coloring: ColoringMode,
+  precision: PrecisionMode = 'doubleSingle'
+): boolean {
+  if (precision === 'perturbation') {
+    return (fractal === 'mandelbrot' || fractal === 'julia')
+      && getColoringChunk(coloring) !== null;
+  }
   // Mandelbrot uses DS iteration (not in ITERATION_CHUNKS)
   const hasIteration = fractal === 'mandelbrot' || getIterationChunk(fractal) !== null;
   return hasIteration && getColoringChunk(coloring) !== null;
@@ -111,7 +124,8 @@ export function assembleFragmentSource(
   fractal: FractalType,
   coloring: ColoringMode,
   maxIter: number,
-  interiorColoring: boolean
+  interiorColoring: boolean,
+  precision: PrecisionMode = 'doubleSingle'
 ): string | null {
   const coloringChunk = getColoringChunk(coloring);
   if (!coloringChunk) return null;
@@ -119,15 +133,32 @@ export function assembleFragmentSource(
   const needsRealAccum = coloring !== 'classic' || interiorColoring;
   const accumulator = needsRealAccum ? accumulatorRealChunk : accumulatorNoopChunk;
 
-  // Mandelbrot uses DS iteration for extended zoom precision
-  const useDS = fractal === 'mandelbrot';
-  const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
-  if (!iteration) return null;
-
   // Stripe mode: cosine palette + high bailout for quality
   const isStripe = coloring === 'stripe';
   const paletteChunk = isStripe ? cosinePaletteLookupChunk : paletteLookupChunk;
   const defines = buildDefines(maxIter, isStripe);
+
+  // Perturbation path
+  if (precision === 'perturbation') {
+    const PERTURBATION_CHUNKS: Partial<Record<FractalType, string>> = {
+      mandelbrot: mandelbrotPerturbationChunk,
+      julia: juliaPerturbationChunk,
+    };
+    const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
+    if (!iteration) return null;
+
+    return [
+      headerChunk, perturbationHeaderChunk, dsHeaderChunk, defines,
+      doubleSingleChunk, screenToComplexDSChunk, screenToComplexChunk,
+      smoothEscapeChunk, paletteChunk, accumulator,
+      orbitLookupChunk, iteration, coloringChunk, mainChunk
+    ].join('\n');
+  }
+
+  // Mandelbrot uses DS iteration for extended zoom precision
+  const useDS = fractal === 'mandelbrot';
+  const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
+  if (!iteration) return null;
 
   const chunks = [
     headerChunk,
@@ -164,9 +195,10 @@ function makeShaderKey(
   fractal: FractalType,
   coloring: ColoringMode,
   maxIter: number,
-  interiorColoring: boolean
+  interiorColoring: boolean,
+  precision: PrecisionMode = 'doubleSingle'
 ): ShaderKey {
-  return `${fractal}_${coloring}_${maxIter}_${interiorColoring}`;
+  return `${fractal}_${coloring}_${maxIter}_${interiorColoring}_${precision}`;
 }
 
 function createShader(
@@ -248,16 +280,17 @@ export function getOrCompile(
   fractal: FractalType,
   coloring: ColoringMode,
   maxIter: number,
-  interiorColoring: boolean = false
+  interiorColoring: boolean = false,
+  precision: PrecisionMode = 'doubleSingle'
 ): CompiledProgram | null {
-  const key = makeShaderKey(fractal, coloring, maxIter, interiorColoring);
+  const key = makeShaderKey(fractal, coloring, maxIter, interiorColoring, precision);
   const existing = cache.get(key);
   if (existing) return existing;
 
   // Already pending — don't double-submit
   if (pendingCompiles.some(p => p.key === key)) return null;
 
-  const fragSource = assembleFragmentSource(fractal, coloring, maxIter, interiorColoring);
+  const fragSource = assembleFragmentSource(fractal, coloring, maxIter, interiorColoring, precision);
   if (!fragSource) return null;
 
   const vert = createShader(gl, gl.VERTEX_SHADER, fullscreenVert);

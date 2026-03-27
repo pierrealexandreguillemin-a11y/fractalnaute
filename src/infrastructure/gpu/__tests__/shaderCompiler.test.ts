@@ -193,6 +193,43 @@ describe('shaderCompiler', () => {
     });
   });
 
+  describe('perturbation shader assembly', () => {
+    it('assembles mandelbrot perturbation shader', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'perturbation');
+      expect(source).not.toBeNull();
+      expect(source).toContain('u_orbitTexture');
+      expect(source).toContain('getOrbitData');
+      expect(source).toContain('refIter = 0'); // rebasing
+    });
+
+    it('assembles julia perturbation shader', () => {
+      const source = assembleFragmentSource('julia', 'classic', 256, false, 'perturbation');
+      expect(source).not.toBeNull();
+      expect(source).toContain('u_orbitTexture');
+    });
+
+    it('returns null for unsupported perturbation fractals', () => {
+      expect(assembleFragmentSource('burningship', 'classic', 256, false, 'perturbation')).toBeNull();
+      expect(assembleFragmentSource('tricorn', 'classic', 256, false, 'perturbation')).toBeNull();
+      expect(assembleFragmentSource('multibrot3', 'classic', 256, false, 'perturbation')).toBeNull();
+    });
+
+    it('perturbation works with all 5 coloring modes', () => {
+      const modes = ['classic', 'stripe', 'decomposition', 'orbitTrap', 'normalMap'] as const;
+      for (const mode of modes) {
+        const source = assembleFragmentSource('mandelbrot', mode, 256, false, 'perturbation');
+        expect(source).not.toBeNull();
+      }
+    });
+
+    it('existing DS tests still pass with default precision param', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false);
+      expect(source).not.toBeNull();
+      expect(source).toContain('ds_add');
+      expect(source).not.toContain('u_orbitTexture');
+    });
+  });
+
   describe('isGpuSupported', () => {
     it('returns true for Mandelbrot + Classic', () => {
       expect(isGpuSupported('mandelbrot', 'classic')).toBe(true);
