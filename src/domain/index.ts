@@ -23,7 +23,7 @@ export type {
 
 export { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, INTERIOR_COLORING_DEFAULTS } from './types';
 
-export type { ColoringMode } from './types';
+export type { ColoringMode, PrecisionMode, OrbitData, DeepViewport } from './types';
 
 export {
   initAccumulator,

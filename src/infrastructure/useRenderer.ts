@@ -43,6 +43,9 @@ interface UseRendererOptions {
   interiorColoring?: boolean;
   ssaa?: boolean;
   lastRenderTime?: number;
+  /** Optional reference point for perturbation (deep zoom). Falls back to viewport center. */
+  zoomTargetRe?: number;
+  zoomTargetIm?: number;
   onRenderStart?: () => void;
   onRenderComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
@@ -56,6 +59,7 @@ export function useRenderer({
   fractalType, viewport, maxIterations, palette, params,
   coloringMode = 'classic', interiorColoring = false, ssaa = false,
   lastRenderTime = 0,
+  zoomTargetRe, zoomTargetIm,
   onRenderStart, onRenderComplete
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
@@ -114,6 +118,7 @@ export function useRenderer({
     canvasRef, poolRef, gpuRef,
     fractalType, viewport, maxIterations, palette, params,
     coloringMode, interiorColoring, ssaa, lastRenderTime,
+    zoomTargetRe, zoomTargetIm,
     cancelRenderRef, onRenderStartRef, onRenderCompleteRef
   });
 

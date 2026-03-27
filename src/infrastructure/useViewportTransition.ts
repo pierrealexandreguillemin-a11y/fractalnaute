@@ -36,6 +36,9 @@ interface TransitionDeps {
   interiorColoring: boolean;
   ssaa: boolean;
   lastRenderTime: number;
+  /** Optional reference point for perturbation (deep zoom). Falls back to viewport center. */
+  zoomTargetRe?: number;
+  zoomTargetIm?: number;
   cancelRenderRef: React.MutableRefObject<(() => void) | null>;
   onRenderStartRef: React.MutableRefObject<(() => void) | undefined>;
   onRenderCompleteRef: React.MutableRefObject<((t: number, backend: RenderBackend) => void) | undefined>;
@@ -66,6 +69,8 @@ function doRenderFull(
     coloringMode: deps.coloringMode,
     interiorColoring: deps.interiorColoring,
     ssaa: deps.ssaa,
+    zoomTargetRe: deps.zoomTargetRe,
+    zoomTargetIm: deps.zoomTargetIm,
     onComplete: (renderTime, backend) => {
       cancelRenderRef.current = null;
       onRenderCompleteRef.current?.(renderTime, backend);
