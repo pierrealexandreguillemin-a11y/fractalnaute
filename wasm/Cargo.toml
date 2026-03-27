@@ -17,8 +17,4 @@ getrandom = { version = "0.2", features = ["js"] }
 # Rust compiler already optimizes with opt-level = "z".
 wasm-opt = false
 
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-strip = true
+# [profile.release] is in workspace root Cargo.toml
