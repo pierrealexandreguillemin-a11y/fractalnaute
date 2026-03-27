@@ -41,6 +41,8 @@ self.addEventListener('message', (e: MessageEvent) => {
 
     const orbitLength = Math.round(resultArray[0]!);
     const cancelled = resultArray[1] !== 0;
+    // .slice() copies data (vs .subarray() which shares buffer).
+    // Necessary because WASM linear memory may be detached after worker terminates.
     const orbitData = resultArray.slice(2);
 
     self.postMessage({ orbitData, orbitLength, cancelled });

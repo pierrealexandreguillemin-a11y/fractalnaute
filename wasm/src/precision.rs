@@ -47,7 +47,7 @@ pub fn parse_decimal(s: &str, prec: usize) -> Result<BigFloat, String> {
 ///
 /// Adaptation: astro-float 0.9 has no public `to_f64()` on `BigFloat`.
 /// We reconstruct the f64 from `as_raw_parts()` (mantissa words, sign, exponent).
-/// On WASM32, `Word` = u32, `WORD_BIT_SIZE` = 32.
+/// On `WASM32`, `Word` = u32, `WORD_BIT_SIZE` = 32.
 #[allow(clippy::cast_possible_wrap)]
 pub fn to_f64(val: &BigFloat) -> f64 {
     let Some(parts) = val.as_raw_parts() else {
@@ -181,7 +181,7 @@ mod tests {
         let val = BigFloat::from_f64(3.14159265358979, 128);
         let f = to_f64(&val);
         assert!(
-            (f - 3.14159265358979).abs() < 1e-10,
+            (f - 3.14159265358979).abs() < 1e-14,
             "expected ~3.14159, got {f}"
         );
     }

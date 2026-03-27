@@ -114,6 +114,14 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
     u = temp_u;
 
     refIter++;
+
+    // Recompute full position and derivative for accumulator
+    // z_{n+1} = Z_{n+1} + δ_{n+1} (need next orbit entry)
+    if (refIter < u_orbitLength) {
+      vec4 nextOrbit = getOrbitData(refIter);
+      z = nextOrbit.xy + vec2(u, v);
+      dz = nextOrbit.zw + vec2(du, dv);  // full derivative = Z' + δ'
+    }
     updateAccumulator(z, dz, acc);
   }
 
@@ -187,6 +195,14 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
     u = temp_u;
 
     refIter++;
+
+    // Recompute full position and derivative for accumulator
+    // z_{n+1} = Z_{n+1} + δ_{n+1} (need next orbit entry)
+    if (refIter < u_orbitLength) {
+      vec4 nextOrbit = getOrbitData(refIter);
+      z = nextOrbit.xy + vec2(u, v);
+      dz = nextOrbit.zw + vec2(du, dv);  // full derivative = Z' + δ'
+    }
     updateAccumulator(z, dz, acc);
   }
 

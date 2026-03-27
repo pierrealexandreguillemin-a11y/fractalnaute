@@ -20,13 +20,13 @@ use wasm_bindgen::prelude::*;
 ///
 /// **Cancel/progress limitation:** The `control_buf` values are read once at call start.
 /// Runtime cancellation (JS writing to SAB while WASM runs) requires WASM shared memory
-/// (`+atomics` flag + WebAssembly.Memory({shared: true})), which adds build complexity.
+/// (`+atomics` flag + `WebAssembly.Memory({shared: true})`), which adds build complexity.
 ///
-/// Current cancel strategy (handled in orbit.worker.ts, Task 3):
-/// - Worker.terminate() for immediate cancel (re-instantiates WASM, ~50ms)
-/// - Progress polling via periodic postMessage between chunked WASM calls
+/// Current cancel strategy (handled in `orbit.worker.ts`, Task 3):
+/// - `Worker.terminate()` for immediate cancel (re-instantiates WASM, ~50ms)
+/// - Progress polling via periodic `postMessage` between chunked WASM calls
 ///
-/// The AtomicI32 parameters in orbit.rs enable unit testing of cancel/progress logic.
+/// The `AtomicI32` parameters in `orbit.rs` enable unit testing of cancel/progress logic.
 /// Runtime SAB integration is a future optimization.
 ///
 /// # Errors
@@ -72,7 +72,10 @@ pub fn compute_reference_orbit(
     let data_len = data.len() as u32;
     let total_len = header_len + data_len;
     let arr = Float32Array::new_with_length(total_len);
-    arr.set_index(0, f32::from_bits(length));
+    // u32→f32 cast: orbit lengths up to 2^24 (16M) are exact in f32.
+    #[allow(clippy::cast_precision_loss)]
+    let length_f32 = length as f32;
+    arr.set_index(0, length_f32);
     arr.set_index(1, if cancelled { 1.0 } else { 0.0 });
 
     // Copy orbit data into the Float32Array after the header

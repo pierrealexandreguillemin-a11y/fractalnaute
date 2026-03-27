@@ -30,7 +30,7 @@ pub enum OrbitResult {
 ///
 /// Cancel/progress via `SharedArrayBuffer` atomics:
 /// - `cancel_flag`: 0 = continue, nonzero = abort
-/// - progress: updated every `CANCEL_CHECK_INTERVAL` iterations
+/// - `progress`: updated every `CANCEL_CHECK_INTERVAL` iterations
 ///
 /// # Errors
 ///
