@@ -7,13 +7,15 @@
  */
 
 import type {
-  Viewport, FractalType, ColoringMode, PaletteName, FractalParams
+  Viewport, FractalType, ColoringMode, PaletteName, FractalParams,
+  PrecisionMode, OrbitData
 } from '../../domain/types';
 import {
   initCompiler, getOrCompile, pollCompilation,
   destroyAllPrograms, hasCompiledProgram
 } from './shaderCompiler';
 import { createPaletteTexture, updatePaletteTexture } from './paletteTexture';
+import { createOrbitTexture, updateOrbitTexture, destroyOrbitTexture } from './orbitTexture';
 import {
   createScaledFBO, resizeScaledFBO,
   blitFBOToCanvas, destroyFBO,
@@ -32,6 +34,8 @@ export interface GPURenderOptions {
   interiorColoring: boolean;
   fractalParams: FractalParams;
   ssaa?: boolean;
+  precision?: PrecisionMode;
+  orbitData?: OrbitData;
 }
 
 export interface WebGLRenderer {
@@ -110,6 +114,97 @@ function setFractalParams(
   if (power) gl.uniform1i(power, params.power ?? 3);
 }
 
+/** Set perturbation-specific uniforms (orbit texture, ref point, orbit length). */
+function setOrbitUniforms(
+  gl: WebGL2RenderingContext,
+  locations: Map<string, WebGLUniformLocation>,
+  orbit: OrbitContext
+): void {
+  const loc = (name: string) => locations.get(name);
+
+  const lenLoc = loc('u_orbitLength');
+  if (lenLoc) gl.uniform1i(lenLoc, orbit.orbitData.length);
+
+  const texSizeLoc = loc('u_orbitTexSize');
+  if (texSizeLoc) gl.uniform2f(texSizeLoc, orbit.orbitTexWidth, orbit.orbitTexHeight);
+
+  const refPointLoc = loc('u_refPoint');
+  if (refPointLoc) {
+    const [reHi] = splitDouble(orbit.orbitData.refPointRe);
+    const [imHi] = splitDouble(orbit.orbitData.refPointIm);
+    gl.uniform2f(refPointLoc, reHi, imHi);
+  }
+
+  const refPointLoLoc = loc('u_refPointLo');
+  if (refPointLoLoc) {
+    const [, reLo] = splitDouble(orbit.orbitData.refPointRe);
+    const [, imLo] = splitDouble(orbit.orbitData.refPointIm);
+    gl.uniform2f(refPointLoLoc, reLo, imLo);
+  }
+
+  // Bind orbit texture to TEXTURE1 (palette is TEXTURE0)
+  const orbitTexLoc = loc('u_orbitTexture');
+  if (orbitTexLoc) {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, orbit.orbitTexture);
+    gl.uniform1i(orbitTexLoc, 1);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+}
+
+/** Orbit context for perturbation rendering — passed through to renderToTarget. */
+interface OrbitContext {
+  orbitData: OrbitData;
+  orbitTexture: WebGLTexture;
+  orbitTexWidth: number;
+  orbitTexHeight: number;
+}
+
+/** Mutable orbit texture state managed by the renderer closure. */
+interface OrbitTextureState {
+  texture: WebGLTexture | null;
+  width: number;
+  height: number;
+}
+
+/** Upload orbit data, reusing the texture when possible. Returns success. */
+function uploadOrbitData(
+  gl: WebGL2RenderingContext,
+  state: OrbitTextureState,
+  data: OrbitData
+): boolean {
+  if (state.texture && data.length <= state.width * state.height) {
+    updateOrbitTexture(gl, state.texture, data.data, data.length, state.width, state.height);
+    return true;
+  }
+  if (state.texture) destroyOrbitTexture(gl, state.texture);
+  const result = createOrbitTexture(gl, data.data, data.length);
+  if (!result) { state.texture = null; return false; }
+  state.texture = result.texture;
+  state.width = result.width;
+  state.height = result.height;
+  return true;
+}
+
+/**
+ * Build orbit context for perturbation rendering.
+ * Uploads orbit data to GPU texture and returns the context, or null on failure.
+ */
+function buildOrbitContext(
+  gl: WebGL2RenderingContext,
+  state: OrbitTextureState,
+  orbitData: OrbitData
+): OrbitContext | null {
+  if (!uploadOrbitData(gl, state, orbitData)) return null;
+  if (!state.texture) return null;
+  return {
+    orbitData,
+    orbitTexture: state.texture,
+    orbitTexWidth: state.width,
+    orbitTexHeight: state.height
+  };
+}
+
 /** Render the fractal to a specific target (FBO or canvas). */
 function renderToTarget(
   gl: WebGL2RenderingContext,
@@ -118,12 +213,14 @@ function renderToTarget(
   viewport: Viewport,
   paletteTexture: WebGLTexture,
   fractalParams: FractalParams,
-  interiorColoring: boolean = false
+  interiorColoring: boolean = false,
+  orbit?: OrbitContext
 ): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
   gl.viewport(0, 0, target.width, target.height);
   gl.useProgram(compiled.program);
   setCenterAndScale(gl, compiled.uniformLocations, viewport);
+  if (orbit) setOrbitUniforms(gl, compiled.uniformLocations, orbit);
   const res = compiled.uniformLocations.get('u_resolution');
   if (res) gl.uniform2f(res, target.width, target.height);
   setFractalParams(gl, compiled.uniformLocations, fractalParams);
@@ -164,8 +261,8 @@ function needsProgressiveRender(
 
 interface ProgressiveController {
   cancelPending(): void;
-  renderDirect(compiled: CompiledRef, options: GPURenderOptions, vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture): void;
-  renderProgressive(compiled: CompiledRef, options: GPURenderOptions, vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture): void;
+  renderDirect(compiled: CompiledRef, options: GPURenderOptions, vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture, orbit?: OrbitContext): void;
+  renderProgressive(compiled: CompiledRef, options: GPURenderOptions, vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture, orbit?: OrbitContext): void;
   shouldUseProgressive(maxIterations: number): boolean;
   pollTimerQuery(): void;
   destroy(): void;
@@ -241,20 +338,21 @@ function createProgressiveController(
   /** Render to canvas, optionally via SSAA 2x FBO. Falls back to direct if FBO unavailable. */
   function renderWithSSAA(
     compiled: CompiledRef, options: GPURenderOptions,
-    vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture
+    vao: WebGLVertexArrayObject | null, paletteTexture: WebGLTexture,
+    orbit?: OrbitContext
   ): void {
     gl.bindVertexArray(vao);
     if (options.ssaa) {
       ssaaFBO = ssaaFBO ? resizeScaledFBO(gl, ssaaFBO, SSAA_SCALE) : createScaledFBO(gl, SSAA_SCALE);
       if (ssaaFBO) {
         const target: DrawTarget = { fbo: ssaaFBO.fbo, width: ssaaFBO.width, height: ssaaFBO.height };
-        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
         blitFBOToCanvas(gl, ssaaFBO);
         return;
       }
       // FBO creation failed (exceeds MAX_TEXTURE_SIZE or VRAM) — fall through to direct
     }
-    renderToTarget(gl, canvasTarget(), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+    renderToTarget(gl, canvasTarget(), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
   }
 
   return {
@@ -265,30 +363,30 @@ function createProgressiveController(
       return needsProgressiveRender(maxIterations, tq.lastGpuTimeMs);
     },
 
-    renderDirect(compiled, options, vao, paletteTexture): void {
+    renderDirect(compiled, options, vao, paletteTexture, orbit): void {
       beginTimerQuery(gl, tq);
-      renderWithSSAA(compiled, options, vao, paletteTexture);
+      renderWithSSAA(compiled, options, vao, paletteTexture, orbit);
       endTimerQuery(gl, tq);
     },
 
-    renderProgressive(compiled, options, vao, paletteTexture): void {
+    renderProgressive(compiled, options, vao, paletteTexture, orbit): void {
       // Preview: quarter-res (no SSAA — speed over quality)
       previewFBO = previewFBO ? resizeScaledFBO(gl, previewFBO, PREVIEW_SCALE) : createScaledFBO(gl, PREVIEW_SCALE);
       gl.bindVertexArray(vao);
       if (previewFBO) {
         const target: DrawTarget = { fbo: previewFBO.fbo, width: previewFBO.width, height: previewFBO.height };
-        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
         blitFBOToCanvas(gl, previewFBO);
       } else {
         // FBO unavailable — render direct as preview
-        renderToTarget(gl, canvasTarget(), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring);
+        renderToTarget(gl, canvasTarget(), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
       }
       // Full-res on next frame (with SSAA if enabled).
       // cancelPending() at the top of render() prevents stale callbacks.
       pendingFullResRAF = requestAnimationFrame(() => {
         pendingFullResRAF = null;
         beginTimerQuery(gl, tq);
-        renderWithSSAA(compiled, options, vao, paletteTexture);
+        renderWithSSAA(compiled, options, vao, paletteTexture, orbit);
         endTimerQuery(gl, tq);
       });
     },
@@ -428,6 +526,8 @@ export function createWebGLRenderer(
   let contextLost = false;
   let destroyed = false;
 
+  const orbitState: OrbitTextureState = { texture: null, width: 0, height: 0 };
+
   const progressive = createProgressiveController(gl);
   getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
   precompileCommonVariants(gl, () => destroyed);
@@ -444,15 +544,25 @@ export function createWebGLRenderer(
       progressive.cancelPending();
       progressive.pollTimerQuery();
       pollCompilation(gl);
+      const precision = options.precision ?? 'doubleSingle';
       const compiled = getOrCompile(
         gl, options.fractalType, options.coloringMode, options.maxIterations,
-        options.interiorColoring
+        options.interiorColoring, precision
       );
       if (!compiled) return false;
+
+      // Build orbit context for perturbation rendering
+      let orbit: OrbitContext | undefined;
+      if (precision === 'perturbation' && options.orbitData) {
+        const ctx = buildOrbitContext(gl, orbitState, options.orbitData);
+        if (!ctx) return false;
+        orbit = ctx;
+      }
+
       if (progressive.shouldUseProgressive(options.maxIterations)) {
-        progressive.renderProgressive(compiled, options, emptyVAO, paletteTexture);
+        progressive.renderProgressive(compiled, options, emptyVAO, paletteTexture, orbit);
       } else {
-        progressive.renderDirect(compiled, options, emptyVAO, paletteTexture);
+        progressive.renderDirect(compiled, options, emptyVAO, paletteTexture, orbit);
       }
       return true;
     },
@@ -480,6 +590,7 @@ export function createWebGLRenderer(
       gpuCanvas.removeEventListener('webglcontextrestored', onContextRestored);
       destroyAllPrograms(gl);
       gl.deleteTexture(paletteTexture);
+      if (orbitState.texture) { destroyOrbitTexture(gl, orbitState.texture); orbitState.texture = null; }
       gl.deleteVertexArray(emptyVAO);
       gpuCanvas.remove();
     },
