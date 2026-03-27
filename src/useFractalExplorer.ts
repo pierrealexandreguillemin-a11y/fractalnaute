@@ -56,20 +56,21 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
 
   useUrlSync(buildUrlState(state) as Parameters<typeof useUrlSync>[0]);
 
-  useEffect(() => {
-    actions.setPrecisionMode(derivePrecisionMode(state.viewport.scale, state.fractalType));
-  }, [state.viewport.scale, state.fractalType, actions]);
+  // Derive precision mode — no state, no effect, no re-render loop
+  const precisionMode = derivePrecisionMode(state.viewport.scale, state.fractalType);
 
   const handleJuliaPick = useCallback((re: number, im: number) => {
     actions.setJuliaParams({ juliaRe: re, juliaIm: im });
     actions.setPickingJulia(false);
     actions.setFractalType('julia');
-  }, [actions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- actions callbacks are stable (useCallback with [])
+  }, []);
 
   const handleEscapeCancel = useCallback(() => {
     cancelOrbit();
     actions.setOrbitComputing(false);
-  }, [actions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- actions callbacks are stable (useCallback with [])
+  }, []);
 
   useCanvasEvents({
     canvasRef, viewport: state.viewport, fractalType: state.fractalType,
@@ -106,5 +107,6 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   return {
     containerRef, canvasRef, state, stats, actions,
     exportImage, handleThemeChange, handlePickJulia,
+    precisionMode,
   };
 }

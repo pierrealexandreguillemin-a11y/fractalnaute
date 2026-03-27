@@ -40,7 +40,8 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
 }) => {
   const {
     containerRef, canvasRef, state, stats, actions,
-    exportImage, handleThemeChange, handlePickJulia
+    exportImage, handleThemeChange, handlePickJulia,
+    precisionMode
   } = useFractalExplorer({
     fractalType: initialFractalType,
     theme: initialTheme,
@@ -96,7 +97,7 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
       {showInfo && (
         <InfoPanel
           stats={stats}
-          precisionMode={state.precisionMode}
+          precisionMode={precisionMode}
           orbitComputing={state.orbitComputing}
         />
       )}
