@@ -60,7 +60,6 @@ version = "0.1.0"
 dependencies = [
  "astro-float",
  "getrandom",
- "js-sys",
  "wasm-bindgen",
 ]
 
