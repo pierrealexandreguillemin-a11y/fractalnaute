@@ -58,7 +58,10 @@ pub fn compute_mandelbrot_orbit(
     let mut dz_re = zero.clone();
     let mut dz_im = zero;
 
-    let mut orbit = Vec::with_capacity((max_iter as usize) * 4);
+    let capacity = (max_iter as usize)
+        .checked_mul(4)
+        .ok_or_else(|| format!("max_iter {max_iter} too large for orbit allocation"))?;
+    let mut orbit = Vec::with_capacity(capacity);
     let mut actual_length: u32 = 0;
 
     for i in 0..max_iter {

@@ -8,8 +8,7 @@ interface WasmModule {
   default: () => Promise<void>;
   compute_reference_orbit(
     centerRe: string, centerIm: string,
-    maxIter: number, precisionBits: number, scaleStr: string,
-    controlBuf: Int32Array
+    maxIter: number, precisionBits: number, scaleStr: string
   ): Float32Array;
 }
 
@@ -33,10 +32,8 @@ self.addEventListener('message', (e: MessageEvent) => {
   const { centerRe, centerIm, maxIter, scaleStr } = e.data;
 
   loadWasm().then((wasm) => {
-    const controlBuf = new Int32Array(2);
-
     const resultArray = wasm.compute_reference_orbit(
-      centerRe, centerIm, maxIter, 0, scaleStr, controlBuf
+      centerRe, centerIm, maxIter, 0, scaleStr
     );
 
     const orbitLength = Math.round(resultArray[0]!);

@@ -196,7 +196,7 @@ mod tests {
     fn to_f64_negative() {
         let val = BigFloat::from_f64(-2.5, 128);
         let f = to_f64(&val);
-        assert!((f - (-2.5)).abs() < 1e-10, "expected -2.5, got {f}");
+        assert!((f - (-2.5)).abs() < 1e-14, "expected -2.5, got {f}");
     }
 
     #[test]

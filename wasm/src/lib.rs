@@ -12,22 +12,14 @@ use wasm_bindgen::prelude::*;
 /// Compute Mandelbrot reference orbit at arbitrary precision.
 ///
 /// Returns `Float32Array`:
-///   `[orbit_length (as u32 bits in f32), cancelled_flag,`
-///   `z_re, z_im, dz_re, dz_im, ...]`
+///   `[orbit_length (as f32), cancelled_flag (0.0/1.0),`
+///   `Z_re, Z_im, Z'_re, Z'_im, ...]`
 ///
-/// `control_buf`: `Int32Array` backed by `SharedArrayBuffer`
-///   `[cancel_flag, progress]`
-///
-/// **Cancel/progress limitation:** The `control_buf` values are read once at call start.
-/// Runtime cancellation (JS writing to SAB while WASM runs) requires WASM shared memory
-/// (`+atomics` flag + `WebAssembly.Memory({shared: true})`), which adds build complexity.
-///
-/// Current cancel strategy (handled in `orbit.worker.ts`, Task 3):
-/// - `Worker.terminate()` for immediate cancel (re-instantiates WASM, ~50ms)
-/// - Progress polling via periodic `postMessage` between chunked WASM calls
-///
-/// The `AtomicI32` parameters in `orbit.rs` enable unit testing of cancel/progress logic.
-/// Runtime SAB integration is a future optimization.
+/// **Cancel strategy** (ISO 9241-110: controllability):
+/// Runtime cancel is handled by `Worker.terminate()` in `orbit.worker.ts`.
+/// The `orbit.rs` layer accepts `AtomicI32` cancel/progress for unit testing;
+/// here we pass inert locals. SAB-backed atomics are a future optimization
+/// requiring `WebAssembly.Memory({shared: true})`.
 ///
 /// # Errors
 ///
@@ -39,7 +31,6 @@ pub fn compute_reference_orbit(
     max_iter: u32,
     precision_bits: u32,
     scale_str: &str,
-    control_buf: &js_sys::Int32Array,
 ) -> Result<Float32Array, JsValue> {
     let prec = if precision_bits == 0 {
         precision::bits_for_scale(scale_str)
@@ -48,7 +39,8 @@ pub fn compute_reference_orbit(
         precision_bits as usize
     };
 
-    let cancel_flag = AtomicI32::new(control_buf.get_index(0));
+    // Inert cancel/progress — runtime cancel via Worker.terminate()
+    let cancel_flag = AtomicI32::new(0);
     let progress = AtomicI32::new(0);
 
     let result = orbit::compute_mandelbrot_orbit(
@@ -82,10 +74,6 @@ pub fn compute_reference_orbit(
     let orbit_arr = Float32Array::new_with_length(data_len);
     orbit_arr.copy_from(&data);
     arr.set(&orbit_arr, header_len);
-
-    // Write final progress back to the control buffer
-    #[allow(clippy::cast_possible_wrap)]
-    control_buf.set_index(1, length as i32);
 
     Ok(arr)
 }
