@@ -42,5 +42,10 @@ yarn-error.log*
 .vercel
 .playwright-mcp/
 
+# WASM build artifacts
+wasm/target/
+wasm/pkg/
+public/wasm/
+
 # Worktrees
 .worktrees/
