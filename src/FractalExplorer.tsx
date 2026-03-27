@@ -93,7 +93,13 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
         />
       )}
 
-      {showInfo && <InfoPanel stats={stats} />}
+      {showInfo && (
+        <InfoPanel
+          stats={stats}
+          precisionMode={state.precisionMode}
+          orbitComputing={state.orbitComputing}
+        />
+      )}
       {showHelp && <HelpTooltip />}
     </div>
   );

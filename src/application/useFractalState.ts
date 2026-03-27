@@ -14,7 +14,8 @@ import type {
   Viewport,
   FractalParams,
   RenderStats,
-  RenderBackend
+  RenderBackend,
+  PrecisionMode
 } from '../domain';
 import {
   DEFAULT_JULIA_PARAMS,
@@ -40,6 +41,8 @@ interface FractalState {
   renderTime: number;
   renderBackend: RenderBackend | null;
   ssaa: boolean;
+  precisionMode: PrecisionMode;
+  orbitComputing: boolean;
 }
 
 /** Action types */
@@ -56,7 +59,9 @@ type FractalAction =
   | { type: 'SET_PICKING_JULIA'; isPickingJulia: boolean }
   | { type: 'SET_COLORING_MODE'; mode: ColoringMode }
   | { type: 'SET_INTERIOR_COLORING'; enabled: boolean }
-  | { type: 'SET_SSAA'; enabled: boolean };
+  | { type: 'SET_SSAA'; enabled: boolean }
+  | { type: 'SET_PRECISION_MODE'; mode: PrecisionMode }
+  | { type: 'SET_ORBIT_COMPUTING'; computing: boolean };
 
 /** Initial state */
 const initialState: FractalState = {
@@ -72,7 +77,9 @@ const initialState: FractalState = {
   isPickingJulia: false,
   renderTime: 0,
   renderBackend: null,
-  ssaa: false
+  ssaa: false,
+  precisionMode: 'float32' as PrecisionMode,
+  orbitComputing: false
 };
 
 /** Handle SET_RENDERING — extracted to stay under complexity limit */
@@ -140,15 +147,24 @@ function fractalReducer(state: FractalState, action: FractalAction): FractalStat
     case 'SET_PICKING_JULIA':
       return { ...state, isPickingJulia: action.isPickingJulia };
 
+    default:
+      return reducerExtras(state, action);
+  }
+}
+
+/** Handle secondary actions — extracted to stay under complexity limit */
+function reducerExtras(state: FractalState, action: FractalAction): FractalState {
+  switch (action.type) {
     case 'SET_COLORING_MODE':
       return { ...state, coloringMode: action.mode };
-
     case 'SET_INTERIOR_COLORING':
       return { ...state, interiorColoring: action.enabled };
-
     case 'SET_SSAA':
       return { ...state, ssaa: action.enabled };
-
+    case 'SET_PRECISION_MODE':
+      return { ...state, precisionMode: action.mode };
+    case 'SET_ORBIT_COMPUTING':
+      return { ...state, orbitComputing: action.computing };
     default:
       return state;
   }
@@ -290,6 +306,9 @@ export function useFractalState(initial?: InitialFractalConfig) {
     dispatch({ type: 'SET_SSAA', enabled });
   }, []);
 
+  const setPrecisionMode = useCallback((mode: PrecisionMode) => dispatch({ type: 'SET_PRECISION_MODE', mode }), []);
+  const setOrbitComputing = useCallback((computing: boolean) => dispatch({ type: 'SET_ORBIT_COMPUTING', computing }), []);
+
   // Computed stats
   const stats: RenderStats = useMemo(() => {
     const config = getFractalConfig(state.fractalType);
@@ -320,7 +339,9 @@ export function useFractalState(initial?: InitialFractalConfig) {
       setPickingJulia,
       setColoringMode,
       setInteriorColoring,
-      setSSAA
+      setSSAA,
+      setPrecisionMode,
+      setOrbitComputing
     }
   };
 }

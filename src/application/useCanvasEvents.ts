@@ -23,6 +23,7 @@ interface UseCanvasEventsOptions {
   isPickingJulia: boolean;
   actions: FractalActions;
   onJuliaPick?: (re: number, im: number) => void;
+  onEscapeCancel?: () => void;
 }
 
 /** Shared canvas dimension getter */
@@ -172,19 +173,23 @@ function useKeyboardHandler(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   viewport: Viewport,
   isPickingJulia: boolean,
-  actions: FractalActions
+  actions: FractalActions,
+  onEscapeCancel?: () => void
 ) {
   return useCallback((e: KeyboardEvent) => {
     if (e.key === 'r' || e.key === 'R') {
       actions.reset();
-    } else if (e.key === 'Escape' && isPickingJulia) {
-      actions.setPickingJulia(false);
+    } else if (e.key === 'Escape') {
+      if (isPickingJulia) {
+        actions.setPickingJulia(false);
+      }
+      onEscapeCancel?.();
     } else if (e.key === '+' || e.key === '=' || e.key === '-') {
       const dims = getCanvasDims(canvasRef.current);
       const c = screenToComplex(dims.width / 2, dims.height / 2, dims.width, dims.height, viewport);
       actions.zoom(e.key === '-' ? 1.4 : 0.7, c.re, c.im);
     }
-  }, [canvasRef, viewport, actions, isPickingJulia]);
+  }, [canvasRef, viewport, actions, isPickingJulia, onEscapeCancel]);
 }
 
 /**
@@ -196,11 +201,12 @@ export function useCanvasEvents({
   viewport,
   isPickingJulia,
   actions,
-  onJuliaPick
+  onJuliaPick,
+  onEscapeCancel
 }: UseCanvasEventsOptions) {
   const mouse = useMouseHandlers(canvasRef, viewport, isPickingJulia, actions, onJuliaPick);
   const touch = useTouchHandlers(canvasRef, viewport, actions);
-  const handleKeyDown = useKeyboardHandler(canvasRef, viewport, isPickingJulia, actions);
+  const handleKeyDown = useKeyboardHandler(canvasRef, viewport, isPickingJulia, actions, onEscapeCancel);
 
   useEffect(() => {
     const canvas = canvasRef.current;

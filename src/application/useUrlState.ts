@@ -27,6 +27,7 @@ export interface UrlState {
 }
 
 const DEBOUNCE_MS = 200;
+const DEEP_ZOOM_THRESHOLD = 1e-13;
 
 // ── Validators (cached) ──────────────────────────────────────────
 
@@ -62,11 +63,33 @@ function parseBool(raw: string | null): boolean | undefined {
   return undefined;
 }
 
-/** Parse viewport fields from URLSearchParams */
+/** Decode a base64-encoded decimal string to a number, or undefined */
+function parseDeepCoord(raw: string | null): number | undefined {
+  if (raw === null) return undefined;
+  try {
+    const n = parseFloat(atob(raw));
+    return Number.isFinite(n) ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Parse viewport fields from URLSearchParams (deep zoom base64 or normal float) */
 function parseViewportParams(
   params: URLSearchParams,
   result: Partial<InitialFractalConfig>
 ): void {
+  // Deep zoom params take priority
+  const dre = parseDeepCoord(params.get('dre'));
+  if (dre !== undefined) {
+    result.centerRe = dre;
+    const dim = parseDeepCoord(params.get('dim'));
+    if (dim !== undefined) result.centerIm = dim;
+    const ds = parseDeepCoord(params.get('ds'));
+    if (ds !== undefined && ds > 0) result.scale = ds;
+    return;
+  }
+  // Normal float params
   const re = parseNum(params.get('re'));
   const im = parseNum(params.get('im'));
   const s = parseNum(params.get('s'));
@@ -130,12 +153,23 @@ export function parseHash(hash: string): Partial<InitialFractalConfig> {
   return result;
 }
 
+/** Encode viewport params: base64 for deep zoom, plain float otherwise */
+function encodeViewport(params: URLSearchParams, state: UrlState): void {
+  if (state.scale < DEEP_ZOOM_THRESHOLD) {
+    params.set('dre', btoa(String(state.centerRe)));
+    params.set('dim', btoa(String(state.centerIm)));
+    params.set('ds', btoa(String(state.scale)));
+  } else {
+    params.set('re', formatCoord(state.centerRe));
+    params.set('im', formatCoord(state.centerIm));
+    params.set('s', formatCoord(state.scale));
+  }
+}
+
 /** Build a URL hash string from serializable state */
 export function buildHash(state: UrlState): string {
   const params = new URLSearchParams();
-  params.set('re', formatCoord(state.centerRe));
-  params.set('im', formatCoord(state.centerIm));
-  params.set('s', formatCoord(state.scale));
+  encodeViewport(params, state);
   params.set('f', state.fractalType);
   params.set('i', String(state.maxIterations));
   params.set('p', state.palette);
