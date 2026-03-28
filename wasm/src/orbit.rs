@@ -239,6 +239,53 @@ mod tests {
     }
 
     #[test]
+    fn orbit_at_mandelbrot_boundary_should_not_escape_early() {
+        // Exact coordinates from runtime: near Mandelbrot boundary
+        // At 111 bits (auto-calculated from scale=1e-14)
+        let (cancel, progress) = no_cancel();
+        let prec = crate::precision::bits_for_scale("1e-14").unwrap();
+        assert_eq!(prec, 111, "expected 111 bits for scale 1e-14");
+        let result = compute_mandelbrot_orbit(
+            "-0.7436438885706",
+            "0.1318259043124",
+            256,
+            prec,
+            &cancel,
+            &progress,
+        )
+        .unwrap();
+        let (orbit, len) = unwrap_complete(result);
+        // This point is near the boundary — should NOT escape in 2 iterations
+        // z₁ = c ≈ (-0.74, 0.13), |z₁|² ≈ 0.57 < 4
+        assert!(
+            len > 10,
+            "boundary point should not escape early, got len={len}"
+        );
+        // Verify z₁ ≈ c (first iteration after z₀=0)
+        let z1_re = orbit[4]; // index 4 = iter 1, z_re
+        let z1_im = orbit[5]; // index 5 = iter 1, z_im
+        assert!(
+            (z1_re - (-0.7436_f32)).abs() < 0.01,
+            "z1_re should be ~c_re, got {z1_re}"
+        );
+        assert!(
+            (z1_im - 0.1318_f32).abs() < 0.01,
+            "z1_im should be ~c_im, got {z1_im}"
+        );
+    }
+
+    #[test]
+    fn to_f64_of_parsed_decimal() {
+        // Verify parse_decimal + to_f64 roundtrip at 111 bits
+        let val = crate::precision::parse_decimal("-0.7436438885706", 111).unwrap();
+        let f = crate::precision::to_f64(&val);
+        assert!(
+            (f - (-0.7436438885706_f64)).abs() < 1e-10,
+            "to_f64 should return ~-0.7436, got {f}"
+        );
+    }
+
+    #[test]
     fn invalid_input_returns_error() {
         let (cancel, progress) = no_cancel();
         let result = compute_mandelbrot_orbit(

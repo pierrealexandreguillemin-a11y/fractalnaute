@@ -14,7 +14,8 @@ import type { WebGLRenderer } from './gpu';
 import { resizeCanvas, downloadCanvas } from './canvasUtils';
 import { useViewportTransition } from './useViewportTransition';
 
-/** Poll GPU readiness and trigger re-render when shaders finish compiling */
+/** Poll GPU readiness and trigger re-render when shaders finish compiling.
+ *  Skip if GPU is ready on first check — the initial render already used it. */
 function scheduleGpuReadyRender(
   gpuRef: React.RefObject<WebGLRenderer | null>,
   forceRenderRef: React.MutableRefObject<(() => void) | null>
@@ -23,7 +24,8 @@ function scheduleGpuReadyRender(
   const check = () => {
     if (++attempts > 60 || !gpuRef.current) return; // ~1s max
     if (gpuRef.current.isReady()) {
-      forceRenderRef.current?.();
+      // Only force re-render if GPU wasn't ready initially (shader was compiling)
+      if (attempts > 1) forceRenderRef.current?.();
       return;
     }
     requestAnimationFrame(check);

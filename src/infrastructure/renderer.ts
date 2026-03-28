@@ -7,10 +7,34 @@
 
 import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode, RenderBackend, PrecisionMode, OrbitData } from '../domain';
 import type { WorkerPool } from './workerPool';
-import type { WebGLRenderer } from './gpu';
+import type { WebGLRenderer, GPURenderOptions } from './gpu';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
 import { needsPerturbation, computeReferenceOrbit, cancelOrbit } from './wasmBridge';
+
+/** Max retry attempts while waiting for perturbation shader compilation */
+const PERTURBATION_RENDER_MAX_RETRIES = 30; // ~500ms at 16ms/frame
+
+/** Retry perturbation GPU render until shader compiles (async KHR_parallel_shader_compile). */
+function tryPerturbationRender(
+  gpu: WebGLRenderer,
+  opts: GPURenderOptions,
+  onComplete?: (renderTime: number, backend: RenderBackend) => void,
+  attempt = 0
+): void {
+  const t0 = performance.now();
+  if (gpu.render(opts)) {
+    gpu.setVisible(true);
+    onComplete?.(performance.now() - t0, 'gpu');
+    return;
+  }
+  if (attempt >= PERTURBATION_RENDER_MAX_RETRIES) {
+    console.warn('[perturbation] shader compile timeout — falling back');
+    onComplete?.(0, 'cpu');
+    return;
+  }
+  requestAnimationFrame(() => tryPerturbationRender(gpu, opts, onComplete, attempt + 1));
+}
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -60,24 +84,21 @@ export function renderFractal(
     ).then(({ data, length, cancelled }) => {
       if (cancelled) return;
       const orbitData: OrbitData = { data, length, refPointRe: refRe, refPointIm: refIm };
-      const t0 = performance.now();
-      const ok = gpuRenderer.render({
+      const renderOpts = {
         viewport: options.viewport,
         fractalType: options.fractalType,
         maxIterations: options.maxIterations,
-        coloringMode: options.coloringMode ?? 'classic',
+        coloringMode: options.coloringMode ?? 'classic' as const,
         interiorColoring: options.interiorColoring ?? false,
         fractalParams: options.params,
         ssaa: options.ssaa,
-        precision: 'perturbation',
+        precision: 'perturbation' as const,
         orbitData,
-      });
-      if (ok) {
-        gpuRenderer.setVisible(true);
-        options.onComplete?.(performance.now() - t0, 'gpu');
-      }
-    }).catch(() => {
-      // WASM error or timeout — DS fallback on next render cycle
+      };
+      tryPerturbationRender(gpuRenderer, renderOpts, options.onComplete);
+    }).catch((err: unknown) => {
+      console.warn('[perturbation] orbit failed:', String(err));
+      options.onComplete?.(0, 'cpu');
     });
 
     return () => { cancelOrbit(); gpuRenderer.cancelPending(); };

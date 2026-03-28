@@ -61,7 +61,8 @@ type FractalAction =
   | { type: 'SET_INTERIOR_COLORING'; enabled: boolean }
   | { type: 'SET_SSAA'; enabled: boolean }
   | { type: 'SET_PRECISION_MODE'; mode: PrecisionMode }
-  | { type: 'SET_ORBIT_COMPUTING'; computing: boolean };
+  | { type: 'SET_ORBIT_COMPUTING'; computing: boolean }
+  | { type: 'APPLY_CONFIG'; config: InitialFractalConfig };
 
 /** Initial state */
 const initialState: FractalState = {
@@ -165,6 +166,16 @@ function reducerExtras(state: FractalState, action: FractalAction): FractalState
       return { ...state, precisionMode: action.mode };
     case 'SET_ORBIT_COMPUTING':
       return { ...state, orbitComputing: action.computing };
+    case 'APPLY_CONFIG': {
+      let s = state;
+      const c = action.config;
+      if (c.fractalType) {
+        s = { ...s, fractalType: c.fractalType, viewport: getDefaultViewport(c.fractalType) };
+      }
+      s = applyScalarOverrides(s, c);
+      s = applyJuliaOverrides(s, c);
+      return applyViewportOverrides(s, c);
+    }
     default:
       return state;
   }
@@ -308,6 +319,7 @@ export function useFractalState(initial?: InitialFractalConfig) {
 
   const setPrecisionMode = useCallback((mode: PrecisionMode) => dispatch({ type: 'SET_PRECISION_MODE', mode }), []);
   const setOrbitComputing = useCallback((computing: boolean) => dispatch({ type: 'SET_ORBIT_COMPUTING', computing }), []);
+  const applyConfig = useCallback((config: InitialFractalConfig) => dispatch({ type: 'APPLY_CONFIG', config }), []);
 
   // Computed stats
   const stats: RenderStats = useMemo(() => {
@@ -341,7 +353,8 @@ export function useFractalState(initial?: InitialFractalConfig) {
       setInteriorColoring,
       setSSAA,
       setPrecisionMode,
-      setOrbitComputing
+      setOrbitComputing,
+      applyConfig
     }
   };
 }

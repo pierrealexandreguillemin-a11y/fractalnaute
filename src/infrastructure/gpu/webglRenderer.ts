@@ -448,6 +448,12 @@ const PRECOMPILE_FRACTALS: FractalType[] = [
   'julia', 'burningship', 'tricorn', 'multibrot3'
 ];
 
+/** Perturbation variants to pre-compile (needed before deep zoom). */
+type PrecompileEntry = { fractal: FractalType; precision: 'doubleSingle' | 'perturbation' };
+const PRECOMPILE_PERTURBATION: PrecompileEntry[] = [
+  { fractal: 'mandelbrot', precision: 'perturbation' },
+];
+
 /**
  * Pre-compile common shader variants during browser idle time.
  * This eliminates the CPU-fallback stall when switching fractal type.
@@ -459,12 +465,18 @@ function precompileCommonVariants(
   isDestroyed: () => boolean
 ): void {
   let index = 0;
+  const total = PRECOMPILE_FRACTALS.length + PRECOMPILE_PERTURBATION.length;
 
   function compileNext(): void {
     if (isDestroyed()) return;
-    if (index >= PRECOMPILE_FRACTALS.length) return;
-    const fractal = PRECOMPILE_FRACTALS[index]!;
-    getOrCompile(gl, fractal, 'classic', PRECOMPILE_MAX_ITER);
+    if (index >= total) return;
+    if (index < PRECOMPILE_FRACTALS.length) {
+      const fractal = PRECOMPILE_FRACTALS[index]!;
+      getOrCompile(gl, fractal, 'classic', PRECOMPILE_MAX_ITER);
+    } else {
+      const entry = PRECOMPILE_PERTURBATION[index - PRECOMPILE_FRACTALS.length]!;
+      getOrCompile(gl, entry.fractal, 'classic', PRECOMPILE_MAX_ITER, false, entry.precision);
+    }
     index++;
     scheduleNext();
   }

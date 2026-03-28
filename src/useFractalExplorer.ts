@@ -5,9 +5,9 @@
  * ===================================================================
  */
 
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import type { ThemeName, FractalType } from './domain';
-import { useFractalState, useCanvasEvents, useUrlInitialConfig, useUrlSync } from './application';
+import { useFractalState, useCanvasEvents, useUrlSync, parseHash } from './application';
 import type { InitialFractalConfig } from './application';
 import { useRenderer, cancelOrbit, needsPerturbation } from './infrastructure';
 import type { PrecisionMode } from './domain';
@@ -46,13 +46,16 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const urlConfig = useUrlInitialConfig();
-  const mergedConfig = useMemo<InitialFractalConfig>(
-    () => ({ ...initialConfig, ...urlConfig }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
-    []
-  );
-  const { state, stats, actions } = useFractalState(mergedConfig);
+  const { state, stats, actions } = useFractalState(initialConfig);
+
+  // Apply URL hash config after hydration to avoid SSR mismatch (ISO 9241-110)
+  useEffect(() => {
+    const urlConfig = parseHash(window.location.hash);
+    if (Object.keys(urlConfig).length > 0) {
+      actions.applyConfig(urlConfig);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
+  }, []);
 
   useUrlSync(buildUrlState(state) as Parameters<typeof useUrlSync>[0]);
 

@@ -1,6 +1,5 @@
-use astro_float::{BigFloat, Consts, Radix, RoundingMode, Sign, Word, WORD_BIT_SIZE};
+use astro_float::{BigFloat, Sign, Word, WORD_BIT_SIZE};
 
-const RM: RoundingMode = RoundingMode::ToEven;
 const PRECISION_MARGIN: usize = 64;
 
 /// Compute required precision bits for a given zoom scale.
@@ -30,17 +29,23 @@ pub fn bits_for_scale(scale_str: &str) -> Result<usize, String> {
 
 /// Parse a decimal string into a `BigFloat` at given precision.
 ///
+/// @tradeoff Workaround: `BigFloat::parse(Radix::Dec)` has a bug on WASM32
+/// where the result is scaled by `10^(decimal_digits - 1)`. We use f64
+/// parsing as intermediate step. Precision loss is acceptable up to ~10^-15
+/// (f64 significand). Beyond that, a fixed astro-float or alternative
+/// library is needed.
+///
 /// # Errors
 ///
-/// Returns `Err` if `s` cannot be parsed (astro-float returns NaN for
-/// malformed input) or if `Consts` initialization fails.
+/// Returns `Err` if `s` cannot be parsed as a finite f64.
 pub fn parse_decimal(s: &str, prec: usize) -> Result<BigFloat, String> {
-    let mut cc = Consts::new().map_err(|e| format!("{e:?}"))?;
-    let val = BigFloat::parse(s, Radix::Dec, prec, RM, &mut cc);
-    if val.is_nan() {
-        return Err(format!("failed to parse '{s}' as BigFloat"));
+    let f: f64 = s
+        .parse()
+        .map_err(|e| format!("failed to parse '{s}' as f64: {e}"))?;
+    if !f.is_finite() {
+        return Err(format!("parsed value is not finite: {f}"));
     }
-    Ok(val)
+    Ok(BigFloat::from_f64(f, prec))
 }
 
 /// Convert a `BigFloat` to f64 using raw mantissa extraction.

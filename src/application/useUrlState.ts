@@ -6,7 +6,7 @@
  * ===================================================================
  */
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import type { FractalType, PaletteName, ColoringMode } from '../domain';
 import { getFractalTypeNames, getPaletteNames, COLORING_MODES } from '../domain';
 import type { InitialFractalConfig } from './useFractalState';
@@ -194,17 +194,6 @@ function formatCoord(n: number): string {
 }
 
 // ── Hooks ────────────────────────────────────────────────────────
-
-/**
- * Read initial config from URL hash on mount.
- * Returns Partial<InitialFractalConfig> to merge with defaults.
- */
-export function useUrlInitialConfig(): Partial<InitialFractalConfig> {
-  return useMemo(() => {
-    if (typeof window === 'undefined') return {};
-    return parseHash(window.location.hash);
-  }, []);
-}
 
 /**
  * Sync state changes to URL hash via history.replaceState.
