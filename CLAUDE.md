@@ -124,42 +124,91 @@ grep -r @tradeoff src/
 5. ~~Double-single emulation~~ — Mandelbrot DS (vec2 hi+lo), zoom 10^-15
 6. ~~Stripe rewrite~~ — deep-mandelbrot quality (Re·Im/|z|², Catmull-Rom, cosine palette, bailout 300K)
 7. ~~P0 UX~~ — URL state, touch pinch, responsive mobile, adaptive debounce
+8. ~~Perturbation theory v1~~ — Rust/WASM dashu-float orbit + GPU perturbation shader.
+   Mandelbrot + Julia. Zoom 10^-40+ verified. SAB cancel/progress, WCAG progressbar.
+   Measured: orbit ~1s @256iter, GPU ~50ms, total <1.5s. Plans A+B complete.
 
-### Next (ordre par gain de performance)
+### Next (ordre par dependances)
+
+Phases ordonnees : correctness → perceived speed → real speed → polish.
+
+#### Phase C: Perturbation correctness
 
 | # | Feature | Gain | Effort | Reference |
 |---|---|---|---|---|
-| 1 | **Perturbation theory** | Zoom ×10^45 (10^-15 → 10^-60+) | 6 sem | mandelbrot.page, deep-mandelbrot |
-| 2 | **Progressive infinite** | Perceived speed ×∞ (instant + refine) | 2 sem | mandelbrot.page |
-| 3 | **Histogram coloring** | Banding → 0 (uniform CDF distribution) | 1 sem | mandelbrot.page (HCL) |
-| 4 | **Video export** | Feature (zoom animation download) | 2 sem | mandelbrot.page |
+| C1 | **Glitch detection** | Correct deep zoom images | 1 sem | deep-mandelbrot, Pauldelbrot |
+| C2 | **Reference point selection** | Fewer glitches, better images | 1 sem | deep-mandelbrot (12×12 grid) |
 
-#### 1. Perturbation theory — zoom 10^-60+ (IMPERATIF)
-- Precision ladder: DS (10^-15) → DD (10^-30) → Jampary/QD (10^-60+)
-- Architecture: CPU Worker arbitrary precision ref orbit → GPU float32 delta iteration
-- Reference point: logarithmic grid search (12×12, 15 iter) — deep-mandelbrot
-- Glitch detection: bad reference → artefacts aux mini-Mandelbrots → auto re-reference
-- From scratch si besoin. ~3 impls browser existent (munrocket, davidbau, Ambrose)
-- Research: docs/research-deep-mandelbrot.md, docs/competitive-analysis.md
+##### C1. Glitch detection — auto re-reference
+- Detect bad reference: |δ_n| > |Z_n| threshold → pixel is "glitched"
+- Two strategies: (a) mark + re-render with new reference, (b) multi-reference
+- Sans ca: artefacts visibles aux mini-Mandelbrots en deep zoom
+- Reference: Pauldelbrot method, deep-mandelbrot implementation
 
-#### 2. Progressive infinite refinement
-- Start at low maxIter (64), render instant, keep doubling in background (128→256→512→...)
+##### C2. Reference point selection — grid search
+- Logarithmic grid (12×12, 15 iter) to find optimal reference point
+- Current: viewport center. Problem: center can be in the set → orbit escapes late → waste
+- deep-mandelbrot approach: pick reference that escapes latest (most orbit data)
+- Can combine with glitch detection for iterative refinement
+
+#### Phase D: Perceived speed
+
+| # | Feature | Gain | Effort | Reference |
+|---|---|---|---|---|
+| D1 | **Progressive orbit** | <200ms to first visual | 1 sem | mandelbrot.page |
+
+##### D1. Progressive orbit — render partial, refine
+- Render with partial orbit during WASM computation, re-render when complete
+- Start at low maxIter (64), render instant, double in background (128→256→512→...)
 - Combined with cycle detection for early termination of converged pixels
-- User sees result in <100ms that keeps improving while idle
+- Masque la latence orbit (~1s) sans optimiser le calcul lui-meme
 - Reference: mandelbrot.page — progressive + cycle detection
 
-#### 3. Histogram coloring
+#### Phase E: Real speed
+
+| # | Feature | Gain | Effort | Reference |
+|---|---|---|---|---|
+| E1 | **Orbit perf (binary arithmetic)** | 10-100x orbit speedup | 2 sem | Jampary, dashu FBig |
+| E2 | **Series Approximation (SA)** | 5-10x deep zoom speedup | 3 sem | deep-mandelbrot |
+
+##### E1. Orbit performance — binary arithmetic
+- Current: dashu-float DBig (decimal) avec trunc() par op. ~1s @256iter.
+- Options: (a) dashu FBig (binary), (b) Jampary float expansion (double-double chains),
+  (c) GMP/MPFR via wasm (complexe mais reference standard)
+- Binary arithmetic est 10-100x plus rapide que decimal pour meme precision
+- @tradeoff actuel: DBig choisi pour simplicite API, pas pour perf
+
+##### E2. Series Approximation (SA)
+- Polynomes A_n, B_n, C_n calcules en Rust sur l'orbite de reference
+- GPU skip iterations via coefficients precomputes
+- Expected: 5-10x speedup at deep zoom (skip 90%+ des iterations)
+- Prerequis: orbite correcte (glitch detection), idealement orbite rapide
+
+#### Phase F: Polish & features
+
+| # | Feature | Gain | Effort | Reference |
+|---|---|---|---|---|
+| F1 | **Rescaling** | Anti-artefacts extreme zoom | 1 sem | Zhuoran 2021 |
+| F2 | **Histogram coloring** | Banding → 0 | 1 sem | mandelbrot.page (HCL) |
+| F3 | **Video export** | Feature (zoom animation) | 2 sem | mandelbrot.page |
+| F4 | **LLM-readable app (SEO)** | Discoverability | 1 sem | — |
+
+##### F1. Rescaling — float32 delta underflow
+- Extension range δ = S·w quand float32 underflow aux zooms extremes
+- Seulement si artefacts observes en pratique (pas encore le cas a 10^-40)
+
+##### F2. Histogram coloring
 - Two-pass: count iteration histogram → build CDF → map colors uniformly
 - Eliminates ALL banding regardless of maxIter or palette
-- HCL color space (perceptually uniform, compatible with our OKLCH approach)
+- Compatible OKLCH (perceptually uniform)
 - Reference: mandelbrot.page
 
-#### 4. Video export
+##### F3. Video export
 - Record zoom path → render frames → download as MP4/WebM
 - Canvas.captureStream() + MediaRecorder API
 - Pre-computed zoom path with smooth interpolation
 
-#### Nice-to-have: LLM-readable app (SEO)
+##### F4. Nice-to-have: LLM-readable app (SEO)
 - Structured metadata (JSON-LD, Open Graph) decrivant les capacites de l'app
 - Balises semantiques HTML (headings, landmarks, aria) pour que les crawlers/LLMs comprennent le contenu
 - README.md riche et structure (features, screenshots, benchmarks, stack) — c'est le premier document qu'un LLM lit sur GitHub
@@ -180,13 +229,15 @@ grep -r @tradeoff src/
 ### Performance options evaluated
 - See docs/performance-history.md for full comparison table
 - GPU (A) DONE — measured ~5700x (0.04ms @256iter). All 25 fractal×coloring combinations.
-- WASM (B) only for perturbation ref orbit if JS perf insufficient
+- WASM (B) DONE — dashu-float arbitrary precision ref orbit. ~1s @256iter.
+- Perturbation (D) DONE v1 — Rust/WASM orbit + GPU shader. Zoom 10^-40+.
 - OffscreenCanvas (C), adaptive debounce (E) DONE, pool resize (F) — marginal
 - See docs/competitive-analysis.md for full competitive landscape (March 2026)
 
 ### Competitive advantages (unique in market)
 - 5 fractals × 5 coloring modes GPU-rendered (all others are Mandelbrot-only)
 - WebGL 2 native (<1ms render, no library overhead)
+- Perturbation theory: Rust/WASM arbitrary precision orbit + GPU shader (zoom 10^-40+)
 - SSAA 2x2 toggle (no competitor has this)
 - Touch mobile (most are desktop-only)
 - URL state with Julia params (viewport + fractal + coloring + Julia c)
