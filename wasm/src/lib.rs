@@ -1,6 +1,9 @@
 #![deny(clippy::all, clippy::pedantic)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::print_stdout, clippy::print_stderr)]
 #![forbid(unsafe_code)]
 
+mod control;
 mod orbit;
 mod precision;
 
@@ -37,10 +40,8 @@ pub fn compute_reference_orbit(
         precision_bits as usize
     };
 
-    // Map SAB control buffer to cancel/progress atomics.
-    // Int32Array.get_index reads from SharedArrayBuffer (live, not snapshot).
-    let cancel_flag = orbit::SabControl::new(control_buf, 0);
-    let progress = orbit::SabControl::new(control_buf, 1);
+    let cancel_flag = control::SabControl::new(control_buf, 0);
+    let progress = control::SabControl::new(control_buf, 1);
 
     let result = orbit::compute_mandelbrot_orbit(
         center_re,
@@ -58,18 +59,15 @@ pub fn compute_reference_orbit(
     };
 
     let header_len = 2_u32;
-    // Orbit data length is bounded by max_iter * 4, which fits in u32.
     #[allow(clippy::cast_possible_truncation)]
     let data_len = data.len() as u32;
     let total_len = header_len + data_len;
     let arr = Float32Array::new_with_length(total_len);
-    // u32→f32 cast: orbit lengths up to 2^24 (16M) are exact in f32.
     #[allow(clippy::cast_precision_loss)]
     let length_f32 = length as f32;
     arr.set_index(0, length_f32);
     arr.set_index(1, if cancelled { 1.0 } else { 0.0 });
 
-    // Copy orbit data into the Float32Array after the header
     let orbit_arr = Float32Array::new_with_length(data_len);
     orbit_arr.copy_from(&data);
     arr.set(&orbit_arr, header_len);
@@ -77,17 +75,20 @@ pub fn compute_reference_orbit(
     Ok(arr)
 }
 
-/// Smoke test: verify astro-float precision at given bits.
+/// Smoke test: verify dashu-float precision at given bits.
+///
+/// Parses a known value and returns its string representation.
 ///
 /// # Errors
 ///
-/// Returns `JsValue` error if constants cache initialization fails.
+/// Returns `JsValue` error if parsing fails.
 #[wasm_bindgen]
 pub fn verify_precision(bits: u32) -> Result<String, JsValue> {
-    use astro_float::{Consts, RoundingMode};
-    let prec = bits as usize;
-    let mut cc = Consts::new()
-        .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-    let pi = cc.pi(prec, RoundingMode::ToEven);
-    Ok(format!("{pi}"))
+    let digits = precision::bits_to_digits(bits as usize);
+    let val = precision::parse_decimal(
+        "3.14159265358979323846264338327950288419716939937510",
+    )
+    .map_err(|e| JsValue::from_str(&e))?;
+    let truncated = precision::trunc(val, digits);
+    Ok(format!("{truncated}"))
 }

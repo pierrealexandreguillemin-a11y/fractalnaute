@@ -20,11 +20,13 @@
 export function compute_reference_orbit(center_re: string, center_im: string, max_iter: number, precision_bits: number, scale_str: string, control_buf: Int32Array): Float32Array;
 
 /**
- * Smoke test: verify astro-float precision at given bits.
+ * Smoke test: verify dashu-float precision at given bits.
+ *
+ * Parses a known value and returns its string representation.
  *
  * # Errors
  *
- * Returns `JsValue` error if constants cache initialization fails.
+ * Returns `JsValue` error if parsing fails.
  */
 export function verify_precision(bits: number): string;
 

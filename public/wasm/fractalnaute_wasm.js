@@ -47,11 +47,13 @@ export function compute_reference_orbit(center_re, center_im, max_iter, precisio
 }
 
 /**
- * Smoke test: verify astro-float precision at given bits.
+ * Smoke test: verify dashu-float precision at given bits.
+ *
+ * Parses a known value and returns its string representation.
  *
  * # Errors
  *
- * Returns `JsValue` error if constants cache initialization fails.
+ * Returns `JsValue` error if parsing fails.
  * @param {number} bits
  * @returns {string}
  */
@@ -83,31 +85,31 @@ export function verify_precision(bits) {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg___wbindgen_throw_6ddd609b62940d55: function(arg0, arg1) {
+        __wbg___wbindgen_throw_5549492daedad139: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_get_index_711482e792962f29: function(arg0, arg1) {
+        __wbg_get_index_8ac92b7c32482ac6: function(arg0, arg1) {
             const ret = getObject(arg0)[arg1 >>> 0];
             return ret;
         },
-        __wbg_length_259ee9d041e381ad: function(arg0) {
+        __wbg_length_041162c2b6ec20f9: function(arg0) {
             const ret = getObject(arg0).length;
             return ret;
         },
-        __wbg_new_with_length_81c1c31d4432cb9f: function(arg0) {
+        __wbg_new_with_length_3301eabff12dda6d: function(arg0) {
             const ret = new Float32Array(arg0 >>> 0);
             return addHeapObject(ret);
         },
-        __wbg_set_10bf9e6b867d1935: function(arg0, arg1, arg2) {
-            getObject(arg0).set(getObject(arg1), arg2 >>> 0);
-        },
-        __wbg_set_361bc2460da3016f: function(arg0, arg1, arg2) {
+        __wbg_set_50e15ab935cff07d: function(arg0, arg1, arg2) {
             getObject(arg0).set(getArrayF32FromWasm0(arg1, arg2));
         },
-        __wbg_set_index_9067832dab4f23b8: function(arg0, arg1, arg2) {
+        __wbg_set_ce457e54604a37e6: function(arg0, arg1, arg2) {
+            getObject(arg0).set(getObject(arg1), arg2 >>> 0);
+        },
+        __wbg_set_index_665919f731973f92: function(arg0, arg1, arg2) {
             getObject(arg0)[arg1 >>> 0] = arg2;
         },
-        __wbg_set_index_f66997fc93f75edc: function(arg0, arg1, arg2) {
+        __wbg_set_index_798d032904959949: function(arg0, arg1, arg2) {
             getObject(arg0)[arg1 >>> 0] = arg2;
         },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {

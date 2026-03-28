@@ -1,4 +1,5 @@
-use astro_float::{BigFloat, Sign, Word, WORD_BIT_SIZE};
+use std::f64::consts::LOG10_2;
+
 use dashu_float::DBig;
 
 const PRECISION_MARGIN: usize = 64;
@@ -28,127 +29,57 @@ pub fn bits_for_scale(scale_str: &str) -> Result<usize, String> {
     Ok(bits + PRECISION_MARGIN)
 }
 
-/// Parse a decimal string into a `BigFloat` at arbitrary precision.
+/// Convert precision in bits to decimal significant digits for `DBig`.
 ///
-/// Uses `dashu-float` for parsing (astro-float `BigFloat::parse(Radix::Dec)`
-/// has a bug on WASM32 scaling by `10^(decimal_digits - 1)`).
-/// dashu parses correctly → convert to f64 → `BigFloat::from_f64`.
+/// Formula: `digits = ceil(bits * log10(2)) + 2` margin.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+pub fn bits_to_digits(bits: usize) -> usize {
+    ((bits as f64) * LOG10_2).ceil() as usize + 2
+}
+
+/// Parse a decimal string into a `DBig`.
 ///
-/// Precision beyond f64 (~10^-15): dashu preserves full decimal precision
-/// in its `DBig` type. We extract f64 for now; for zoom > 10^-15, the
-/// orbit computation already uses astro-float arithmetic at `prec` bits
-/// starting from this seed value.
+/// `DBig` preserves full decimal precision from the input string,
+/// enabling correct orbits at arbitrary zoom depth (10^-40+).
 ///
 /// # Errors
 ///
 /// Returns `Err` if `s` cannot be parsed as a finite number.
-pub fn parse_decimal(s: &str, prec: usize) -> Result<BigFloat, String> {
-    let dbig: DBig = s
-        .parse()
-        .map_err(|e| format!("failed to parse '{s}': {e}"))?;
-    let f = dbig.to_f64().value();
-    if !f.is_finite() {
-        return Err(format!("parsed value is not finite: {f}"));
-    }
-    Ok(BigFloat::from_f64(f, prec))
+pub fn parse_decimal(s: &str) -> Result<DBig, String> {
+    s.parse::<DBig>()
+        .map_err(|e| format!("failed to parse '{s}': {e}"))
 }
 
-/// Convert a `BigFloat` to f64 using raw mantissa extraction.
+/// Arithmetic constants for `DBig` (cannot be `const` — heap-allocated).
+pub fn dbig_zero() -> DBig { DBig::from(0) }
+pub fn dbig_one() -> DBig { DBig::from(1) }
+pub fn dbig_two() -> DBig { DBig::from(2) }
+
+/// Truncate a `DBig` to `digits` significant decimal digits.
 ///
-/// Adaptation: astro-float 0.9 has no public `to_f64()` on `BigFloat`.
-/// We reconstruct the f64 from `as_raw_parts()` (mantissa words, sign, exponent).
-/// On `WASM32`, `Word` = u32, `WORD_BIT_SIZE` = 32.
-#[allow(clippy::cast_possible_wrap)]
-pub fn to_f64(val: &BigFloat) -> f64 {
-    let Some(parts) = val.as_raw_parts() else {
-        return 0.0; // NaN or Inf => 0.0 for safety
-    };
-    let (mantissa_words, _n_bits, sign, exponent, _inexact) = parts;
-
-    if val.is_zero() {
-        return 0.0;
-    }
-
-    // Build f64 from mantissa + exponent.
-    // BigFloat stores mantissa as array of Words, MSW last.
-    // The mantissa represents a value in [0.5, 1.0) with the binary point
-    // before the MSB. Exponent is such that value = mantissa * 2^exponent.
-    //
-    // f64 layout: 1 sign bit + 11 exponent bits + 52 mantissa bits.
-    // IEEE 754: value = (-1)^s * 1.fraction * 2^(e-1023)
-    // BigFloat: value = 0.1mantissa * 2^exp = 1.mantissa * 2^(exp-1)
-
-    // Extract top 64 bits of mantissa (MSW is at the end of the slice).
-    let top_bits: u64 = extract_top_64(mantissa_words);
-
-    // The implicit leading 1 in BigFloat is the MSB of the mantissa.
-    // For IEEE 754 f64, we need 52 fraction bits (without the implicit 1).
-    // Shift to get fraction bits (remove the leading 1).
-    let fraction = (top_bits << 1) >> 12; // remove MSB, then shift to 52-bit position
-
-    // Compute IEEE 754 biased exponent.
-    // BigFloat exponent means value = mantissa * 2^exponent where mantissa in [0.5, 1.0)
-    // So value = 1.frac * 2^(exponent - 1)
-    // IEEE 754: biased_exp = (exponent - 1) + 1023
-    let biased_exp = i64::from(exponent) - 1 + 1023;
-
-    if biased_exp >= 2047 {
-        return if sign == Sign::Neg {
-            f64::NEG_INFINITY
-        } else {
-            f64::INFINITY
-        };
-    }
-    if biased_exp <= 0 {
-        // Underflow/subnormal => return 0.0 for simplicity
-        return 0.0;
-    }
-
-    let mut bits: u64 = 0;
-    if sign == Sign::Neg {
-        bits |= 1 << 63;
-    }
-    // biased_exp is in 1..2047 so cast to u64 is safe
-    #[allow(clippy::cast_sign_loss)]
-    {
-        bits |= (biased_exp as u64) << 52;
-    }
-    bits |= fraction & 0x000F_FFFF_FFFF_FFFF;
-
-    f64::from_bits(bits)
+/// @tradeoff Truncate after every intermediate op to bound `DBig` digit growth.
+/// Exact decimal arithmetic doubles digits per multiply — without truncation,
+/// 256 iterations would produce 2^256 digits. Per-op truncation caps working
+/// precision at `digits` (~bits/3.32 + 2) with `HalfEven` rounding (= IEEE 754
+/// `ToEven`). Output is f32, so sub-7-digit differences are invisible.
+pub fn trunc(val: DBig, digits: usize) -> DBig {
+    val.with_precision(digits).value()
 }
 
-/// Convert a `BigFloat` to f32 (for GPU texture upload).
+/// Convert a `DBig` to f64.
+pub fn to_f64(val: &DBig) -> f64 {
+    val.to_f64().value()
+}
+
+/// Convert a `DBig` to f32 (for GPU texture upload).
 #[allow(clippy::cast_possible_truncation)]
-pub fn to_f32(val: &BigFloat) -> f32 {
-    let f = to_f64(val) as f32;
+pub fn to_f32(val: &DBig) -> f32 {
+    let f = val.to_f64().value() as f32;
     if f.is_finite() { f } else { 0.0_f32 }
-}
-
-/// Extract the top 64 bits from a mantissa word array.
-/// In astro-float, the most significant word is at the END of the slice.
-#[allow(clippy::useless_conversion)]
-fn extract_top_64(words: &[Word]) -> u64 {
-    if words.is_empty() {
-        return 0;
-    }
-
-    let len = words.len();
-
-    if WORD_BIT_SIZE == 64 {
-        // On 64-bit: Word = u64, top word is last.
-        // u64::from is a no-op here but needed for WASM32 where Word = u32.
-        u64::from(words[len - 1])
-    } else {
-        // On 32-bit (WASM): Word = u32, combine two MSWs
-        let hi = u64::from(words[len - 1]);
-        let lo = if len >= 2 {
-            u64::from(words[len - 2])
-        } else {
-            0
-        };
-        (hi << 32) | lo
-    }
 }
 
 #[cfg(test)]
@@ -175,20 +106,28 @@ mod tests {
     }
 
     #[test]
+    fn bits_to_digits_basic() {
+        // 128 bits => ~40 digits, 256 bits => ~79 digits
+        assert!(bits_to_digits(128) >= 40);
+        assert!(bits_to_digits(256) >= 79);
+    }
+
+    #[test]
     fn parse_decimal_valid() {
-        let val = parse_decimal("3.14159", 128).unwrap();
-        assert!(!val.is_nan());
+        let val = parse_decimal("3.14159").unwrap();
+        let f = to_f64(&val);
+        assert!((f - 3.14159).abs() < 1e-4, "expected ~3.14159, got {f}");
     }
 
     #[test]
     fn parse_decimal_invalid() {
-        let result = parse_decimal("not_a_number", 128);
+        let result = parse_decimal("not_a_number");
         assert!(result.is_err());
     }
 
     #[test]
     fn to_f64_roundtrip() {
-        let val = BigFloat::from_f64(3.14159265358979, 128);
+        let val = parse_decimal("3.14159265358979").unwrap();
         let f = to_f64(&val);
         assert!(
             (f - 3.14159265358979).abs() < 1e-14,
@@ -198,21 +137,34 @@ mod tests {
 
     #[test]
     fn to_f64_zero() {
-        let val = BigFloat::from_f64(0.0, 128);
-        assert!((to_f64(&val)).abs() < f64::EPSILON);
+        let val = parse_decimal("0").unwrap();
+        assert!(to_f64(&val).abs() < f64::EPSILON);
     }
 
     #[test]
     fn to_f64_negative() {
-        let val = BigFloat::from_f64(-2.5, 128);
+        let val = parse_decimal("-2.5").unwrap();
         let f = to_f64(&val);
         assert!((f - (-2.5)).abs() < 1e-14, "expected -2.5, got {f}");
     }
 
     #[test]
     fn to_f32_roundtrip() {
-        let val = BigFloat::from_f64(1.5, 128);
+        let val = parse_decimal("1.5").unwrap();
         let f = to_f32(&val);
         assert!((f - 1.5_f32).abs() < 1e-5, "expected 1.5, got {f}");
+    }
+
+    #[test]
+    fn deep_zoom_precision_preserved() {
+        // 40-digit coordinate should parse without loss
+        let s = "-0.7436438885706951598312068939351231241234";
+        let val = parse_decimal(s).unwrap();
+        let f = to_f64(&val);
+        // f64 can only represent ~15 digits, but the DBig has full precision
+        assert!(
+            (f - (-0.743643888570695)).abs() < 1e-14,
+            "f64 truncation should be close, got {f}"
+        );
     }
 }

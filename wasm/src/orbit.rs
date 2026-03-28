@@ -1,41 +1,11 @@
-use std::sync::atomic::{AtomicI32, Ordering};
+use crate::control::ControlSignal;
+use crate::precision::{
+    bits_to_digits, dbig_one, dbig_two, dbig_zero, parse_decimal, to_f32,
+    to_f64, trunc,
+};
 
-use astro_float::{BigFloat, RoundingMode};
-
-use crate::precision::{parse_decimal, to_f32, to_f64};
-
-const RM: RoundingMode = RoundingMode::ToEven;
 const BAILOUT_SQ: f64 = 4.0;
 const CANCEL_CHECK_INTERVAL: u32 = 1024;
-
-/// Abstraction for cancel/progress signals.
-/// `AtomicI32` for native tests, `SabControl` for WASM runtime (SAB-backed).
-pub trait ControlSignal {
-    fn load(&self) -> i32;
-    fn store(&self, val: i32);
-}
-
-impl ControlSignal for AtomicI32 {
-    fn load(&self) -> i32 { AtomicI32::load(self, Ordering::Relaxed) }
-    fn store(&self, val: i32) { AtomicI32::store(self, val, Ordering::Relaxed); }
-}
-
-/// SAB-backed control signal — reads/writes `Int32Array[offset]` live.
-pub struct SabControl<'a> {
-    buf: &'a js_sys::Int32Array,
-    offset: u32,
-}
-
-impl<'a> SabControl<'a> {
-    pub fn new(buf: &'a js_sys::Int32Array, offset: u32) -> Self {
-        Self { buf, offset }
-    }
-}
-
-impl ControlSignal for SabControl<'_> {
-    fn load(&self) -> i32 { self.buf.get_index(self.offset) }
-    fn store(&self, val: i32) { self.buf.set_index(self.offset, val); }
-}
 
 /// Result of a reference orbit computation.
 pub enum OrbitResult {
@@ -73,19 +43,18 @@ pub fn compute_mandelbrot_orbit(
     cancel_flag: &dyn ControlSignal,
     progress: &dyn ControlSignal,
 ) -> Result<OrbitResult, String> {
-    let prec = precision_bits;
+    let digits = bits_to_digits(precision_bits);
 
-    let center_re = parse_decimal(c_re_str, prec)?;
-    let center_im = parse_decimal(c_im_str, prec)?;
+    let center_re = trunc(parse_decimal(c_re_str)?, digits);
+    let center_im = trunc(parse_decimal(c_im_str)?, digits);
 
-    let zero = BigFloat::from_f64(0.0, prec);
-    let one = BigFloat::from_f64(1.0, prec);
-    let two = BigFloat::from_f64(2.0, prec);
+    let one = dbig_one();
+    let two = dbig_two();
 
-    let mut z_re = zero.clone();
-    let mut z_im = zero.clone();
-    let mut dz_re = zero.clone();
-    let mut dz_im = zero;
+    let mut z_re = dbig_zero();
+    let mut z_im = dbig_zero();
+    let mut dz_re = dbig_zero();
+    let mut dz_im = dbig_zero();
 
     let capacity = (max_iter as usize)
         .checked_mul(4)
@@ -117,25 +86,19 @@ pub fn compute_mandelbrot_orbit(
         // Derivative: Z'_{n+1} = 2 * Z_n * Z'_n + 1
         // Real part: 2*(zr*dzr - zi*dzi) + 1
         // Imag part: 2*(zr*dzi + zi*dzr)
-        let prod_rr = z_re.mul(&dz_re, prec, RM);
-        let prod_ii = z_im.mul(&dz_im, prec, RM);
-        let prod_ri = z_re.mul(&dz_im, prec, RM);
-        let prod_ir = z_im.mul(&dz_re, prec, RM);
-        let new_dz_re = two
-            .mul(&prod_rr.sub(&prod_ii, prec, RM), prec, RM)
-            .add(&one, prec, RM);
-        let new_dz_im = two.mul(&prod_ri.add(&prod_ir, prec, RM), prec, RM);
-        dz_re = new_dz_re;
-        dz_im = new_dz_im;
+        let prod_rr = trunc(&z_re * &dz_re, digits);
+        let prod_ii = trunc(&z_im * &dz_im, digits);
+        let prod_ri = trunc(&z_re * &dz_im, digits);
+        let prod_ir = trunc(&z_im * &dz_re, digits);
+        dz_re = trunc(&two * &trunc(&prod_rr - &prod_ii, digits) + &one, digits);
+        dz_im = trunc(&two * &trunc(&prod_ri + &prod_ir, digits), digits);
 
         // Iteration: Z_{n+1} = Z_n^2 + C
-        let zr_sq = z_re.mul(&z_re, prec, RM);
-        let zi_sq = z_im.mul(&z_im, prec, RM);
-        let two_zr_zi = two.mul(&z_re.mul(&z_im, prec, RM), prec, RM);
-        z_re = zr_sq
-            .sub(&zi_sq, prec, RM)
-            .add(&center_re, prec, RM);
-        z_im = two_zr_zi.add(&center_im, prec, RM);
+        let zr_sq = trunc(&z_re * &z_re, digits);
+        let zi_sq = trunc(&z_im * &z_im, digits);
+        let two_zr_zi = trunc(&two * &trunc(&z_re * &z_im, digits), digits);
+        z_re = trunc(&trunc(&zr_sq - &zi_sq, digits) + &center_re, digits);
+        z_im = trunc(&two_zr_zi + &center_im, digits);
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -146,7 +109,7 @@ pub fn compute_mandelbrot_orbit(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicI32;
+    use std::sync::atomic::{AtomicI32, Ordering};
 
     fn no_cancel() -> (AtomicI32, AtomicI32) {
         (AtomicI32::new(0), AtomicI32::new(0))
@@ -190,7 +153,6 @@ mod tests {
             )
             .unwrap(),
         );
-        // After iter 0 (Z_0 = 0), iter 1 should be Z_1 = C
         assert!(
             (orbit[4] - 0.5_f32).abs() < 1e-5,
             "z_1 re should be c_re, got {}",
@@ -269,8 +231,6 @@ mod tests {
 
     #[test]
     fn orbit_at_mandelbrot_boundary_should_not_escape_early() {
-        // Exact coordinates from runtime: near Mandelbrot boundary
-        // At 111 bits (auto-calculated from scale=1e-14)
         let (cancel, progress) = no_cancel();
         let prec = crate::precision::bits_for_scale("1e-14").unwrap();
         assert_eq!(prec, 111, "expected 111 bits for scale 1e-14");
@@ -284,15 +244,12 @@ mod tests {
         )
         .unwrap();
         let (orbit, len) = unwrap_complete(result);
-        // This point is near the boundary — should NOT escape in 2 iterations
-        // z₁ = c ≈ (-0.74, 0.13), |z₁|² ≈ 0.57 < 4
         assert!(
             len > 10,
             "boundary point should not escape early, got len={len}"
         );
-        // Verify z₁ ≈ c (first iteration after z₀=0)
-        let z1_re = orbit[4]; // index 4 = iter 1, z_re
-        let z1_im = orbit[5]; // index 5 = iter 1, z_im
+        let z1_re = orbit[4];
+        let z1_im = orbit[5];
         assert!(
             (z1_re - (-0.7436_f32)).abs() < 0.01,
             "z1_re should be ~c_re, got {z1_re}"
@@ -305,8 +262,7 @@ mod tests {
 
     #[test]
     fn to_f64_of_parsed_decimal() {
-        // Verify parse_decimal + to_f64 roundtrip at 111 bits
-        let val = crate::precision::parse_decimal("-0.7436438885706", 111).unwrap();
+        let val = crate::precision::parse_decimal("-0.7436438885706").unwrap();
         let f = crate::precision::to_f64(&val);
         assert!(
             (f - (-0.7436438885706_f64)).abs() < 1e-10,
@@ -326,5 +282,31 @@ mod tests {
             &progress,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn orbit_correct_at_very_deep_zoom() {
+        let (cancel, progress) = no_cancel();
+        let prec = crate::precision::bits_for_scale("1e-40").unwrap();
+        assert!(prec >= 196, "expected >=196 bits for 1e-40, got {prec}");
+        let result = compute_mandelbrot_orbit(
+            "-0.74364388857069515983120689393512312412",
+            "0.13182590431243590778813628973715582882",
+            256,
+            prec,
+            &cancel,
+            &progress,
+        )
+        .unwrap();
+        let (orbit, len) = unwrap_complete(result);
+        assert!(
+            len > 10,
+            "deep zoom point should iterate, got len={len}"
+        );
+        let z1_re = orbit[4];
+        assert!(
+            (z1_re - (-0.7436_f32)).abs() < 0.01,
+            "z1_re at deep zoom should be ~c_re, got {z1_re}"
+        );
     }
 }

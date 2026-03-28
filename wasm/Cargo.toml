@@ -9,9 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 wasm-bindgen = "0.2"
 js-sys = "0.3"
-astro-float = "0.9"
 dashu-float = "0.4"
-getrandom = { version = "0.2", features = ["js"] }
 
 [package.metadata.wasm-pack.profile.release]
 # Bundled wasm-opt lacks bulk-memory support; skip it.
