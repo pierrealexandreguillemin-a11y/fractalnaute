@@ -44,6 +44,7 @@ interface FractalState {
   precisionMode: PrecisionMode;
   orbitComputing: boolean;
   orbitProgress: number;
+  statusMessage: string | null;
 }
 
 /** Action types */
@@ -64,6 +65,7 @@ type FractalAction =
   | { type: 'SET_PRECISION_MODE'; mode: PrecisionMode }
   | { type: 'SET_ORBIT_COMPUTING'; computing: boolean }
   | { type: 'SET_ORBIT_PROGRESS'; progress: number }
+  | { type: 'SET_STATUS_MESSAGE'; message: string | null }
   | { type: 'APPLY_CONFIG'; config: InitialFractalConfig };
 
 /** Initial state */
@@ -83,7 +85,8 @@ const initialState: FractalState = {
   ssaa: false,
   precisionMode: 'float32' as PrecisionMode,
   orbitComputing: false,
-  orbitProgress: 0
+  orbitProgress: 0,
+  statusMessage: null
 };
 
 /** Handle SET_RENDERING — extracted to stay under complexity limit */
@@ -171,6 +174,8 @@ function reducerExtras(state: FractalState, action: FractalAction): FractalState
       return { ...state, orbitComputing: action.computing };
     case 'SET_ORBIT_PROGRESS':
       return { ...state, orbitProgress: action.progress };
+    case 'SET_STATUS_MESSAGE':
+      return { ...state, statusMessage: action.message };
     case 'APPLY_CONFIG': {
       let s = state;
       const c = action.config;
@@ -294,22 +299,12 @@ export function useFractalState(initial?: InitialFractalConfig) {
     dispatch({ type: 'SET_THEME', theme });
   }, []);
 
-  const setIterations = useCallback((maxIterations: number) => {
-    dispatch({ type: 'SET_ITERATIONS', maxIterations });
-  }, []);
-
-  const setJuliaParams = useCallback((params: FractalParams) => {
-    dispatch({ type: 'SET_JULIA_PARAMS', params });
-  }, []);
-
+  const setIterations = useCallback((maxIterations: number) => dispatch({ type: 'SET_ITERATIONS', maxIterations }), []);
+  const setJuliaParams = useCallback((params: FractalParams) => dispatch({ type: 'SET_JULIA_PARAMS', params }), []);
   const setRendering = useCallback((isRendering: boolean, renderTime?: number, renderBackend?: RenderBackend) => {
     dispatch({ type: 'SET_RENDERING', isRendering, renderTime, renderBackend });
   }, []);
-
-  const setPickingJulia = useCallback((isPickingJulia: boolean) => {
-    dispatch({ type: 'SET_PICKING_JULIA', isPickingJulia });
-  }, []);
-
+  const setPickingJulia = useCallback((isPickingJulia: boolean) => dispatch({ type: 'SET_PICKING_JULIA', isPickingJulia }), []);
   const setColoringMode = useCallback((mode: ColoringMode) => {
     dispatch({ type: 'SET_COLORING_MODE', mode });
   }, []);
@@ -322,6 +317,7 @@ export function useFractalState(initial?: InitialFractalConfig) {
   const setPrecisionMode = useCallback((mode: PrecisionMode) => dispatch({ type: 'SET_PRECISION_MODE', mode }), []);
   const setOrbitComputing = useCallback((computing: boolean) => dispatch({ type: 'SET_ORBIT_COMPUTING', computing }), []);
   const setOrbitProgress = useCallback((progress: number) => dispatch({ type: 'SET_ORBIT_PROGRESS', progress }), []);
+  const setStatusMessage = useCallback((message: string | null) => dispatch({ type: 'SET_STATUS_MESSAGE', message }), []);
   const applyConfig = useCallback((config: InitialFractalConfig) => dispatch({ type: 'APPLY_CONFIG', config }), []);
 
   // Computed stats
@@ -358,6 +354,7 @@ export function useFractalState(initial?: InitialFractalConfig) {
       setPrecisionMode,
       setOrbitComputing,
       setOrbitProgress,
+      setStatusMessage,
       applyConfig
     }
   };

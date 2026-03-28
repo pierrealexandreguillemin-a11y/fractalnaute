@@ -70,6 +70,7 @@ export interface RenderOptions {
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
   ssaa?: boolean;
+  onStatusMessage?: (message: string | null) => void;
   zoomTargetRe?: number;
   zoomTargetIm?: number;
   onProgress?: (progress: number) => void;
@@ -149,7 +150,15 @@ export function renderFractal(
       handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
     }).catch((err: unknown) => {
       if (stale) return;
-      console.warn('[perturbation] orbit failed:', String(err));
+      const msg = String(err);
+      console.warn('[perturbation] orbit failed:', msg);
+      if (msg.includes('timed out')) {
+        options.onStatusMessage?.('Orbit computation timed out — using standard precision');
+      } else if (msg.includes('memory') || msg.includes('alloc')) {
+        options.onStatusMessage?.('Not enough memory for this zoom depth — try reducing iterations');
+      } else {
+        options.onStatusMessage?.('Deep zoom computation failed — using standard precision');
+      }
       gpuRenderer.setVisible(false);
       renderDsFallback(canvas, pool, gpuRenderer, options);
     });

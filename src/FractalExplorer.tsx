@@ -40,7 +40,7 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
 }) => {
   const {
     containerRef, canvasRef, state, stats, actions,
-    exportImage, handleThemeChange, handlePickJulia,
+    exportImage, handleThemeChange, handlePickJulia, handleEscapeCancel,
     precisionMode
   } = useFractalExplorer({
     fractalType: initialFractalType,
@@ -101,6 +101,8 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
           orbitComputing={state.orbitComputing}
           orbitProgress={state.orbitProgress ?? 0}
           maxIterations={state.maxIterations}
+          onCancelOrbit={handleEscapeCancel}
+          statusMessage={state.statusMessage}
         />
       )}
       {showHelp && <HelpTooltip />}

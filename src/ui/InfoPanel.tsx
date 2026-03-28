@@ -15,6 +15,8 @@ interface InfoPanelProps {
   orbitComputing?: boolean;
   orbitProgress?: number;
   maxIterations?: number;
+  onCancelOrbit?: () => void;
+  statusMessage?: string | null;
 }
 
 /** Format render time: <1ms shown as "<1ms", else rounded */
@@ -27,6 +29,7 @@ function formatRenderTime(ms: number): string {
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
   stats, precisionMode, orbitComputing, orbitProgress = 0, maxIterations = 256,
+  onCancelOrbit, statusMessage,
 }) => (
   <div
     className={cn(
@@ -48,24 +51,41 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
       )}
       {precisionMode && <PrecisionBadge mode={precisionMode} />}
       {orbitComputing && (
-        <div
-          role="progressbar"
-          aria-valuenow={orbitProgress}
-          aria-valuemin={0}
-          aria-valuemax={maxIterations}
-          aria-label="Computing reference orbit"
-          className="flex items-center gap-1.5"
-        >
-          <div className="h-1 w-16 bg-muted-foreground/20 rounded overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-100"
-              style={{ width: `${Math.min(100, (orbitProgress / maxIterations) * 100)}%` }}
-            />
+        <div className="flex items-center gap-1.5">
+          <div
+            role="progressbar"
+            aria-valuenow={orbitProgress}
+            aria-valuemin={0}
+            aria-valuemax={maxIterations}
+            aria-label="Computing reference orbit"
+            className="flex items-center gap-1.5"
+          >
+            <div className="h-1 w-16 bg-muted-foreground/20 rounded overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-100"
+                style={{ width: `${Math.min(100, (orbitProgress / maxIterations) * 100)}%` }}
+              />
+            </div>
+            <span className="text-[9px] opacity-60">
+              {Math.round((orbitProgress / maxIterations) * 100)}%
+            </span>
           </div>
-          <span className="text-[9px] opacity-60">
-            {Math.round((orbitProgress / maxIterations) * 100)}%
-          </span>
+          {onCancelOrbit && (
+            <button
+              type="button"
+              onClick={onCancelOrbit}
+              aria-label="Cancel orbit computation"
+              className="text-[9px] px-1 py-0.5 rounded border border-current opacity-60 hover:opacity-100"
+            >
+              ✕
+            </button>
+          )}
         </div>
+      )}
+      {statusMessage && (
+        <span role="alert" className="text-[9px] text-amber-400/80">
+          {statusMessage}
+        </span>
       )}
     </div>
   </div>

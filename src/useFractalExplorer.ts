@@ -103,6 +103,7 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
     ssaa: state.ssaa, lastRenderTime: state.renderTime,
     onRenderStart: () => actions.setRendering(true),
     onRenderComplete: (renderTime, backend) => actions.setRendering(false, renderTime, backend),
+    onStatusMessage: (msg) => actions.setStatusMessage(msg),
   });
 
   useEffect(() => {
@@ -123,7 +124,7 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
 
   return {
     containerRef, canvasRef, state, stats, actions,
-    exportImage, handleThemeChange, handlePickJulia,
+    exportImage, handleThemeChange, handlePickJulia, handleEscapeCancel,
     precisionMode,
   };
 }

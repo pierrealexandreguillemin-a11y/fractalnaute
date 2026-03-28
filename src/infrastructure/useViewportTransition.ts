@@ -42,6 +42,7 @@ interface TransitionDeps {
   cancelRenderRef: React.MutableRefObject<(() => void) | null>;
   onRenderStartRef: React.MutableRefObject<(() => void) | undefined>;
   onRenderCompleteRef: React.MutableRefObject<((t: number, backend: RenderBackend) => void) | undefined>;
+  onStatusMessageRef: React.MutableRefObject<((msg: string | null) => void) | undefined>;
 }
 
 /** Full re-render — cancel previous, reset transform, dispatch two-pass workers */
@@ -49,7 +50,7 @@ function doRenderFull(
   deps: TransitionDeps,
   prevViewportRef: React.MutableRefObject<Viewport | null>
 ): void {
-  const { canvasRef, poolRef, gpuRef, cancelRenderRef, onRenderStartRef, onRenderCompleteRef } = deps;
+  const { canvasRef, poolRef, gpuRef, cancelRenderRef, onRenderStartRef, onRenderCompleteRef, onStatusMessageRef } = deps;
   const canvas = canvasRef.current;
   if (!canvas) return;
 
@@ -71,6 +72,7 @@ function doRenderFull(
     ssaa: deps.ssaa,
     zoomTargetRe: deps.zoomTargetRe,
     zoomTargetIm: deps.zoomTargetIm,
+    onStatusMessage: (msg) => onStatusMessageRef.current?.(msg),
     onComplete: (renderTime, backend) => {
       cancelRenderRef.current = null;
       onRenderCompleteRef.current?.(renderTime, backend);

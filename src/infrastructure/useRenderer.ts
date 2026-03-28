@@ -50,6 +50,7 @@ interface UseRendererOptions {
   zoomTargetIm?: number;
   onRenderStart?: () => void;
   onRenderComplete?: (renderTime: number, backend: RenderBackend) => void;
+  onStatusMessage?: (message: string | null) => void;
 }
 
 /**
@@ -62,7 +63,7 @@ export function useRenderer({
   coloringMode = 'classic', interiorColoring = false, ssaa = false,
   lastRenderTime = 0,
   zoomTargetRe, zoomTargetIm,
-  onRenderStart, onRenderComplete
+  onRenderStart, onRenderComplete, onStatusMessage
 }: UseRendererOptions) {
   const cancelRenderRef = useRef<(() => void) | null>(null);
   const poolRef = useRef<WorkerPool | null>(null);
@@ -72,10 +73,8 @@ export function useRenderer({
   // Store callbacks in refs to avoid re-creating render closures on every parent render.
   const onRenderStartRef = useRef(onRenderStart);
   const onRenderCompleteRef = useRef(onRenderComplete);
-  useEffect(() => {
-    onRenderStartRef.current = onRenderStart;
-    onRenderCompleteRef.current = onRenderComplete;
-  }, [onRenderStart, onRenderComplete]);
+  const onStatusMessageRef = useRef(onStatusMessage);
+  useEffect(() => { onRenderStartRef.current = onRenderStart; onRenderCompleteRef.current = onRenderComplete; onStatusMessageRef.current = onStatusMessage; }, [onRenderStart, onRenderComplete, onStatusMessage]);
 
   // Pool + GPU lifecycle: create on mount, destroy on unmount
   const forceRenderRef = useRef<(() => void) | null>(null);
@@ -121,7 +120,7 @@ export function useRenderer({
     fractalType, viewport, maxIterations, palette, params,
     coloringMode, interiorColoring, ssaa, lastRenderTime,
     zoomTargetRe, zoomTargetIm,
-    cancelRenderRef, onRenderStartRef, onRenderCompleteRef
+    cancelRenderRef, onRenderStartRef, onRenderCompleteRef, onStatusMessageRef
   });
 
   // Wire forceRenderRef so GPU-ready callback can trigger re-render
