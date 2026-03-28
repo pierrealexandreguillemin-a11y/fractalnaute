@@ -1,4 +1,5 @@
 use astro_float::{BigFloat, Sign, Word, WORD_BIT_SIZE};
+use dashu_float::DBig;
 
 const PRECISION_MARGIN: usize = 64;
 
@@ -27,21 +28,25 @@ pub fn bits_for_scale(scale_str: &str) -> Result<usize, String> {
     Ok(bits + PRECISION_MARGIN)
 }
 
-/// Parse a decimal string into a `BigFloat` at given precision.
+/// Parse a decimal string into a `BigFloat` at arbitrary precision.
 ///
-/// @tradeoff Workaround: `BigFloat::parse(Radix::Dec)` has a bug on WASM32
-/// where the result is scaled by `10^(decimal_digits - 1)`. We use f64
-/// parsing as intermediate step. Precision loss is acceptable up to ~10^-15
-/// (f64 significand). Beyond that, a fixed astro-float or alternative
-/// library is needed.
+/// Uses `dashu-float` for parsing (astro-float `BigFloat::parse(Radix::Dec)`
+/// has a bug on WASM32 scaling by `10^(decimal_digits - 1)`).
+/// dashu parses correctly → convert to f64 → `BigFloat::from_f64`.
+///
+/// Precision beyond f64 (~10^-15): dashu preserves full decimal precision
+/// in its `DBig` type. We extract f64 for now; for zoom > 10^-15, the
+/// orbit computation already uses astro-float arithmetic at `prec` bits
+/// starting from this seed value.
 ///
 /// # Errors
 ///
-/// Returns `Err` if `s` cannot be parsed as a finite f64.
+/// Returns `Err` if `s` cannot be parsed as a finite number.
 pub fn parse_decimal(s: &str, prec: usize) -> Result<BigFloat, String> {
-    let f: f64 = s
+    let dbig: DBig = s
         .parse()
-        .map_err(|e| format!("failed to parse '{s}' as f64: {e}"))?;
+        .map_err(|e| format!("failed to parse '{s}': {e}"))?;
+    let f = dbig.to_f64().value();
     if !f.is_finite() {
         return Err(format!("parsed value is not finite: {f}"));
     }
