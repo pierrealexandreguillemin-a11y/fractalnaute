@@ -147,23 +147,45 @@ All 25 fractal×coloring combinations are GPU-rendered. Interior coloring suppor
 
 ---
 
+## + Perturbation Theory (Rust/WASM dashu-float + GPU)
+
+Reference orbit: Rust/WASM `dashu-float` `DBig` arbitrary decimal precision.
+GPU: perturbation delta iteration with rebasing (Zhuoran 2021).
+Auto-switch: float32 → DS → perturbation at scale < 10^-13.
+
+**Measurement:** Playwright (headed Chromium), AMD Radeon RDNA2, 1280×720, maxIter=256.
+Timing: total = navigation → InfoPanel render time shown. GPU render = InfoPanel value. Orbit ≈ total - GPU - 300ms overhead.
+
+| Zoom | Orbit (WASM) | GPU render | Total | Notes |
+|---|---|---|---|---|
+| 10^-14 | ~880ms | 60ms | 1242ms | Overlap zone — validates DS→perturbation switch |
+| 10^-20 | ~1050ms | 51ms | 1396ms | Misiurewicz point (`-1.769, -0.002`) |
+| 10^-40 | ~1100ms | 54ms | 1453ms | Seahorse valley (`-0.744, 0.132`) — 197 bits precision |
+
+**Key observations:**
+- Orbit time is ~1s regardless of zoom depth (dominated by 256 iterations, not precision)
+- GPU render ≈ 50-60ms at all depths (constant — perturbation shader complexity is independent of precision)
+- Total < 1.5s for all depths — interactive for single renders
+- Orbit computation is the bottleneck (95% of total time)
+- Previous f64-only limit: 10^-15. Now: 10^-40+ (dashu-float arbitrary precision)
+
 ## Performance Improvement Options
 
 | Option | Expected Gain | Effort | Status |
 |---|---|---|---|
 | **A. GPU WebGL 2** | **Measured: ~5700x** (0.04ms @256iter) | High | DONE. All 25 fractal×coloring combinations. Dedicated GPU canvas + cardioid pre-test. |
-| **B. WASM (Rust)** | 1.5-2x vs JS CPU | Medium | Only useful for perturbation theory ref orbit, not pixel rendering |
+| **B. WASM (Rust)** | 1.5-2x vs JS CPU | Medium | DONE. dashu-float arbitrary precision ref orbit. ~1s @256iter. |
 | **C. OffscreenCanvas** | ~20% — unblocks main thread | Low | Workers use OffscreenCanvas instead of SAB→putImageData |
-| **D. Perturbation theory** | Unlimited deep zoom | High | JS arbitrary precision (Jampary-style). Only ~3 browser implementations exist. |
+| **D. Perturbation theory** | Unlimited deep zoom | High | DONE. Rust/WASM dashu-float orbit + GPU perturbation shader. Zoom 10^-40+. |
 | **E. Adaptive debounce** | Better perceived responsiveness | Low | 40ms if last render <100ms, 120ms otherwise |
 | **F. Worker pool resize** | ~10-30% | Trivial | Dynamic pool size based on runtime load |
 
 ### Recommended path
 
 1. **A (GPU)** — DONE. Measured 228ms → 0.04ms (~5700x). All 25 fractal×coloring combinations.
-2. **D (Perturbation)** — after GPU. Deep zoom beyond float64. DeepMandelbrot proves JS-only is viable.
-3. C/E/F become unnecessary once GPU is in place.
-4. B (WASM) only for perturbation ref orbit computation if JS perf is insufficient.
+2. **D (Perturbation)** — DONE. Zoom 10^-40+ via Rust/WASM orbit + GPU perturbation shader.
+3. **B (WASM)** — DONE. dashu-float arbitrary precision for reference orbit.
+4. C/E/F become unnecessary once GPU + perturbation are in place.
 
 ### Reference implementations
 
