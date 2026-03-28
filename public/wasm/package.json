@@ -1,0 +1,15 @@
+{
+  "name": "fractalnaute-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "fractalnaute_wasm_bg.wasm",
+    "fractalnaute_wasm.js",
+    "fractalnaute_wasm.d.ts"
+  ],
+  "main": "fractalnaute_wasm.js",
+  "types": "fractalnaute_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

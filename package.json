@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run wasm:build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint src app",
@@ -19,7 +18,7 @@
     "wasm:dev": "cd wasm && wasm-pack build --target web --dev"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
+    "!(public/**)*.{ts,tsx}": [
       "eslint --max-warnings 0"
     ]
   },

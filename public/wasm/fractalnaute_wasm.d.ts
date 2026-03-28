@@ -1,0 +1,64 @@
+/* tslint:disable */
+/* eslint-disable */
+
+/**
+ * Compute Mandelbrot reference orbit at arbitrary precision.
+ *
+ * Returns `Float32Array`:
+ *   `[orbit_length (as f32), cancelled_flag (0.0/1.0),`
+ *   `Z_re, Z_im, Z'_re, Z'_im, ...]`
+ *
+ * **Cancel strategy** (ISO 9241-110: controllability):
+ * Runtime cancel is handled by `Worker.terminate()` in `orbit.worker.ts`.
+ * The `orbit.rs` layer accepts `AtomicI32` cancel/progress for unit testing;
+ * here we pass inert locals. SAB-backed atomics are a future optimization
+ * requiring `WebAssembly.Memory({shared: true})`.
+ *
+ * # Errors
+ *
+ * Returns `JsValue` error if coordinate parsing or precision scaling fails.
+ */
+export function compute_reference_orbit(center_re: string, center_im: string, max_iter: number, precision_bits: number, scale_str: string): Float32Array;
+
+/**
+ * Smoke test: verify astro-float precision at given bits.
+ *
+ * # Errors
+ *
+ * Returns `JsValue` error if constants cache initialization fails.
+ */
+export function verify_precision(bits: number): string;
+
+export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
+
+export interface InitOutput {
+    readonly memory: WebAssembly.Memory;
+    readonly compute_reference_orbit: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+    readonly verify_precision: (a: number, b: number) => void;
+    readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
+    readonly __wbindgen_export: (a: number, b: number) => number;
+    readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_export3: (a: number, b: number, c: number) => void;
+}
+
+export type SyncInitInput = BufferSource | WebAssembly.Module;
+
+/**
+ * Instantiates the given `module`, which can either be bytes or
+ * a precompiled `WebAssembly.Module`.
+ *
+ * @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
+ *
+ * @returns {InitOutput}
+ */
+export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
+
+/**
+ * If `module_or_path` is {RequestInfo} or {URL}, makes a request and
+ * for everything else, calls `WebAssembly.instantiate` directly.
+ *
+ * @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
+ *
+ * @returns {Promise<InitOutput>}
+ */
+export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;
