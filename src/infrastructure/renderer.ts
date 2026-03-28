@@ -7,33 +7,58 @@
 
 import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode, RenderBackend, PrecisionMode, OrbitData } from '../domain';
 import type { WorkerPool } from './workerPool';
-import type { WebGLRenderer, GPURenderOptions } from './gpu';
+import type { WebGLRenderer } from './gpu';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
 import { needsPerturbation, computeReferenceOrbit, cancelOrbit } from './wasmBridge';
 
-/** Max retry attempts while waiting for perturbation shader compilation */
-const PERTURBATION_RENDER_MAX_RETRIES = 30; // ~500ms at 16ms/frame
+/** Cancellable retry state for perturbation shader compile wait */
+let perturbationRetryId: number | null = null;
 
-/** Retry perturbation GPU render until shader compiles (async KHR_parallel_shader_compile). */
-function tryPerturbationRender(
-  gpu: WebGLRenderer,
-  opts: GPURenderOptions,
-  onComplete?: (renderTime: number, backend: RenderBackend) => void,
-  attempt = 0
+function cancelPerturbationRetry(): void {
+  if (perturbationRetryId !== null) {
+    cancelAnimationFrame(perturbationRetryId);
+    perturbationRetryId = null;
+  }
+}
+
+/** DS GPU / CPU fallback when perturbation shader isn't ready yet. */
+function renderDsFallback(
+  canvas: HTMLCanvasElement, pool: WorkerPool | null,
+  gpu: WebGLRenderer, options: RenderOptions
 ): void {
   const t0 = performance.now();
-  if (gpu.render(opts)) {
+  const ok = gpu.render({
+    viewport: options.viewport,
+    fractalType: options.fractalType,
+    maxIterations: options.maxIterations,
+    coloringMode: options.coloringMode ?? 'classic',
+    interiorColoring: options.interiorColoring ?? false,
+    fractalParams: options.params,
+    ssaa: options.ssaa,
+  });
+  if (ok) {
     gpu.setVisible(true);
-    onComplete?.(performance.now() - t0, 'gpu');
+    options.onComplete?.(performance.now() - t0, 'gpu');
     return;
   }
-  if (attempt >= PERTURBATION_RENDER_MAX_RETRIES) {
-    console.warn('[perturbation] shader compile timeout — falling back');
-    onComplete?.(0, 'cpu');
-    return;
+  // GPU DS also not ready — CPU fallback
+  if (pool) {
+    renderWithPool({
+      canvas, pool,
+      viewport: options.viewport,
+      fractalType: options.fractalType,
+      maxIterations: options.maxIterations,
+      palette: options.palette,
+      params: options.params,
+      coloringMode: options.coloringMode,
+      interiorColoring: options.interiorColoring,
+      onProgress: options.onProgress,
+      onComplete: options.onComplete,
+    });
+  } else {
+    options.onComplete?.(0, 'cpu');
   }
-  requestAnimationFrame(() => tryPerturbationRender(gpu, opts, onComplete, attempt + 1));
 }
 
 export interface RenderOptions {
@@ -60,6 +85,42 @@ function getPrecisionMode(viewport: Viewport, fractalType: FractalType): Precisi
     ? 'perturbation' : 'doubleSingle';
 }
 
+/** Handle perturbation orbit result: GPU render → DS preview + upgrade loop. */
+function handleOrbitResult(
+  gpu: WebGLRenderer, orbitData: OrbitData,
+  canvas: HTMLCanvasElement, pool: WorkerPool | null, options: RenderOptions,
+  isStale: () => boolean
+): void {
+  const perturbOpts = {
+    viewport: options.viewport, fractalType: options.fractalType,
+    maxIterations: options.maxIterations,
+    coloringMode: options.coloringMode ?? 'classic' as const,
+    interiorColoring: options.interiorColoring ?? false,
+    fractalParams: options.params, ssaa: options.ssaa,
+    precision: 'perturbation' as const, orbitData,
+  };
+  const t0 = performance.now();
+  if (gpu.render(perturbOpts)) {
+    gpu.setVisible(true);
+    options.onComplete?.(performance.now() - t0, 'gpu');
+    return;
+  }
+  // Shader compiling — DS preview now, upgrade to perturbation when ready
+  gpu.setVisible(false);
+  renderDsFallback(canvas, pool, gpu, options);
+  let attempt = 0;
+  const tryUpgrade = () => {
+    if (isStale() || attempt++ > 120) return;
+    if (gpu.render(perturbOpts)) {
+      gpu.setVisible(true);
+      options.onComplete?.(performance.now() - t0, 'gpu');
+      return;
+    }
+    perturbationRetryId = requestAnimationFrame(tryUpgrade);
+  };
+  perturbationRetryId = requestAnimationFrame(tryUpgrade);
+}
+
 /**
  * Render a fractal to canvas.
  * If pool is provided, uses parallel workers.
@@ -71,37 +132,29 @@ export function renderFractal(
   gpuRenderer: WebGLRenderer | null,
   options: RenderOptions
 ): () => void {
-  // Perturbation path: async WASM orbit → GPU render (deep zoom on Mandelbrot/Julia)
   const precision = getPrecisionMode(options.viewport, options.fractalType);
 
   if (precision === 'perturbation' && gpuRenderer?.isReady()) {
     const refRe = options.zoomTargetRe ?? options.viewport.centerRe;
     const refIm = options.zoomTargetIm ?? options.viewport.centerIm;
+    let stale = false;
+    const isStale = () => stale;
 
     computeReferenceOrbit(
       refRe.toString(), refIm.toString(),
       options.maxIterations, options.viewport.scale.toString()
     ).then(({ data, length, cancelled }) => {
-      if (cancelled) return;
+      if (cancelled || stale) return;
       const orbitData: OrbitData = { data, length, refPointRe: refRe, refPointIm: refIm };
-      const renderOpts = {
-        viewport: options.viewport,
-        fractalType: options.fractalType,
-        maxIterations: options.maxIterations,
-        coloringMode: options.coloringMode ?? 'classic' as const,
-        interiorColoring: options.interiorColoring ?? false,
-        fractalParams: options.params,
-        ssaa: options.ssaa,
-        precision: 'perturbation' as const,
-        orbitData,
-      };
-      tryPerturbationRender(gpuRenderer, renderOpts, options.onComplete);
+      handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
     }).catch((err: unknown) => {
+      if (stale) return;
       console.warn('[perturbation] orbit failed:', String(err));
-      options.onComplete?.(0, 'cpu');
+      gpuRenderer.setVisible(false);
+      renderDsFallback(canvas, pool, gpuRenderer, options);
     });
 
-    return () => { cancelOrbit(); gpuRenderer.cancelPending(); };
+    return () => { stale = true; cancelOrbit(); cancelPerturbationRetry(); gpuRenderer.cancelPending(); };
   }
 
   // Try GPU path first
