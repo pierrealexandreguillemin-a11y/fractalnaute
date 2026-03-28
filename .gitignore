@@ -42,9 +42,11 @@ yarn-error.log*
 .vercel
 .playwright-mcp/
 
-# WASM build artifacts (source — pkg is rebuilt by wasm:build)
+# Rust/WASM build artifacts
+target/
 wasm/target/
 wasm/pkg/
+Cargo.lock
 # public/wasm/ is committed for Vercel deploy (no Rust on Vercel CI)
 
 # Worktrees
