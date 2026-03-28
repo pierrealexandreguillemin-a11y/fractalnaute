@@ -99,6 +99,8 @@ export const FractalExplorer: React.FC<FractalExplorerProps> = ({
           stats={stats}
           precisionMode={precisionMode}
           orbitComputing={state.orbitComputing}
+          orbitProgress={state.orbitProgress ?? 0}
+          maxIterations={state.maxIterations}
         />
       )}
       {showHelp && <HelpTooltip />}

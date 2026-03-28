@@ -13,6 +13,8 @@ interface InfoPanelProps {
   stats: RenderStats;
   precisionMode?: PrecisionMode;
   orbitComputing?: boolean;
+  orbitProgress?: number;
+  maxIterations?: number;
 }
 
 /** Format render time: <1ms shown as "<1ms", else rounded */
@@ -23,7 +25,9 @@ function formatRenderTime(ms: number): string {
   return `${Math.round(ms)}ms`;
 }
 
-export const InfoPanel: React.FC<InfoPanelProps> = ({ stats, precisionMode, orbitComputing }) => (
+export const InfoPanel: React.FC<InfoPanelProps> = ({
+  stats, precisionMode, orbitComputing, orbitProgress = 0, maxIterations = 256,
+}) => (
   <div
     className={cn(
       'absolute bottom-14 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto z-10 px-3 py-1.5 sm:px-4 sm:py-2',
@@ -44,9 +48,24 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ stats, precisionMode, orbi
       )}
       {precisionMode && <PrecisionBadge mode={precisionMode} />}
       {orbitComputing && (
-        <span className="text-xs opacity-60 animate-pulse" role="status" aria-label="Computing orbit">
-          Computing orbit...
-        </span>
+        <div
+          role="progressbar"
+          aria-valuenow={orbitProgress}
+          aria-valuemin={0}
+          aria-valuemax={maxIterations}
+          aria-label="Computing reference orbit"
+          className="flex items-center gap-1.5"
+        >
+          <div className="h-1 w-16 bg-muted-foreground/20 rounded overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-100"
+              style={{ width: `${Math.min(100, (orbitProgress / maxIterations) * 100)}%` }}
+            />
+          </div>
+          <span className="text-[9px] opacity-60">
+            {Math.round((orbitProgress / maxIterations) * 100)}%
+          </span>
+        </div>
       )}
     </div>
   </div>
@@ -84,7 +103,7 @@ const PrecisionBadge: React.FC<{ mode: PrecisionMode }> = ({ mode }) => (
     aria-live="polite"
     className="text-xs px-1.5 py-0.5 rounded border border-current opacity-60"
     title={mode === 'perturbation'
-      ? 'Deep zoom powered by perturbation theory' : undefined}
+      ? 'Deep zoom powered by perturbation theory — zoom deeper than 10⁻¹⁵ for fractal structures invisible at lower zoom' : undefined}
   >
     {precisionLabel(mode)}
   </span>

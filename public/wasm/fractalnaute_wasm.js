@@ -7,11 +7,10 @@
  *   `[orbit_length (as f32), cancelled_flag (0.0/1.0),`
  *   `Z_re, Z_im, Z'_re, Z'_im, ...]`
  *
- * **Cancel strategy** (ISO 9241-110: controllability):
- * Runtime cancel is handled by `Worker.terminate()` in `orbit.worker.ts`.
- * The `orbit.rs` layer accepts `AtomicI32` cancel/progress for unit testing;
- * here we pass inert locals. SAB-backed atomics are a future optimization
- * requiring `WebAssembly.Memory({shared: true})`.
+ * **Cancel/progress** (ISO 9241-110: controllability):
+ * `control_buf` is an `Int32Array` backed by `SharedArrayBuffer(8)`:
+ *   - offset 0: cancel flag (main thread writes 1 → Rust reads and aborts)
+ *   - offset 1: progress counter (Rust writes current iteration → main reads)
  *
  * # Errors
  *
@@ -21,9 +20,10 @@
  * @param {number} max_iter
  * @param {number} precision_bits
  * @param {string} scale_str
+ * @param {Int32Array} control_buf
  * @returns {Float32Array}
  */
-export function compute_reference_orbit(center_re, center_im, max_iter, precision_bits, scale_str) {
+export function compute_reference_orbit(center_re, center_im, max_iter, precision_bits, scale_str, control_buf) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passStringToWasm0(center_re, wasm.__wbindgen_export, wasm.__wbindgen_export2);
@@ -32,7 +32,7 @@ export function compute_reference_orbit(center_re, center_im, max_iter, precisio
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passStringToWasm0(scale_str, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len2 = WASM_VECTOR_LEN;
-        wasm.compute_reference_orbit(retptr, ptr0, len0, ptr1, len1, max_iter, precision_bits, ptr2, len2);
+        wasm.compute_reference_orbit(retptr, ptr0, len0, ptr1, len1, max_iter, precision_bits, ptr2, len2, addBorrowedObject(control_buf));
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -42,6 +42,7 @@ export function compute_reference_orbit(center_re, center_im, max_iter, precisio
         return takeObject(r0);
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
+        heap[stack_pointer++] = undefined;
     }
 }
 
@@ -85,6 +86,10 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_6ddd609b62940d55: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
+        __wbg_get_index_711482e792962f29: function(arg0, arg1) {
+            const ret = getObject(arg0)[arg1 >>> 0];
+            return ret;
+        },
         __wbg_length_259ee9d041e381ad: function(arg0) {
             const ret = getObject(arg0).length;
             return ret;
@@ -98,6 +103,9 @@ function __wbg_get_imports() {
         },
         __wbg_set_361bc2460da3016f: function(arg0, arg1, arg2) {
             getObject(arg0).set(getArrayF32FromWasm0(arg1, arg2));
+        },
+        __wbg_set_index_9067832dab4f23b8: function(arg0, arg1, arg2) {
+            getObject(arg0)[arg1 >>> 0] = arg2;
         },
         __wbg_set_index_f66997fc93f75edc: function(arg0, arg1, arg2) {
             getObject(arg0)[arg1 >>> 0] = arg2;
@@ -124,6 +132,12 @@ function addHeapObject(obj) {
 
     heap[idx] = obj;
     return idx;
+}
+
+function addBorrowedObject(obj) {
+    if (stack_pointer == 1) throw new Error('out of js stack');
+    heap[--stack_pointer] = obj;
+    return stack_pointer;
 }
 
 function dropObject(idx) {
@@ -209,6 +223,8 @@ function passStringToWasm0(arg, malloc, realloc) {
     WASM_VECTOR_LEN = offset;
     return ptr;
 }
+
+let stack_pointer = 1024;
 
 function takeObject(idx) {
     const ret = getObject(idx);

@@ -1,14 +1,15 @@
 /**
  * Dedicated Worker for WASM orbit computation.
+ * Receives SharedArrayBuffer for cancel/progress (SAB atomics).
  * Loads WASM lazily on first message.
- * Cancel = Worker.terminate() from main thread (wasmBridge.cancelOrbit).
  */
 
 interface WasmModule {
   default: () => Promise<void>;
   compute_reference_orbit(
     centerRe: string, centerIm: string,
-    maxIter: number, precisionBits: number, scaleStr: string
+    maxIter: number, precisionBits: number, scaleStr: string,
+    controlView: Int32Array
   ): Float32Array;
 }
 
@@ -19,7 +20,6 @@ const WASM_PATH = '/wasm/fractalnaute_wasm.js';
 
 async function loadWasm(): Promise<WasmModule> {
   if (wasmModule) return wasmModule;
-  // Dynamic import with runtime string — webpackIgnore prevents bundling
   const wasm = await (import(/* webpackIgnore: true */ WASM_PATH) as Promise<WasmModule>);
   await wasm.default();
   wasmModule = wasm;
@@ -29,11 +29,12 @@ async function loadWasm(): Promise<WasmModule> {
 self.addEventListener('message', (e: MessageEvent) => {
   if (e.data.type !== 'compute-orbit') return;
 
-  const { centerRe, centerIm, maxIter, scaleStr } = e.data;
+  const { centerRe, centerIm, maxIter, scaleStr, controlBuffer } = e.data;
+  const controlView = new Int32Array(controlBuffer as SharedArrayBuffer);
 
   loadWasm().then((wasm) => {
     const resultArray = wasm.compute_reference_orbit(
-      centerRe, centerIm, maxIter, 0, scaleStr
+      centerRe, centerIm, maxIter, 0, scaleStr, controlView
     );
 
     const orbitLength = Math.round(resultArray[0]!);

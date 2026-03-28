@@ -1,19 +1,29 @@
 /**
  * WASM Bridge — thin layer between JS and Rust perturbation module.
  * Lazy-loads WASM only when deep zoom is needed (scale < PERTURBATION_THRESHOLD).
- * Orbit computation runs in a dedicated Worker.
+ * Orbit computation runs in a dedicated Worker with SAB cancel/progress.
  *
- * Cancel architecture: Worker.terminate() for immediate cancel.
- * Progress: polled via postMessage between render cycles.
+ * Cancel architecture: SharedArrayBuffer(8) = [cancel_flag:i32, progress:i32]
+ * Same pattern as workerPool.ts (ISO 9241-110: controllability).
  */
 
 const PERTURBATION_THRESHOLD = 1e-13;
+/** ISO 25010 Performance: orbit computation timeout. */
 const ORBIT_TIMEOUT_MS = 10_000;
 
 let orbitWorker: Worker | null = null;
+let controlBuffer: SharedArrayBuffer | null = null;
+let controlView: Int32Array | null = null;
 
 function isWasmSupported(): boolean {
   return typeof WebAssembly !== 'undefined';
+}
+
+function ensureControlBuffer(): void {
+  if (!controlBuffer) {
+    controlBuffer = new SharedArrayBuffer(8);
+    controlView = new Int32Array(controlBuffer);
+  }
 }
 
 function createOrbitWorker(): Worker {
@@ -30,7 +40,17 @@ export function needsPerturbation(scale: number): boolean {
   return scale < PERTURBATION_THRESHOLD && isWasmSupported();
 }
 
+/** Read current orbit computation progress (0..maxIter). */
+export function getOrbitProgress(): number {
+  if (!controlView) return 0;
+  return Atomics.load(controlView, 1);
+}
+
+/** Cancel any in-progress orbit computation via SAB flag. */
 export function cancelOrbit(): void {
+  if (controlView) {
+    Atomics.store(controlView, 0, 1);
+  }
   if (orbitWorker) {
     orbitWorker.terminate();
     orbitWorker = null;
@@ -51,6 +71,11 @@ export function computeReferenceOrbit(
 ): Promise<OrbitResult> {
   return new Promise((resolve, reject) => {
     cancelOrbit();
+    ensureControlBuffer();
+
+    // Reset control buffer: cancel=0, progress=0
+    Atomics.store(controlView!, 0, 0);
+    Atomics.store(controlView!, 1, 0);
 
     let worker: Worker;
     try {
@@ -96,6 +121,7 @@ export function computeReferenceOrbit(
     worker.postMessage({
       type: 'compute-orbit',
       centerRe, centerIm, maxIter, scaleStr,
+      controlBuffer: controlBuffer!,
     });
   });
 }

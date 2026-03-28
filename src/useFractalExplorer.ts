@@ -9,7 +9,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import type { ThemeName, FractalType } from './domain';
 import { useFractalState, useCanvasEvents, useUrlSync, parseHash } from './application';
 import type { InitialFractalConfig } from './application';
-import { useRenderer, cancelOrbit, needsPerturbation } from './infrastructure';
+import { useRenderer, cancelOrbit, needsPerturbation, getOrbitProgress } from './infrastructure';
 import type { PrecisionMode } from './domain';
 
 interface UseFractalExplorerOptions extends InitialFractalConfig {
@@ -72,8 +72,22 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   const handleEscapeCancel = useCallback(() => {
     cancelOrbit();
     actions.setOrbitComputing(false);
+    actions.setOrbitProgress(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- actions callbacks are stable (useCallback with [])
   }, []);
+
+  // Poll orbit progress via SAB while computing (ISO 9241-110: self-descriptiveness)
+  useEffect(() => {
+    if (!state.orbitComputing) return;
+    let rafId: number;
+    const poll = () => {
+      actions.setOrbitProgress(getOrbitProgress());
+      rafId = requestAnimationFrame(poll);
+    };
+    rafId = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(rafId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- actions stable
+  }, [state.orbitComputing]);
 
   useCanvasEvents({
     canvasRef, viewport: state.viewport, fractalType: state.fractalType,

@@ -4,9 +4,7 @@
 mod orbit;
 mod precision;
 
-use std::sync::atomic::AtomicI32;
-
-use js_sys::Float32Array;
+use js_sys::{Float32Array, Int32Array};
 use wasm_bindgen::prelude::*;
 
 /// Compute Mandelbrot reference orbit at arbitrary precision.
@@ -15,11 +13,10 @@ use wasm_bindgen::prelude::*;
 ///   `[orbit_length (as f32), cancelled_flag (0.0/1.0),`
 ///   `Z_re, Z_im, Z'_re, Z'_im, ...]`
 ///
-/// **Cancel strategy** (ISO 9241-110: controllability):
-/// Runtime cancel is handled by `Worker.terminate()` in `orbit.worker.ts`.
-/// The `orbit.rs` layer accepts `AtomicI32` cancel/progress for unit testing;
-/// here we pass inert locals. SAB-backed atomics are a future optimization
-/// requiring `WebAssembly.Memory({shared: true})`.
+/// **Cancel/progress** (ISO 9241-110: controllability):
+/// `control_buf` is an `Int32Array` backed by `SharedArrayBuffer(8)`:
+///   - offset 0: cancel flag (main thread writes 1 → Rust reads and aborts)
+///   - offset 1: progress counter (Rust writes current iteration → main reads)
 ///
 /// # Errors
 ///
@@ -31,6 +28,7 @@ pub fn compute_reference_orbit(
     max_iter: u32,
     precision_bits: u32,
     scale_str: &str,
+    control_buf: &Int32Array,
 ) -> Result<Float32Array, JsValue> {
     let prec = if precision_bits == 0 {
         precision::bits_for_scale(scale_str)
@@ -39,9 +37,10 @@ pub fn compute_reference_orbit(
         precision_bits as usize
     };
 
-    // Inert cancel/progress — runtime cancel via Worker.terminate()
-    let cancel_flag = AtomicI32::new(0);
-    let progress = AtomicI32::new(0);
+    // Map SAB control buffer to cancel/progress atomics.
+    // Int32Array.get_index reads from SharedArrayBuffer (live, not snapshot).
+    let cancel_flag = orbit::SabControl::new(control_buf, 0);
+    let progress = orbit::SabControl::new(control_buf, 1);
 
     let result = orbit::compute_mandelbrot_orbit(
         center_re,

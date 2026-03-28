@@ -8,17 +8,16 @@
  *   `[orbit_length (as f32), cancelled_flag (0.0/1.0),`
  *   `Z_re, Z_im, Z'_re, Z'_im, ...]`
  *
- * **Cancel strategy** (ISO 9241-110: controllability):
- * Runtime cancel is handled by `Worker.terminate()` in `orbit.worker.ts`.
- * The `orbit.rs` layer accepts `AtomicI32` cancel/progress for unit testing;
- * here we pass inert locals. SAB-backed atomics are a future optimization
- * requiring `WebAssembly.Memory({shared: true})`.
+ * **Cancel/progress** (ISO 9241-110: controllability):
+ * `control_buf` is an `Int32Array` backed by `SharedArrayBuffer(8)`:
+ *   - offset 0: cancel flag (main thread writes 1 → Rust reads and aborts)
+ *   - offset 1: progress counter (Rust writes current iteration → main reads)
  *
  * # Errors
  *
  * Returns `JsValue` error if coordinate parsing or precision scaling fails.
  */
-export function compute_reference_orbit(center_re: string, center_im: string, max_iter: number, precision_bits: number, scale_str: string): Float32Array;
+export function compute_reference_orbit(center_re: string, center_im: string, max_iter: number, precision_bits: number, scale_str: string, control_buf: Int32Array): Float32Array;
 
 /**
  * Smoke test: verify astro-float precision at given bits.
@@ -33,7 +32,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly compute_reference_orbit: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+    readonly compute_reference_orbit: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
     readonly verify_precision: (a: number, b: number) => void;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
     readonly __wbindgen_export: (a: number, b: number) => number;

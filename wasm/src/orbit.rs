@@ -8,6 +8,35 @@ const RM: RoundingMode = RoundingMode::ToEven;
 const BAILOUT_SQ: f64 = 4.0;
 const CANCEL_CHECK_INTERVAL: u32 = 1024;
 
+/// Abstraction for cancel/progress signals.
+/// `AtomicI32` for native tests, `SabControl` for WASM runtime (SAB-backed).
+pub trait ControlSignal {
+    fn load(&self) -> i32;
+    fn store(&self, val: i32);
+}
+
+impl ControlSignal for AtomicI32 {
+    fn load(&self) -> i32 { AtomicI32::load(self, Ordering::Relaxed) }
+    fn store(&self, val: i32) { AtomicI32::store(self, val, Ordering::Relaxed); }
+}
+
+/// SAB-backed control signal — reads/writes `Int32Array[offset]` live.
+pub struct SabControl<'a> {
+    buf: &'a js_sys::Int32Array,
+    offset: u32,
+}
+
+impl<'a> SabControl<'a> {
+    pub fn new(buf: &'a js_sys::Int32Array, offset: u32) -> Self {
+        Self { buf, offset }
+    }
+}
+
+impl ControlSignal for SabControl<'_> {
+    fn load(&self) -> i32 { self.buf.get_index(self.offset) }
+    fn store(&self, val: i32) { self.buf.set_index(self.offset, val); }
+}
+
 /// Result of a reference orbit computation.
 pub enum OrbitResult {
     /// Orbit completed normally (data, iteration count).
@@ -28,7 +57,7 @@ pub enum OrbitResult {
 /// Critical: orbit MUST start at `Z_0 = 0` (Series Approximation
 /// depends on complete orbit from origin).
 ///
-/// Cancel/progress via `SharedArrayBuffer` atomics:
+/// Cancel/progress via `ControlSignal` trait:
 /// - `cancel_flag`: 0 = continue, nonzero = abort
 /// - `progress`: updated every `CANCEL_CHECK_INTERVAL` iterations
 ///
@@ -41,8 +70,8 @@ pub fn compute_mandelbrot_orbit(
     c_im_str: &str,
     max_iter: u32,
     precision_bits: usize,
-    cancel_flag: &AtomicI32,
-    progress: &AtomicI32,
+    cancel_flag: &dyn ControlSignal,
+    progress: &dyn ControlSignal,
 ) -> Result<OrbitResult, String> {
     let prec = precision_bits;
 
@@ -66,11 +95,11 @@ pub fn compute_mandelbrot_orbit(
 
     for i in 0..max_iter {
         if i % CANCEL_CHECK_INTERVAL == 0 {
-            if cancel_flag.load(Ordering::Relaxed) != 0 {
+            if cancel_flag.load() != 0 {
                 return Ok(OrbitResult::Cancelled(orbit, actual_length));
             }
             #[allow(clippy::cast_possible_wrap)]
-            progress.store(i as i32, Ordering::Relaxed);
+            progress.store(i as i32);
         }
 
         orbit.push(to_f32(&z_re));
@@ -110,7 +139,7 @@ pub fn compute_mandelbrot_orbit(
     }
 
     #[allow(clippy::cast_possible_wrap)]
-    progress.store(actual_length as i32, Ordering::Relaxed);
+    progress.store(actual_length as i32);
     Ok(OrbitResult::Complete(orbit, actual_length))
 }
 
@@ -231,7 +260,7 @@ mod tests {
             "0", "0", 5000, 128, &cancel, &progress,
         )
         .unwrap();
-        let final_progress = progress.load(Ordering::Relaxed);
+        let final_progress = AtomicI32::load(&progress, Ordering::Relaxed);
         assert!(
             final_progress >= 4096,
             "progress should reach at least 4096 for 5000-iter orbit, got {final_progress}"

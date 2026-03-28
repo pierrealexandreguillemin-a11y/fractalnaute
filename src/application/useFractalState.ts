@@ -43,6 +43,7 @@ interface FractalState {
   ssaa: boolean;
   precisionMode: PrecisionMode;
   orbitComputing: boolean;
+  orbitProgress: number;
 }
 
 /** Action types */
@@ -62,6 +63,7 @@ type FractalAction =
   | { type: 'SET_SSAA'; enabled: boolean }
   | { type: 'SET_PRECISION_MODE'; mode: PrecisionMode }
   | { type: 'SET_ORBIT_COMPUTING'; computing: boolean }
+  | { type: 'SET_ORBIT_PROGRESS'; progress: number }
   | { type: 'APPLY_CONFIG'; config: InitialFractalConfig };
 
 /** Initial state */
@@ -80,7 +82,8 @@ const initialState: FractalState = {
   renderBackend: null,
   ssaa: false,
   precisionMode: 'float32' as PrecisionMode,
-  orbitComputing: false
+  orbitComputing: false,
+  orbitProgress: 0
 };
 
 /** Handle SET_RENDERING — extracted to stay under complexity limit */
@@ -166,6 +169,8 @@ function reducerExtras(state: FractalState, action: FractalAction): FractalState
       return { ...state, precisionMode: action.mode };
     case 'SET_ORBIT_COMPUTING':
       return { ...state, orbitComputing: action.computing };
+    case 'SET_ORBIT_PROGRESS':
+      return { ...state, orbitProgress: action.progress };
     case 'APPLY_CONFIG': {
       let s = state;
       const c = action.config;
@@ -313,12 +318,10 @@ export function useFractalState(initial?: InitialFractalConfig) {
     dispatch({ type: 'SET_INTERIOR_COLORING', enabled });
   }, []);
 
-  const setSSAA = useCallback((enabled: boolean) => {
-    dispatch({ type: 'SET_SSAA', enabled });
-  }, []);
-
+  const setSSAA = useCallback((enabled: boolean) => dispatch({ type: 'SET_SSAA', enabled }), []);
   const setPrecisionMode = useCallback((mode: PrecisionMode) => dispatch({ type: 'SET_PRECISION_MODE', mode }), []);
   const setOrbitComputing = useCallback((computing: boolean) => dispatch({ type: 'SET_ORBIT_COMPUTING', computing }), []);
+  const setOrbitProgress = useCallback((progress: number) => dispatch({ type: 'SET_ORBIT_PROGRESS', progress }), []);
   const applyConfig = useCallback((config: InitialFractalConfig) => dispatch({ type: 'APPLY_CONFIG', config }), []);
 
   // Computed stats
@@ -354,6 +357,7 @@ export function useFractalState(initial?: InitialFractalConfig) {
       setSSAA,
       setPrecisionMode,
       setOrbitComputing,
+      setOrbitProgress,
       applyConfig
     }
   };

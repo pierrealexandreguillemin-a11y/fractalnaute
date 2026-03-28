@@ -2,16 +2,23 @@
 
 echo "=== Pre-push quality gate ==="
 
-echo "[1/4] TypeScript type check..."
+echo "[1/5] TypeScript type check..."
 npx tsc --noEmit || exit 1
 
-echo "[2/4] ESLint full project — zero warnings..."
+echo "[2/5] ESLint full project — zero warnings..."
 npx eslint src app --max-warnings 0 || exit 1
 
-echo "[3/4] Production build..."
+echo "[3/5] Production build..."
 npm run build || exit 1
 
-echo "[4/4] npm audit..."
+echo "[4/5] cargo audit (ISO 27001)..."
+if command -v cargo-audit >/dev/null 2>&1; then
+  cargo audit --file wasm/Cargo.lock || exit 1
+else
+  echo "  cargo-audit not installed — skipping (install: cargo install cargo-audit)"
+fi
+
+echo "[5/5] npm audit..."
 npm audit --json 2>/dev/null | node -e "
   let d='';
   process.stdin.on('data',c=>d+=c);
