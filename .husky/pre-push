@@ -13,7 +13,7 @@ npm run build || exit 1
 
 echo "[4/5] cargo audit (ISO 27001)..."
 if command -v cargo-audit >/dev/null 2>&1; then
-  cargo audit --file wasm/Cargo.lock || exit 1
+  cargo audit --file Cargo.lock || exit 1
 else
   echo "  cargo-audit not installed — skipping (install: cargo install cargo-audit)"
 fi
