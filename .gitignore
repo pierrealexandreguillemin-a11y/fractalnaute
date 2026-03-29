@@ -46,8 +46,8 @@ yarn-error.log*
 target/
 wasm/target/
 wasm/pkg/
-Cargo.lock
 # public/wasm/ is committed for Vercel deploy (no Rust on Vercel CI)
+# Cargo.lock committed for cargo audit (ISO 27001) + reproducible WASM builds
 
 # Playwright
 test-results/
