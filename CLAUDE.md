@@ -127,52 +127,39 @@ grep -r @tradeoff src/
 8. ~~Perturbation theory v1~~ — Rust/WASM dashu-float orbit + GPU perturbation shader.
    Mandelbrot + Julia. Zoom 10^-40+ verified. SAB cancel/progress, WCAG progressbar.
    Measured: orbit ~1s @256iter, GPU ~50ms, total <1.5s. Plans A+B complete.
+9. ~~Precision ladder~~ — DD (2xf64, 0.03ms), QD (4xf64, 0.26ms), ArbFloat fallback.
+   OrbitFloat trait (DRY). Orbit no longer bottleneck (<1ms). GPU render (~50ms) = new bottleneck.
 
-### Next (ordre par dependances)
+### Next (ordre par impact perf)
 
-Phases ordonnees : correctness → perceived speed → real speed → polish.
+Post-precision-ladder : orbite <1ms, GPU ~50ms = nouveau bottleneck.
 
-#### Phase C: Perturbation correctness
+#### Phase C: Perturbation correctness — DONE (rebasing)
 
-| # | Feature | Gain | Effort | Reference |
+~~C1/C2~~ : rebasing Heiland-Allen dans le shader GLSL gere la detection de glitch
+implicitement (spec §2: "Rebasing eliminates multi-reference entirely").
+Grid search inutile avec rebasing.
+
+#### Phase D: Perceived speed — DEPRIORITISE
+
+| # | Feature | Gain | Effort | Status |
 |---|---|---|---|---|
-| C1 | **Glitch detection** | Correct deep zoom images | 1 sem | deep-mandelbrot, Pauldelbrot |
-| C2 | **Reference point selection** | Fewer glitches, better images | 1 sem | deep-mandelbrot (12×12 grid) |
+| D1 | **Progressive orbit** | <200ms to first visual | 1 sem | **Deprioritise** |
 
-##### C1. Glitch detection — auto re-reference
-- Detect bad reference: |δ_n| > |Z_n| threshold → pixel is "glitched"
-- Two strategies: (a) mark + re-render with new reference, (b) multi-reference
-- Sans ca: artefacts visibles aux mini-Mandelbrots en deep zoom
-- Reference: Pauldelbrot method, deep-mandelbrot implementation
-
-##### C2. Reference point selection — grid search
-- Logarithmic grid (12×12, 15 iter) to find optimal reference point
-- Current: viewport center. Problem: center can be in the set → orbit escapes late → waste
-- deep-mandelbrot approach: pick reference that escapes latest (most orbit data)
-- Can combine with glitch detection for iterative refinement
-
-#### Phase D: Perceived speed
-
-| # | Feature | Gain | Effort | Reference |
-|---|---|---|---|---|
-| D1 | **Progressive orbit** | <200ms to first visual | 1 sem | mandelbrot.page |
-
-##### D1. Progressive orbit — render partial, refine
-- Render with partial orbit during WASM computation, re-render when complete
-- Start at low maxIter (64), render instant, double in background (128→256→512→...)
-- Combined with cycle detection for early termination of converged pixels
-- Masque la latence orbit (~1s) sans optimiser le calcul lui-meme
-- Reference: mandelbrot.page — progressive + cycle detection
+D1 masquerait une latence orbit qui n'existe plus (<1ms avec DD/QD).
+Utile uniquement pour iterations elevees (10K+) ou ArbFloat (10^-80+, ~5ms).
+Reprioritiser si un nouveau bottleneck apparait.
 
 #### Phase E: Real speed
 
-| # | Feature | Gain | Effort | Reference |
+| # | Feature | Gain | Effort | Status |
 |---|---|---|---|---|
-| E1 | **Orbit perf (binary arithmetic)** | 10-100x orbit speedup | 2 sem | Jampary, dashu FBig |
-| E2 | **Series Approximation (SA)** | 5-10x deep zoom speedup | 3 sem | deep-mandelbrot |
+| ~~E1~~ | ~~Orbit perf (DD/QD)~~ | ~~100-1000x~~ | ~~2 sem~~ | **DONE** (precision ladder) |
+| E2 | **Series Approximation (SA)** | GPU 50ms → <5ms | 3 sem | **NEXT** |
 
-##### E1. Orbit performance — binary arithmetic
-- Current: dashu-float DBig (decimal) avec trunc() par op. ~1s @256iter.
+##### ~~E1. Orbit performance — DONE~~
+- Precision ladder: DD 0.03ms, QD 0.26ms, ArbFloat 5.28ms @256iter.
+- Orbite n'est plus le bottleneck. GPU render (~50ms) est le nouveau bottleneck.
 - Options: (a) dashu FBig (binary), (b) Jampary float expansion (double-double chains),
   (c) GMP/MPFR via wasm (complexe mais reference standard)
 - Binary arithmetic est 10-100x plus rapide que decimal pour meme precision
