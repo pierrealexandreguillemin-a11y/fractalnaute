@@ -20,9 +20,9 @@
 export function compute_reference_orbit(center_re: string, center_im: string, max_iter: number, precision_bits: number, scale_str: string, control_buf: Int32Array): Float32Array;
 
 /**
- * Smoke test: verify dashu-float precision at given bits.
+ * Smoke test: verify `ArbFloat` precision at given bits.
  *
- * Parses a known value and returns its string representation.
+ * Parses a known value of π and returns its f64 representation.
  *
  * # Errors
  *

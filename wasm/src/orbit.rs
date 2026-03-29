@@ -248,4 +248,90 @@ mod tests {
         let result = compute_orbit::<DD>("not_a_number", "0", 100, 106, &cancel, &prog);
         assert!(result.is_err(), "invalid input should return Err");
     }
+
+    // ── Cross-validation tests: DD / QD / ArbFloat ───────────────────────────
+
+    use crate::arb::ArbFloat;
+    use crate::qd::QD;
+
+    #[test]
+    fn dd_matches_qd_at_boundary() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let (dd_data, dd_len) = match compute_orbit::<DD>(
+            "-0.7436438885706", "0.1318259043124", 256, 106, &cancel, &prog
+        ).unwrap() {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("dd cancelled"),
+        };
+        let cancel2 = no_cancel();
+        let prog2 = progress_sink();
+        let (qd_data, qd_len) = match compute_orbit::<QD>(
+            "-0.7436438885706", "0.1318259043124", 256, 106, &cancel2, &prog2
+        ).unwrap() {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("qd cancelled"),
+        };
+        assert_eq!(dd_len, qd_len, "orbit length mismatch DD vs QD");
+        // f32 outputs should match since both parse from same f64
+        for i in 0..(dd_len as usize).min(50) {
+            let dd_re = dd_data[i * 4];
+            let qd_re = qd_data[i * 4];
+            assert!(
+                (dd_re - qd_re).abs() < 1e-5,
+                "DD vs QD mismatch at iter {i}: dd={dd_re}, qd={qd_re}"
+            );
+        }
+    }
+
+    #[test]
+    fn qd_matches_arb_at_deep_zoom() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let (qd_data, qd_len) = match compute_orbit::<QD>(
+            "-0.74364388857069515983120689393512312412",
+            "0.13182590431243590778813628973715582882",
+            256, 200, &cancel, &prog
+        ).unwrap() {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("qd cancelled"),
+        };
+        let cancel2 = no_cancel();
+        let prog2 = progress_sink();
+        let (arb_data, arb_len) = match compute_orbit::<ArbFloat>(
+            "-0.74364388857069515983120689393512312412",
+            "0.13182590431243590778813628973715582882",
+            256, 200, &cancel2, &prog2
+        ).unwrap() {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("arb cancelled"),
+        };
+        assert_eq!(qd_len, arb_len, "orbit length mismatch QD vs ArbFloat");
+        for i in 0..(qd_len as usize).min(50) {
+            let qd_re = qd_data[i * 4];
+            let arb_re = arb_data[i * 4];
+            assert!(
+                (qd_re - arb_re).abs() < 1e-4,
+                "QD vs ArbFloat mismatch at iter {i}: qd={qd_re}, arb={arb_re}"
+            );
+        }
+    }
+
+    #[test]
+    fn qd_orbit_deep_zoom_10_40() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let prec = crate::precision::bits_for_scale("1e-40").unwrap();
+        assert!(prec >= 196);
+        let (data, len) = match compute_orbit::<QD>(
+            "-0.74364388857069515983120689393512312412",
+            "0.13182590431243590778813628973715582882",
+            256, prec, &cancel, &prog
+        ).unwrap() {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("cancelled"),
+        };
+        assert!(len > 10, "deep zoom should iterate, got {len}");
+        assert!((data[4] - (-0.7436_f32)).abs() < 0.01, "z1_re: {}", data[4]);
+    }
 }

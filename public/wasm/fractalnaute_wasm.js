@@ -47,9 +47,9 @@ export function compute_reference_orbit(center_re, center_im, max_iter, precisio
 }
 
 /**
- * Smoke test: verify dashu-float precision at given bits.
+ * Smoke test: verify `ArbFloat` precision at given bits.
  *
- * Parses a known value and returns its string representation.
+ * Parses a known value of π and returns its f64 representation.
  *
  * # Errors
  *

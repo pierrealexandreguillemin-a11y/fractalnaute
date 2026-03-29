@@ -107,12 +107,20 @@ impl OrbitFloat for ArbFloat {
     }
 
     fn to_f64(&self) -> f64 {
-        self.inner.to_f64().value()
+        // Format as decimal string then parse as f64.
+        // Direct DBig::to_f64() has a debug_assert that fires when the
+        // decimal significand has more than 53 binary bits (dashu bug on
+        // small-exponent base-10→base-2 conversion path).
+        // @tradeoff String round-trip is ~200ns but only called at f32 output
+        // (once per iteration for orbit pushes); hot path is the arithmetic.
+        format!("{}", self.inner)
+            .parse::<f64>()
+            .unwrap_or(0.0)
     }
 
     #[allow(clippy::cast_possible_truncation)]
     fn to_f32(&self) -> f32 {
-        let f = self.inner.to_f64().value() as f32;
+        let f = self.to_f64() as f32;
         if f.is_finite() { f } else { 0.0_f32 }
     }
 
