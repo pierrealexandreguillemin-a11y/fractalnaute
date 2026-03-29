@@ -317,6 +317,68 @@ mod tests {
         }
     }
 
+    /// Regression: Misiurewicz boundary point with z1_re AND z1_im assertions.
+    /// (Lost from old orbit.rs — `orbit_at_mandelbrot_boundary_should_not_escape_early`)
+    #[test]
+    fn dd_orbit_misiurewicz_boundary_z1_check() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let prec = crate::precision::bits_for_scale("1e-14").expect("scale");
+        assert_eq!(prec, 111);
+        let (data, len) = match compute_orbit::<QD>(
+            "-0.7436438885706", "0.1318259043124", 256, prec, &cancel, &prog
+        ).expect("ok") {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("cancelled"),
+        };
+        assert!(len > 10, "boundary should not escape early: {len}");
+        let z1_re = data[4];
+        let z1_im = data[5];
+        assert!(
+            (z1_re - (-0.7436_f32)).abs() < 0.01,
+            "z1_re should be ~c_re, got {z1_re}"
+        );
+        assert!(
+            (z1_im - 0.1318_f32).abs() < 0.01,
+            "z1_im should be ~c_im, got {z1_im}"
+        );
+    }
+
+    /// Regression: ArbFloat orbit at deep zoom 10^-40.
+    /// (Lost from old orbit.rs — `orbit_correct_at_very_deep_zoom`)
+    #[test]
+    fn arb_orbit_deep_zoom_10_40() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let prec = crate::precision::bits_for_scale("1e-40").expect("scale");
+        assert!(prec >= 196, "expected >=196 bits for 1e-40, got {prec}");
+        let (data, len) = match compute_orbit::<ArbFloat>(
+            "-0.74364388857069515983120689393512312412",
+            "0.13182590431243590778813628973715582882",
+            256, prec, &cancel, &prog
+        ).expect("ok") {
+            OrbitResult::Complete(d, l) => (d, l),
+            _ => panic!("cancelled"),
+        };
+        assert!(len > 10, "deep zoom should iterate, got {len}");
+        assert!(
+            (data[4] - (-0.7436_f32)).abs() < 0.01,
+            "z1_re at deep zoom should be ~c_re, got {}", data[4]
+        );
+    }
+
+    /// Regression: parse_decimal + to_f64 roundtrip.
+    /// (Lost from old orbit.rs — `to_f64_of_parsed_decimal`)
+    #[test]
+    fn arb_parse_to_f64_roundtrip() {
+        let v = ArbFloat::parse_decimal("-0.7436438885706", 128).expect("parse");
+        let f = v.to_f64();
+        assert!(
+            (f - (-0.7436438885706_f64)).abs() < 1e-10,
+            "to_f64 should return ~-0.7436, got {f}"
+        );
+    }
+
     #[test]
     fn qd_orbit_deep_zoom_10_40() {
         let cancel = no_cancel();

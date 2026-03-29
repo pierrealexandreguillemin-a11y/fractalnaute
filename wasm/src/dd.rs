@@ -266,6 +266,23 @@ mod tests {
     }
 
     #[test]
+    fn dd_to_f64_zero() {
+        assert!(DD::zero().to_f64().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn dd_to_f64_negative() {
+        let v = DD::parse_decimal("-2.5", 106).expect("parse");
+        assert!((v.to_f64() - (-2.5)).abs() < 1e-14, "got {}", v.to_f64());
+    }
+
+    #[test]
+    fn dd_to_f32_roundtrip() {
+        let v = DD::parse_decimal("1.5", 106).expect("parse");
+        assert!((v.to_f32() - 1.5_f32).abs() < 1e-5, "got {}", v.to_f32());
+    }
+
+    #[test]
     fn dd_zero_one_two() {
         let zero = DD::zero();
         assert_eq!(zero.hi, 0.0);

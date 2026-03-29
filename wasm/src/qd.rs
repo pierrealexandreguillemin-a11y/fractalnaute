@@ -165,6 +165,9 @@ impl OrbitFloat for QD {
         let f = self.0 as f32;
         if f.is_finite() { f } else { 0.0_f32 }
     }
+    /// @tradeoff QD uses f64 parsing for center coordinates (same as DD).
+    /// Sufficient because JS sends f64-precision strings. QD arithmetic
+    /// (212 bits) keeps the orbit accurate during iteration.
     fn parse_decimal(s: &str, _precision_bits: usize) -> Result<Self, String> {
         let hi: f64 = s.parse().map_err(|e| format!("QD parse error '{s}': {e}"))?;
         if !hi.is_finite() { return Err(format!("QD parsed non-finite: {hi}")); }

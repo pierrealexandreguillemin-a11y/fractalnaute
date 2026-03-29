@@ -113,6 +113,9 @@ impl OrbitFloat for ArbFloat {
         // small-exponent base-10→base-2 conversion path).
         // @tradeoff String round-trip is ~200ns but only called at f32 output
         // (once per iteration for orbit pushes); hot path is the arithmetic.
+        // parse::<f64> is infallible for well-formed decimal output from DBig.
+        // unwrap_or(0.0) handles the impossible case (ISO 5055 reliability:
+        // no panic in WASM, deny(clippy::unwrap_used) prevents .unwrap()).
         format!("{}", self.inner)
             .parse::<f64>()
             .unwrap_or(0.0)
@@ -177,5 +180,40 @@ mod tests {
     fn arb_parse_invalid() {
         let result = ArbFloat::parse_decimal("not_a_number", 128);
         assert!(result.is_err());
+    }
+
+    // ── Regression tests (lost from old precision.rs) ─────────────────────
+
+    #[test]
+    fn arb_to_f64_zero() {
+        let v = ArbFloat::parse_decimal("0", 128).expect("parse");
+        assert!(v.to_f64().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn arb_to_f64_negative() {
+        let v = ArbFloat::parse_decimal("-2.5", 128).expect("parse");
+        assert!((v.to_f64() - (-2.5)).abs() < 1e-14, "got {}", v.to_f64());
+    }
+
+    #[test]
+    fn arb_to_f32_roundtrip() {
+        let v = ArbFloat::parse_decimal("1.5", 128).expect("parse");
+        let f = v.to_f32();
+        assert!((f - 1.5_f32).abs() < 1e-5, "expected 1.5, got {f}");
+    }
+
+    #[test]
+    fn arb_to_f64_roundtrip() {
+        let v = ArbFloat::parse_decimal("3.14159265358979", 128).expect("parse");
+        let f = v.to_f64();
+        assert!((f - 3.14159265358979).abs() < 1e-14, "got {f}");
+    }
+
+    #[test]
+    fn arb_zero_one_two() {
+        assert!(ArbFloat::zero().to_f64().abs() < f64::EPSILON);
+        assert!((ArbFloat::one().to_f64() - 1.0).abs() < f64::EPSILON);
+        assert!((ArbFloat::two().to_f64() - 2.0).abs() < f64::EPSILON);
     }
 }
