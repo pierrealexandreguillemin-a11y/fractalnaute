@@ -160,16 +160,30 @@ Reprioritiser si un nouveau bottleneck apparait.
 ##### ~~E1. Orbit performance — DONE~~
 - Precision ladder: DD 0.03ms, QD 0.26ms, ArbFloat 5.28ms @256iter.
 - Orbite n'est plus le bottleneck. GPU render (~50ms) est le nouveau bottleneck.
-- Options: (a) dashu FBig (binary), (b) Jampary float expansion (double-double chains),
-  (c) GMP/MPFR via wasm (complexe mais reference standard)
-- Binary arithmetic est 10-100x plus rapide que decimal pour meme precision
-- @tradeoff actuel: DBig choisi pour simplicite API, pas pour perf
+- Spec: `docs/superpowers/specs/2026-03-29-precision-ladder-design.md`
+- Plan: `docs/superpowers/plans/2026-03-29-precision-ladder.md`
 
-##### E2. Series Approximation (SA)
-- Polynomes A_n, B_n, C_n calcules en Rust sur l'orbite de reference
-- GPU skip iterations via coefficients precomputes
-- Expected: 5-10x speedup at deep zoom (skip 90%+ des iterations)
-- Prerequis: orbite correcte (glitch detection), idealement orbite rapide
+##### E2. GPU perturbation render optimization — **NEXT**
+
+Bottleneck identifie : perturbation GPU = 50ms vs 0.03ms standard (1600x plus lent).
+Cause probable : 256 iter x 921K pixels = 236M texelFetch sur orbit texture.
+Recherche exhaustive (27 categories, 50+ sources) — resultats classes par impact :
+
+| # | Technique | Impact | Effort | Reference |
+|---|---|---|---|---|
+| E2a | **Orbit uniform array** | 50ms→10-15ms | 1 sem | WebGL2 256 vec4 uniforms = registres vs texelFetch |
+| E2b | **BLA (Bivariate Linear Approximation)** | 10ms→1-3ms | 3-4 sem | philthompson.me 2023, 10-36x vs SA classique |
+| E2c | **Ping-pong multi-frame** | <1ms first visible | 1 sem | Split budget iterations par frame, FBO existant |
+| E2d | **SA classique** | 2-3x additionnel | 2-3 sem | Supersede par BLA dans la plupart des cas |
+
+Techniques eliminees (avec justification mathematique) :
+- Matrix exponentiation : z^2+c est quadratique, pas lineaire
+- Parareal : iteration chaotique, coarse solver inutile
+- Neural surrogates : frontiere fractale = frequence infinie, NN ne peut pas representer
+- Periodicity GPU : divergence warp annule le gain (deja documente)
+- Workgroup shared memory : pas disponible en WebGL 2 (WebGPU requis)
+
+Ordre d'execution : E2a (tester hypothese texelFetch) → E2b (BLA) → E2c (ping-pong)
 
 #### Phase F: Polish & features
 
