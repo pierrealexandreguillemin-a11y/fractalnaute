@@ -2,6 +2,9 @@ use std::f64::consts::LOG10_2;
 
 use dashu_float::DBig;
 
+use crate::control::ControlSignal;
+use crate::orbit::OrbitResult;
+
 const PRECISION_MARGIN: usize = 64;
 
 /// Compute required precision bits for a given zoom scale.
@@ -80,6 +83,99 @@ pub fn to_f64(val: &DBig) -> f64 {
 pub fn to_f32(val: &DBig) -> f32 {
     let f = val.to_f64().value() as f32;
     if f.is_finite() { f } else { 0.0_f32 }
+}
+
+/// Compute Mandelbrot reference orbit at arbitrary precision (dashu-based).
+///
+/// Temporary home while the generic `OrbitFloat` pipeline (Task 5) is built.
+/// Will be replaced by `orbit_generic::compute_orbit::<ArbFloat>(...)` in Task 6.
+///
+/// Returns flat `[z_re, z_im, dz_re, dz_im, ...]` as f32 values.
+///
+/// Mathematical formulas (uppercase Z for reference orbit):
+///
+/// - `Z_{n+1} = Z_n^2 + C`
+/// - `Z'_{n+1} = 2 * Z_n * Z'_n + 1`
+///
+/// Critical: orbit MUST start at `Z_0 = 0` (Series Approximation depends on
+/// complete orbit from origin).
+///
+/// # Errors
+///
+/// Returns `Err` if the center coordinate strings cannot be parsed.
+#[allow(clippy::similar_names)]
+pub fn compute_mandelbrot_orbit(
+    c_re_str: &str,
+    c_im_str: &str,
+    max_iter: u32,
+    precision_bits: usize,
+    cancel_flag: &dyn ControlSignal,
+    progress: &dyn ControlSignal,
+) -> Result<OrbitResult, String> {
+    const BAILOUT_SQ: f64 = 4.0;
+    const CANCEL_CHECK_INTERVAL: u32 = 1024;
+
+    let digits = bits_to_digits(precision_bits);
+
+    let center_re = trunc(parse_decimal(c_re_str)?, digits);
+    let center_im = trunc(parse_decimal(c_im_str)?, digits);
+
+    let one = dbig_one();
+    let two = dbig_two();
+
+    let mut z_re = dbig_zero();
+    let mut z_im = dbig_zero();
+    let mut dz_re = dbig_zero();
+    let mut dz_im = dbig_zero();
+
+    let capacity = (max_iter as usize)
+        .checked_mul(4)
+        .ok_or_else(|| format!("max_iter {max_iter} too large for orbit allocation"))?;
+    let mut orbit = Vec::with_capacity(capacity);
+    let mut actual_length: u32 = 0;
+
+    for i in 0..max_iter {
+        if i % CANCEL_CHECK_INTERVAL == 0 {
+            if cancel_flag.load() != 0 {
+                return Ok(OrbitResult::Cancelled(orbit, actual_length));
+            }
+            #[allow(clippy::cast_possible_wrap)]
+            progress.store(i as i32);
+        }
+
+        orbit.push(to_f32(&z_re));
+        orbit.push(to_f32(&z_im));
+        orbit.push(to_f32(&dz_re));
+        orbit.push(to_f32(&dz_im));
+        actual_length += 1;
+
+        let zr_f64 = to_f64(&z_re);
+        let zi_f64 = to_f64(&z_im);
+        if zr_f64 * zr_f64 + zi_f64 * zi_f64 > BAILOUT_SQ {
+            break;
+        }
+
+        // Derivative: Z'_{n+1} = 2 * Z_n * Z'_n + 1
+        // Real part: 2*(zr*dzr - zi*dzi) + 1
+        // Imag part: 2*(zr*dzi + zi*dzr)
+        let prod_rr = trunc(&z_re * &dz_re, digits);
+        let prod_ii = trunc(&z_im * &dz_im, digits);
+        let prod_ri = trunc(&z_re * &dz_im, digits);
+        let prod_ir = trunc(&z_im * &dz_re, digits);
+        dz_re = trunc(&two * &trunc(&prod_rr - &prod_ii, digits) + &one, digits);
+        dz_im = trunc(&two * &trunc(&prod_ri + &prod_ir, digits), digits);
+
+        // Iteration: Z_{n+1} = Z_n^2 + C
+        let zr_sq = trunc(&z_re * &z_re, digits);
+        let zi_sq = trunc(&z_im * &z_im, digits);
+        let two_zr_zi = trunc(&two * &trunc(&z_re * &z_im, digits), digits);
+        z_re = trunc(&trunc(&zr_sq - &zi_sq, digits) + &center_re, digits);
+        z_im = trunc(&two_zr_zi + &center_im, digits);
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    progress.store(actual_length as i32);
+    Ok(OrbitResult::Complete(orbit, actual_length))
 }
 
 #[cfg(test)]

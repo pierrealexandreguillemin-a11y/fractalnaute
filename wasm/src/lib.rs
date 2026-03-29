@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod control;
+mod dd;
 mod orbit;
 mod precision;
 
@@ -43,7 +44,7 @@ pub fn compute_reference_orbit(
     let cancel_flag = control::SabControl::new(control_buf, 0);
     let progress = control::SabControl::new(control_buf, 1);
 
-    let result = orbit::compute_mandelbrot_orbit(
+    let result = precision::compute_mandelbrot_orbit(
         center_re,
         center_im,
         max_iter,
