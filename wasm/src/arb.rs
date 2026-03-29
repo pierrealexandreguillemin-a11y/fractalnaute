@@ -30,21 +30,24 @@ impl ArbFloat {
 impl<'a> Add<&'a ArbFloat> for &ArbFloat {
     type Output = ArbFloat;
     fn add(self, rhs: &'a ArbFloat) -> ArbFloat {
-        ArbFloat::truncated(&self.inner + &rhs.inner, self.digits)
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner + &rhs.inner, digits)
     }
 }
 
 impl<'a> Sub<&'a ArbFloat> for &ArbFloat {
     type Output = ArbFloat;
     fn sub(self, rhs: &'a ArbFloat) -> ArbFloat {
-        ArbFloat::truncated(&self.inner - &rhs.inner, self.digits)
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner - &rhs.inner, digits)
     }
 }
 
 impl<'a> Mul<&'a ArbFloat> for &ArbFloat {
     type Output = ArbFloat;
     fn mul(self, rhs: &'a ArbFloat) -> ArbFloat {
-        ArbFloat::truncated(&self.inner * &rhs.inner, self.digits)
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner * &rhs.inner, digits)
     }
 }
 
@@ -54,21 +57,24 @@ impl<'a> Mul<&'a ArbFloat> for &ArbFloat {
 impl<'a> Add<&'a ArbFloat> for ArbFloat {
     type Output = ArbFloat;
     fn add(self, rhs: &'a ArbFloat) -> ArbFloat {
-        ArbFloat::truncated(&self.inner + &rhs.inner, self.digits)
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner + &rhs.inner, digits)
     }
 }
 
 impl<'a> Sub<&'a ArbFloat> for ArbFloat {
     type Output = ArbFloat;
     fn sub(self, rhs: &'a ArbFloat) -> ArbFloat {
-        ArbFloat::truncated(&self.inner - &rhs.inner, self.digits)
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner - &rhs.inner, digits)
     }
 }
 
 impl<'a> Mul<&'a ArbFloat> for ArbFloat {
     type Output = ArbFloat;
     fn mul(self, rhs: &'a ArbFloat) -> ArbFloat {
-        ArbFloat::truncated(&self.inner * &rhs.inner, self.digits)
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner * &rhs.inner, digits)
     }
 }
 

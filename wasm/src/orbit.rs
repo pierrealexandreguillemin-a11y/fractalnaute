@@ -320,7 +320,7 @@ mod tests {
     /// Regression: Misiurewicz boundary point with z1_re AND z1_im assertions.
     /// (Lost from old orbit.rs — `orbit_at_mandelbrot_boundary_should_not_escape_early`)
     #[test]
-    fn dd_orbit_misiurewicz_boundary_z1_check() {
+    fn qd_orbit_misiurewicz_boundary_z1_check() {
         let cancel = no_cancel();
         let prog = progress_sink();
         let prec = crate::precision::bits_for_scale("1e-14").expect("scale");

@@ -230,6 +230,8 @@ mod tests {
     #[test]
     fn qd_parse_invalid() {
         assert!(QD::parse_decimal("not_a_number", 212).is_err());
+        assert!(QD::parse_decimal("inf", 212).is_err());
+        assert!(QD::parse_decimal("nan", 212).is_err());
     }
 
     #[test]
