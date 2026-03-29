@@ -165,16 +165,16 @@ Reprioritiser si un nouveau bottleneck apparait.
 
 ##### E2. GPU perturbation render optimization — **NEXT**
 
-Bottleneck identifie : perturbation GPU = 50ms vs 0.03ms standard (1600x plus lent).
-Cause probable : 256 iter x 921K pixels = 236M texelFetch sur orbit texture.
-Recherche exhaustive (27 categories, 50+ sources) — resultats classes par impact :
+Bottleneck identifie : perturbation GPU = 50-80ms vs 0.03ms standard.
+Cause reelle : boucle d'iteration GPU (256 iter/pixel, branching rebasing/bailout/NaN).
+texelFetch teste et elimine (stub vec4(0.0) → pas de gain coherent).
 
-| # | Technique | Impact | Effort | Reference |
+| # | Technique | Impact | Effort | Status |
 |---|---|---|---|---|
-| E2a | **Orbit uniform array** | 50ms→10-15ms | 1 sem | WebGL2 256 vec4 uniforms = registres vs texelFetch |
-| E2b | **BLA (Bivariate Linear Approximation)** | 10ms→1-3ms | 3-4 sem | philthompson.me 2023, 10-36x vs SA classique |
-| E2c | **Ping-pong multi-frame** | <1ms first visible | 1 sem | Split budget iterations par frame, FBO existant |
-| E2d | **SA classique** | 2-3x additionnel | 2-3 sem | Supersede par BLA dans la plupart des cas |
+| ~~E2a~~ | ~~Orbit uniform array~~ | ~~50ms→10ms~~ | ~~1 sem~~ | **ELIMINE** (texelFetch pas le bottleneck) |
+| E2b | **BLA (Bivariate Linear Approximation)** | Skip 80-99% iter | 3-4 sem | **NEXT** |
+| E2c | **Ping-pong multi-frame** | <1ms first visible | 1 sem | After E2b |
+| E2d | **SA classique** | 2-3x | 2-3 sem | Supersede par BLA |
 
 Techniques eliminees (avec justification mathematique) :
 - Matrix exponentiation : z^2+c est quadratique, pas lineaire
