@@ -7,6 +7,7 @@ mod control;
 mod dd;
 mod orbit;
 mod precision;
+mod qd;
 
 use js_sys::{Float32Array, Int32Array};
 use wasm_bindgen::prelude::*;
