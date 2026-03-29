@@ -169,6 +169,31 @@ Timing: total = navigation → InfoPanel render time shown. GPU render = InfoPan
 - Orbit computation is the bottleneck (95% of total time)
 - Previous f64-only limit: 10^-15. Now: 10^-40+ (dashu-float arbitrary precision)
 
+## + Precision Ladder (DD/QD/ArbFloat)
+
+Replaced dashu `DBig` (decimal) with IEEE 754 float expansion:
+- DD (2xf64, 106 bits): zoom 10^-13 to 10^-30
+- QD (4xf64, 212 bits): zoom 10^-30 to 10^-60
+- ArbFloat (dashu fallback): zoom 10^-60+
+
+Generic `compute_orbit<T: OrbitFloat>` — single orbit loop for all 3 types (DRY).
+
+**Measurement:** Node.js direct WASM timing, 256 iterations, averaged over 10-100 runs.
+
+| Level | Zoom | Orbit time | vs ArbFloat | Notes |
+|---|---|---|---|---|
+| DD | 10^-14 | **0.03ms** | **15x** | 2xf64, zero alloc, stack only |
+| QD | 10^-20 | **0.26ms** | 1.7x | 4xf64, zero alloc |
+| QD | 10^-40 | **0.26ms** | 1.7x | Same as 10^-20 (dominated by iter count) |
+| ArbFloat | 10^-80 | 5.28ms | — | New capability (was impossible before) |
+| ArbFloat | 10^-14 | 0.45ms | 1x (baseline) | Previous DBig baseline |
+
+**Key observations:**
+- Orbit is no longer the bottleneck (<1ms for DD/QD vs ~50-60ms GPU render)
+- DD 15x faster than ArbFloat for the common zoom range (10^-14 to 10^-30)
+- QD matches ArbFloat speed but supports zoom to 10^-60 without arbitrary precision overhead
+- 10^-80 zoom now possible (5ms orbit) — was previously impossible
+
 ## Performance Improvement Options
 
 | Option | Expected Gain | Effort | Status |
