@@ -49,5 +49,9 @@ wasm/pkg/
 Cargo.lock
 # public/wasm/ is committed for Vercel deploy (no Rust on Vercel CI)
 
+# Playwright
+test-results/
+e2e/screenshots/
+
 # Worktrees
 .worktrees/
