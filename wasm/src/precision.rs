@@ -1,11 +1,12 @@
-use std::f64::consts::LOG10_2;
-
-use dashu_float::DBig;
-
+use crate::arb::ArbFloat;
 use crate::control::ControlSignal;
-use crate::orbit::OrbitResult;
+use crate::dd::DD;
+use crate::orbit::{self, OrbitResult};
+use crate::qd::QD;
 
 const PRECISION_MARGIN: usize = 64;
+const DD_MAX_BITS: usize = 106;
+const QD_MAX_BITS: usize = 212;
 
 /// Compute required precision bits for a given zoom scale.
 ///
@@ -32,155 +33,53 @@ pub fn bits_for_scale(scale_str: &str) -> Result<usize, String> {
     Ok(bits + PRECISION_MARGIN)
 }
 
-/// Convert precision in bits to decimal significant digits for `DBig`.
+/// Dispatch Mandelbrot reference orbit computation to the appropriate
+/// precision type based on required bits.
 ///
-/// Formula: `digits = ceil(bits * log10(2)) + 2` margin.
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::cast_precision_loss
-)]
-pub fn bits_to_digits(bits: usize) -> usize {
-    ((bits as f64) * LOG10_2).ceil() as usize + 2
-}
-
-/// Parse a decimal string into a `DBig`.
+/// Precision ladder:
+/// - `precision_bits <= 106` → `DD` (double-double, stack-only, ~5× f64)
+/// - `precision_bits <= 212` → `QD` (quad-double, stack-only, ~20× f64)
+/// - `precision_bits > 212`  → `ArbFloat` (dashu `DBig`, heap, arbitrary depth)
 ///
-/// `DBig` preserves full decimal precision from the input string,
-/// enabling correct orbits at arbitrary zoom depth (10^-40+).
+/// @tradeoff Thresholds 106/212 bits match DD/QD precision limits.
 ///
 /// # Errors
 ///
-/// Returns `Err` if `s` cannot be parsed as a finite number.
-pub fn parse_decimal(s: &str) -> Result<DBig, String> {
-    s.parse::<DBig>()
-        .map_err(|e| format!("failed to parse '{s}': {e}"))
-}
-
-/// Arithmetic constants for `DBig` (cannot be `const` — heap-allocated).
-pub fn dbig_zero() -> DBig { DBig::from(0) }
-pub fn dbig_one() -> DBig { DBig::from(1) }
-pub fn dbig_two() -> DBig { DBig::from(2) }
-
-/// Truncate a `DBig` to `digits` significant decimal digits.
-///
-/// @tradeoff Truncate after every intermediate op to bound `DBig` digit growth.
-/// Exact decimal arithmetic doubles digits per multiply — without truncation,
-/// 256 iterations would produce 2^256 digits. Per-op truncation caps working
-/// precision at `digits` (~bits/3.32 + 2) with `HalfEven` rounding (= IEEE 754
-/// `ToEven`). Output is f32, so sub-7-digit differences are invisible.
-pub fn trunc(val: DBig, digits: usize) -> DBig {
-    val.with_precision(digits).value()
-}
-
-/// Convert a `DBig` to f64.
-pub fn to_f64(val: &DBig) -> f64 {
-    val.to_f64().value()
-}
-
-/// Convert a `DBig` to f32 (for GPU texture upload).
-#[allow(clippy::cast_possible_truncation)]
-pub fn to_f32(val: &DBig) -> f32 {
-    let f = val.to_f64().value() as f32;
-    if f.is_finite() { f } else { 0.0_f32 }
-}
-
-/// Compute Mandelbrot reference orbit at arbitrary precision (dashu-based).
-///
-/// Temporary home while the generic `OrbitFloat` pipeline (Task 5) is built.
-/// Will be replaced by `orbit_generic::compute_orbit::<ArbFloat>(...)` in Task 6.
-///
-/// Returns flat `[z_re, z_im, dz_re, dz_im, ...]` as f32 values.
-///
-/// Mathematical formulas (uppercase Z for reference orbit):
-///
-/// - `Z_{n+1} = Z_n^2 + C`
-/// - `Z'_{n+1} = 2 * Z_n * Z'_n + 1`
-///
-/// Critical: orbit MUST start at `Z_0 = 0` (Series Approximation depends on
-/// complete orbit from origin).
-///
-/// # Errors
-///
-/// Returns `Err` if the center coordinate strings cannot be parsed.
-#[allow(clippy::similar_names)]
+/// Returns `Err` if coordinate parsing or allocation fails.
 pub fn compute_mandelbrot_orbit(
     c_re_str: &str,
     c_im_str: &str,
     max_iter: u32,
     precision_bits: usize,
-    cancel_flag: &dyn ControlSignal,
+    cancel: &dyn ControlSignal,
     progress: &dyn ControlSignal,
 ) -> Result<OrbitResult, String> {
-    const BAILOUT_SQ: f64 = 4.0;
-    const CANCEL_CHECK_INTERVAL: u32 = 1024;
-
-    let digits = bits_to_digits(precision_bits);
-
-    let center_re = trunc(parse_decimal(c_re_str)?, digits);
-    let center_im = trunc(parse_decimal(c_im_str)?, digits);
-
-    let one = dbig_one();
-    let two = dbig_two();
-
-    let mut z_re = dbig_zero();
-    let mut z_im = dbig_zero();
-    let mut dz_re = dbig_zero();
-    let mut dz_im = dbig_zero();
-
-    let capacity = (max_iter as usize)
-        .checked_mul(4)
-        .ok_or_else(|| format!("max_iter {max_iter} too large for orbit allocation"))?;
-    let mut orbit = Vec::with_capacity(capacity);
-    let mut actual_length: u32 = 0;
-
-    for i in 0..max_iter {
-        if i % CANCEL_CHECK_INTERVAL == 0 {
-            if cancel_flag.load() != 0 {
-                return Ok(OrbitResult::Cancelled(orbit, actual_length));
-            }
-            #[allow(clippy::cast_possible_wrap)]
-            progress.store(i as i32);
-        }
-
-        orbit.push(to_f32(&z_re));
-        orbit.push(to_f32(&z_im));
-        orbit.push(to_f32(&dz_re));
-        orbit.push(to_f32(&dz_im));
-        actual_length += 1;
-
-        let zr_f64 = to_f64(&z_re);
-        let zi_f64 = to_f64(&z_im);
-        if zr_f64 * zr_f64 + zi_f64 * zi_f64 > BAILOUT_SQ {
-            break;
-        }
-
-        // Derivative: Z'_{n+1} = 2 * Z_n * Z'_n + 1
-        // Real part: 2*(zr*dzr - zi*dzi) + 1
-        // Imag part: 2*(zr*dzi + zi*dzr)
-        let prod_rr = trunc(&z_re * &dz_re, digits);
-        let prod_ii = trunc(&z_im * &dz_im, digits);
-        let prod_ri = trunc(&z_re * &dz_im, digits);
-        let prod_ir = trunc(&z_im * &dz_re, digits);
-        dz_re = trunc(&two * &trunc(&prod_rr - &prod_ii, digits) + &one, digits);
-        dz_im = trunc(&two * &trunc(&prod_ri + &prod_ir, digits), digits);
-
-        // Iteration: Z_{n+1} = Z_n^2 + C
-        let zr_sq = trunc(&z_re * &z_re, digits);
-        let zi_sq = trunc(&z_im * &z_im, digits);
-        let two_zr_zi = trunc(&two * &trunc(&z_re * &z_im, digits), digits);
-        z_re = trunc(&trunc(&zr_sq - &zi_sq, digits) + &center_re, digits);
-        z_im = trunc(&two_zr_zi + &center_im, digits);
+    if precision_bits <= DD_MAX_BITS {
+        orbit::compute_orbit::<DD>(c_re_str, c_im_str, max_iter, precision_bits, cancel, progress)
+    } else if precision_bits <= QD_MAX_BITS {
+        orbit::compute_orbit::<QD>(c_re_str, c_im_str, max_iter, precision_bits, cancel, progress)
+    } else {
+        orbit::compute_orbit::<ArbFloat>(
+            c_re_str,
+            c_im_str,
+            max_iter,
+            precision_bits,
+            cancel,
+            progress,
+        )
     }
-
-    #[allow(clippy::cast_possible_wrap)]
-    progress.store(actual_length as i32);
-    Ok(OrbitResult::Complete(orbit, actual_length))
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::AtomicI32;
+
     use super::*;
+
+    fn no_cancel() -> AtomicI32 { AtomicI32::new(0) }
+    fn progress_sink() -> AtomicI32 { AtomicI32::new(0) }
+
+    // ── bits_for_scale ────────────────────────────────────────────────────────
 
     #[test]
     fn bits_for_scale_large_scale() {
@@ -201,66 +100,71 @@ mod tests {
         assert!(bits_for_scale("0").is_err());
     }
 
+    // ── precision ladder dispatch ─────────────────────────────────────────────
+
+    /// DD path: bits <= 106 — escaping point works correctly.
     #[test]
-    fn bits_to_digits_basic() {
-        // 128 bits => ~40 digits, 256 bits => ~79 digits
-        assert!(bits_to_digits(128) >= 40);
-        assert!(bits_to_digits(256) >= 79);
+    fn ladder_dd_escapes() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let result =
+            compute_mandelbrot_orbit("2", "0", 100, 64, &cancel, &prog).unwrap();
+        let length = match result {
+            OrbitResult::Complete(_, l) => l,
+            OrbitResult::Cancelled(..) => panic!("should not cancel"),
+        };
+        assert!(length <= 3, "c=2 should escape quickly via DD, got {length}");
     }
 
+    /// QD path: bits in (106, 212] — orbit runs at higher precision.
     #[test]
-    fn parse_decimal_valid() {
-        let val = parse_decimal("3.14159").unwrap();
-        let f = to_f64(&val);
-        assert!((f - 3.14159).abs() < 1e-4, "expected ~3.14159, got {f}");
+    fn ladder_qd_runs() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let result =
+            compute_mandelbrot_orbit("0", "0", 50, 150, &cancel, &prog).unwrap();
+        let length = match result {
+            OrbitResult::Complete(_, l) => l,
+            OrbitResult::Cancelled(..) => panic!("should not cancel"),
+        };
+        assert_eq!(length, 50, "origin runs full 50 iters via QD");
     }
 
+    /// ArbFloat path: bits > 212 — deep-zoom coordinate parsed and computed.
     #[test]
-    fn parse_decimal_invalid() {
-        let result = parse_decimal("not_a_number");
-        assert!(result.is_err());
+    fn ladder_arb_runs() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
+        let result =
+            compute_mandelbrot_orbit("0", "0", 50, 300, &cancel, &prog).unwrap();
+        let length = match result {
+            OrbitResult::Complete(_, l) => l,
+            OrbitResult::Cancelled(..) => panic!("should not cancel"),
+        };
+        assert_eq!(length, 50, "origin runs full 50 iters via ArbFloat");
     }
 
+    /// All three paths agree on the escape length for c=(2,0).
     #[test]
-    fn to_f64_roundtrip() {
-        let val = parse_decimal("3.14159265358979").unwrap();
-        let f = to_f64(&val);
-        assert!(
-            (f - 3.14159265358979).abs() < 1e-14,
-            "expected ~3.14159, got {f}"
-        );
-    }
+    fn ladder_all_paths_agree_on_escape() {
+        let cancel = no_cancel();
+        let prog = progress_sink();
 
-    #[test]
-    fn to_f64_zero() {
-        let val = parse_decimal("0").unwrap();
-        assert!(to_f64(&val).abs() < f64::EPSILON);
-    }
+        let dd_len = match compute_mandelbrot_orbit("2", "0", 100, 64, &cancel, &prog).unwrap() {
+            OrbitResult::Complete(_, l) => l,
+            OrbitResult::Cancelled(..) => panic!(),
+        };
+        let qd_len = match compute_mandelbrot_orbit("2", "0", 100, 150, &cancel, &prog).unwrap() {
+            OrbitResult::Complete(_, l) => l,
+            OrbitResult::Cancelled(..) => panic!(),
+        };
+        let arb_len =
+            match compute_mandelbrot_orbit("2", "0", 100, 300, &cancel, &prog).unwrap() {
+                OrbitResult::Complete(_, l) => l,
+                OrbitResult::Cancelled(..) => panic!(),
+            };
 
-    #[test]
-    fn to_f64_negative() {
-        let val = parse_decimal("-2.5").unwrap();
-        let f = to_f64(&val);
-        assert!((f - (-2.5)).abs() < 1e-14, "expected -2.5, got {f}");
-    }
-
-    #[test]
-    fn to_f32_roundtrip() {
-        let val = parse_decimal("1.5").unwrap();
-        let f = to_f32(&val);
-        assert!((f - 1.5_f32).abs() < 1e-5, "expected 1.5, got {f}");
-    }
-
-    #[test]
-    fn deep_zoom_precision_preserved() {
-        // 40-digit coordinate should parse without loss
-        let s = "-0.7436438885706951598312068939351231241234";
-        let val = parse_decimal(s).unwrap();
-        let f = to_f64(&val);
-        // f64 can only represent ~15 digits, but the DBig has full precision
-        assert!(
-            (f - (-0.743643888570695)).abs() < 1e-14,
-            "f64 truncation should be close, got {f}"
-        );
+        assert_eq!(dd_len, qd_len, "DD and QD should agree on escape");
+        assert_eq!(qd_len, arb_len, "QD and ArbFloat should agree on escape");
     }
 }

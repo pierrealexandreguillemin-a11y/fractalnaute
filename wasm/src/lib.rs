@@ -3,6 +3,7 @@
 #![deny(clippy::print_stdout, clippy::print_stderr)]
 #![forbid(unsafe_code)]
 
+mod arb;
 mod control;
 mod dd;
 mod orbit;
@@ -77,20 +78,20 @@ pub fn compute_reference_orbit(
     Ok(arr)
 }
 
-/// Smoke test: verify dashu-float precision at given bits.
+/// Smoke test: verify `ArbFloat` precision at given bits.
 ///
-/// Parses a known value and returns its string representation.
+/// Parses a known value of π and returns its f64 representation.
 ///
 /// # Errors
 ///
 /// Returns `JsValue` error if parsing fails.
 #[wasm_bindgen]
 pub fn verify_precision(bits: u32) -> Result<String, JsValue> {
-    let digits = precision::bits_to_digits(bits as usize);
-    let val = precision::parse_decimal(
+    use crate::orbit::OrbitFloat;
+    let v = arb::ArbFloat::parse_decimal(
         "3.14159265358979323846264338327950288419716939937510",
+        bits as usize,
     )
     .map_err(|e| JsValue::from_str(&e))?;
-    let truncated = precision::trunc(val, digits);
-    Ok(format!("{truncated}"))
+    Ok(format!("{}", v.to_f64()))
 }
