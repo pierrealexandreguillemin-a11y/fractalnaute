@@ -1,6 +1,38 @@
 /* @ts-self-types="./fractalnaute_wasm.d.ts" */
 
 /**
+ * Compute BLA table from reference orbit data.
+ *
+ * Returns `Float32Array`:
+ *   `[num_levels (f32), level_offsets x num_levels, bla_table_data...]`
+ *
+ * # Errors
+ *
+ * Returns `JsValue` error if orbit data is invalid.
+ * @param {Float32Array} orbit_data
+ * @param {number} orbit_length
+ * @param {number} max_dc
+ * @param {number} epsilon
+ * @returns {Float32Array}
+ */
+export function compute_bla_table(orbit_data, orbit_length, max_dc, epsilon) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        wasm.compute_bla_table(retptr, addBorrowedObject(orbit_data), orbit_length, max_dc, epsilon);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        if (r2) {
+            throw takeObject(r1);
+        }
+        return takeObject(r0);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        heap[stack_pointer++] = undefined;
+    }
+}
+
+/**
  * Compute Mandelbrot reference orbit at arbitrary precision.
  *
  * Returns `Float32Array`:
@@ -99,6 +131,9 @@ function __wbg_get_imports() {
         __wbg_new_with_length_3301eabff12dda6d: function(arg0) {
             const ret = new Float32Array(arg0 >>> 0);
             return addHeapObject(ret);
+        },
+        __wbg_prototypesetcall_203e3a407b4f5bc4: function(arg0, arg1, arg2) {
+            Float32Array.prototype.set.call(getArrayF32FromWasm0(arg0, arg1), getObject(arg2));
         },
         __wbg_set_50e15ab935cff07d: function(arg0, arg1, arg2) {
             getObject(arg0).set(getArrayF32FromWasm0(arg1, arg2));
