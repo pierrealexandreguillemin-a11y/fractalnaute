@@ -55,6 +55,45 @@ int blaLookup(int m, float dz2, out BLAEntry result) {
   }
   return 0;  // no valid BLA
 }
+
+/// BLA skip phase — shared by Mandelbrot and Julia iterate().
+/// @tradeoff du,dv (derivative) NOT updated — BLA only enabled for
+/// classic/decomposition which don't use per-iteration derivative.
+/// Rebase criterion: |z|^2 < |delta|^2 (differs from Heiland-Allen |z|^2<G*|Z|^2
+/// because BLA validity radius encodes the linear approximation bound).
+/// Returns true if BLA skipped iterations (caller should continue).
+bool tryBlaSkip(inout float u, inout float v, inout int refIter, inout int i,
+                vec2 dc, inout vec2 z, out bool escaped, out int iter,
+                out float smoothVal) {
+  BLAEntry blaEntry;
+  int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
+  if (skipped <= 0 || refIter + skipped >= u_orbitLength || i + skipped >= MAX_ITER) {
+    return false;
+  }
+  vec2 dz_bla = applyBla(blaEntry, vec2(u, v), dc);
+  u = dz_bla.x;
+  v = dz_bla.y;
+  refIter += skipped;
+  i += skipped - 1; // -1 because for loop increments
+
+  vec4 postOrbit = getOrbitData(refIter);
+  z = postOrbit.xy + vec2(u, v);
+  float zz = z.x * z.x + z.y * z.y;
+
+  if (zz > BAILOUT_SQ) {
+    escaped = true; iter = i + 1;
+    smoothVal = smoothEscape(i + 1, zz);
+    return true;
+  }
+
+  // Rebase: |z|^2 < |delta|^2
+  float uu_vv = u*u + v*v;
+  if (zz < uu_vv) {
+    u = z.x; v = z.y;
+    refIter = 0;
+  }
+  return true;
+}
 `;
 
 /** Uniform names added by BLA chunks. */

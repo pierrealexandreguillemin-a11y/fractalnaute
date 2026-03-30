@@ -69,41 +69,9 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     #ifdef USE_BLA
-    // BLA phase: skip iterations via precomputed linear approximation.
-    // @tradeoff du,dv (derivative) NOT updated — BLA only enabled for
-    // classic/decomposition which don't use per-iteration derivative.
-    // If a future mode needs derivative + BLA, add derivative tracking here.
-    {
-      BLAEntry blaEntry;
-      int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
-      if (skipped > 0 && refIter + skipped < u_orbitLength && i + skipped < MAX_ITER) {
-        vec2 dz_bla = applyBla(blaEntry, vec2(u, v), vec2(dc_re, dc_im));
-        u = dz_bla.x;
-        v = dz_bla.y;
-        refIter += skipped;
-        i += skipped - 1; // -1 because for loop increments
-
-        // Recompute full position after BLA skip
-        vec4 postOrbit = getOrbitData(refIter);
-        z = postOrbit.xy + vec2(u, v);
-        float zz = z.x * z.x + z.y * z.y;
-
-        // Escape check
-        if (zz > BAILOUT_SQ) {
-          escaped = true; iter = i + 1;
-          smoothVal = smoothEscape(i + 1, zz);
-          return;
-        }
-
-        // Rebase: |z|² < |δ|² (differs from standard Heiland-Allen |z|²<G·|Z|²
-        // because BLA validity radius already encodes the linear approximation bound)
-        float uu_vv = u*u + v*v;
-        if (zz < uu_vv) {
-          u = z.x; v = z.y;
-          refIter = 0;
-        }
-        continue;
-      }
+    if (tryBlaSkip(u, v, refIter, i, vec2(dc_re, dc_im), z, escaped, iter, smoothVal)) {
+      if (escaped) return;
+      continue;
     }
     #endif
     if (refIter >= u_orbitLength) break;
@@ -192,36 +160,10 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     #ifdef USE_BLA
-    // BLA phase: Julia dc = 0 (c is constant, not per-pixel).
-    // @tradeoff du,dv NOT updated — see Mandelbrot BLA phase comment.
-    {
-      BLAEntry blaEntry;
-      int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
-      if (skipped > 0 && refIter + skipped < u_orbitLength && i + skipped < MAX_ITER) {
-        vec2 dz_bla = applyBla(blaEntry, vec2(u, v), vec2(0.0, 0.0));
-        u = dz_bla.x;
-        v = dz_bla.y;
-        refIter += skipped;
-        i += skipped - 1;
-
-        vec4 postOrbit = getOrbitData(refIter);
-        z = postOrbit.xy + vec2(u, v);
-        float zz = z.x * z.x + z.y * z.y;
-
-        if (zz > BAILOUT_SQ) {
-          escaped = true; iter = i + 1;
-          smoothVal = smoothEscape(i + 1, zz);
-          return;
-        }
-
-        // Rebase: |z|² < |δ|² (see Mandelbrot BLA comment for rationale)
-        float uu_vv = u*u + v*v;
-        if (zz < uu_vv) {
-          u = z.x; v = z.y;
-          refIter = 0;
-        }
-        continue;
-      }
+    // Julia: dc = 0 (c is constant, not per-pixel)
+    if (tryBlaSkip(u, v, refIter, i, vec2(0.0, 0.0), z, escaped, iter, smoothVal)) {
+      if (escaped) return;
+      continue;
     }
     #endif
     if (refIter >= u_orbitLength) break;

@@ -16,7 +16,7 @@ import {
 } from './shaderCompiler';
 import { createPaletteTexture, updatePaletteTexture } from './paletteTexture';
 import { createOrbitTexture, updateOrbitTexture, destroyOrbitTexture } from './orbitTexture';
-import { createBlaTexture, destroyBlaTexture } from './blaTexture';
+import { createBlaTexture, updateBlaTexture, destroyBlaTexture } from './blaTexture';
 import {
   createScaledFBO, resizeScaledFBO,
   blitFBOToCanvas, destroyFBO,
@@ -185,12 +185,8 @@ function setBlaUniforms(
   if (blaFirstLoc) gl.uniform1i(blaFirstLoc, 2);
 
   const blaOffsetsLoc = loc('u_blaLevelOffsets[0]');
-  if (blaOffsetsLoc && orbit.blaLevelOffsets.length > 0) {
-    const padded = new Int32Array(16);
-    for (let i = 0; i < orbit.blaLevelOffsets.length && i < 16; i++) {
-      padded[i] = orbit.blaLevelOffsets[i]!;
-    }
-    gl.uniform1iv(blaOffsetsLoc, padded);
+  if (blaOffsetsLoc && orbit.blaLevelOffsetsGpu) {
+    gl.uniform1iv(blaOffsetsLoc, orbit.blaLevelOffsetsGpu);
   }
 }
 
@@ -204,7 +200,8 @@ interface OrbitContext {
   blaTexWidth: number;
   blaTexHeight: number;
   blaNumLevels: number;
-  blaLevelOffsets: number[];
+  /** Pre-padded Int32Array(16) for gl.uniform1iv — avoids allocation per frame. */
+  blaLevelOffsetsGpu: Int32Array | null;
 }
 
 /** Mutable orbit texture state managed by the renderer closure. */
@@ -260,7 +257,7 @@ function buildOrbitContext(
     blaTexWidth: 0,
     blaTexHeight: 0,
     blaNumLevels: 0,
-    blaLevelOffsets: []
+    blaLevelOffsetsGpu: null
   };
 }
 
@@ -274,14 +271,30 @@ function uploadBlaData(
   orbitData: OrbitData
 ): void {
   if (!orbitData.blaData || orbitData.blaNumLevels <= 0) return;
-  if (blaState.texture) destroyBlaTexture(gl, blaState.texture);
   const entryCount = orbitData.blaData.length / 6;
+  const texelCount = entryCount * 2;
+  // Reuse texture if it fits (same pattern as uploadOrbitData)
+  if (blaState.texture && texelCount <= blaState.width * blaState.height) {
+    updateBlaTexture(gl, blaState.texture, orbitData.blaData, entryCount, blaState.width, blaState.height);
+    return;
+  }
+  if (blaState.texture) destroyBlaTexture(gl, blaState.texture);
   const blaResult = createBlaTexture(gl, orbitData.blaData, entryCount);
   if (blaResult) {
     blaState.texture = blaResult.texture;
     blaState.width = blaResult.width;
     blaState.height = blaResult.height;
   }
+}
+
+/** Pad BLA level offsets to Int32Array(16) for gl.uniform1iv. */
+function padBlaOffsets(offsets: number[]): Int32Array | null {
+  if (offsets.length === 0) return null;
+  const padded = new Int32Array(16);
+  for (let i = 0; i < offsets.length && i < 16; i++) {
+    padded[i] = offsets[i]!;
+  }
+  return padded;
 }
 
 /** Build orbit context enriched with BLA texture state. */
@@ -296,7 +309,7 @@ function buildOrbitWithBla(
     blaTexWidth: blaState.width,
     blaTexHeight: blaState.height,
     blaNumLevels: orbitData.blaNumLevels,
-    blaLevelOffsets: orbitData.blaLevelOffsets,
+    blaLevelOffsetsGpu: padBlaOffsets(orbitData.blaLevelOffsets),
   };
 }
 
