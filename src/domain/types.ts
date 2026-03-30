@@ -173,4 +173,10 @@ export interface OrbitData {
   /** Reference point coordinates (f32 hi/lo for DS initial delta) */
   refPointRe: number;
   refPointIm: number;
+  /** BLA table: [A_re, A_im, B_re, B_im, r², l] per entry, or null if BLA disabled */
+  blaData: Float32Array | null;
+  /** Number of BLA tree levels (0 = no BLA) */
+  blaNumLevels: number;
+  /** Per-level entry offset into blaData (length = blaNumLevels) */
+  blaLevelOffsets: number[];
 }

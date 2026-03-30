@@ -61,13 +61,17 @@ export interface OrbitResult {
   data: Float32Array;
   length: number;
   cancelled: boolean;
+  blaData: Float32Array | null;
+  blaNumLevels: number;
+  blaLevelOffsets: number[];
 }
 
 export function computeReferenceOrbit(
   centerRe: string,
   centerIm: string,
   maxIter: number,
-  scaleStr: string
+  scaleStr: string,
+  maxDc: number = 0.01
 ): Promise<OrbitResult> {
   return new Promise((resolve, reject) => {
     cancelOrbit();
@@ -106,6 +110,9 @@ export function computeReferenceOrbit(
           data: e.data.orbitData,
           length: e.data.orbitLength,
           cancelled: e.data.cancelled ?? false,
+          blaData: e.data.blaData ?? null,
+          blaNumLevels: e.data.blaNumLevels ?? 0,
+          blaLevelOffsets: e.data.blaLevelOffsets ?? [],
         });
       }
     };
@@ -120,7 +127,7 @@ export function computeReferenceOrbit(
 
     worker.postMessage({
       type: 'compute-orbit',
-      centerRe, centerIm, maxIter, scaleStr,
+      centerRe, centerIm, maxIter, scaleStr, maxDc,
       controlBuffer: controlBuffer!,
     });
   });
