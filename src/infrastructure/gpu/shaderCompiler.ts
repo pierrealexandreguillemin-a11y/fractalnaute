@@ -119,6 +119,49 @@ export function isGpuSupported(
   return hasIteration && getColoringChunk(coloring) !== null;
 }
 
+/** Resolve common shader ingredients from coloring mode. */
+function resolveCommonChunks(coloring: ColoringMode, interiorColoring: boolean) {
+  const coloringChunk = getColoringChunk(coloring);
+  if (!coloringChunk) return null;
+  const needsRealAccum = coloring !== 'classic' || interiorColoring;
+  const accumulator = needsRealAccum ? accumulatorRealChunk : accumulatorNoopChunk;
+  const isStripe = coloring === 'stripe';
+  const paletteChunk = isStripe ? cosinePaletteLookupChunk : paletteLookupChunk;
+  return { coloringChunk, accumulator, paletteChunk, isStripe };
+}
+
+const PERTURBATION_CHUNKS: Partial<Record<FractalType, string>> = {
+  mandelbrot: mandelbrotPerturbationChunk,
+  julia: juliaPerturbationChunk,
+};
+
+/** @tradeoff BLA disabled for stripe/orbitTrap/normalMap (need per-iteration accumulators) */
+const BLA_ELIGIBLE_MODES = new Set<ColoringMode>(['classic', 'decomposition']);
+
+/** Assemble perturbation fragment shader. */
+function assemblePerturbationSource(
+  fractal: FractalType, coloring: ColoringMode,
+  maxIter: number, common: NonNullable<ReturnType<typeof resolveCommonChunks>>
+): string | null {
+  const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
+  if (!iteration) return null;
+
+  const useBla = BLA_ELIGIBLE_MODES.has(coloring);
+  const blaDefine = useBla ? '#define USE_BLA\n' : '';
+  const defines = buildDefines(maxIter, common.isStripe);
+
+  // GLSL declaration order: tryBlaSkip() calls getOrbitData() + smoothEscape(),
+  // so blaLookupChunk must come AFTER orbitLookupChunk + smoothEscapeChunk.
+  return [
+    headerChunk, perturbationHeaderChunk, dsHeaderChunk, defines, blaDefine,
+    ...(useBla ? [blaHeaderChunk] : []),
+    doubleSingleChunk, screenToComplexDSChunk, screenToComplexChunk,
+    smoothEscapeChunk, common.paletteChunk, common.accumulator,
+    orbitLookupChunk, ...(useBla ? [blaLookupChunk] : []),
+    iteration, common.coloringChunk, mainChunk
+  ].join('\n');
+}
+
 /**
  * Assemble a complete fragment shader source from chunks.
  * Pure function — no WebGL dependency, fully testable.
@@ -130,59 +173,24 @@ export function assembleFragmentSource(
   interiorColoring: boolean,
   precision: PrecisionMode = 'doubleSingle'
 ): string | null {
-  const coloringChunk = getColoringChunk(coloring);
-  if (!coloringChunk) return null;
+  const common = resolveCommonChunks(coloring, interiorColoring);
+  if (!common) return null;
 
-  const needsRealAccum = coloring !== 'classic' || interiorColoring;
-  const accumulator = needsRealAccum ? accumulatorRealChunk : accumulatorNoopChunk;
-
-  // Stripe mode: cosine palette + high bailout for quality
-  const isStripe = coloring === 'stripe';
-  const paletteChunk = isStripe ? cosinePaletteLookupChunk : paletteLookupChunk;
-  const defines = buildDefines(maxIter, isStripe);
-
-  // Perturbation path
   if (precision === 'perturbation') {
-    const PERTURBATION_CHUNKS: Partial<Record<FractalType, string>> = {
-      mandelbrot: mandelbrotPerturbationChunk,
-      julia: juliaPerturbationChunk,
-    };
-    const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
-    if (!iteration) return null;
-
-    // @tradeoff BLA disabled for stripe/orbitTrap/normalMap (need per-iteration accumulators)
-    const useBla = coloring === 'classic' || coloring === 'decomposition';
-    const blaDefine = useBla ? '#define USE_BLA\n' : '';
-    const blaChunks = useBla ? [blaHeaderChunk, blaLookupChunk] : [];
-
-    return [
-      headerChunk, perturbationHeaderChunk, dsHeaderChunk, defines, blaDefine,
-      ...blaChunks,
-      doubleSingleChunk, screenToComplexDSChunk, screenToComplexChunk,
-      smoothEscapeChunk, paletteChunk, accumulator,
-      orbitLookupChunk, iteration, coloringChunk, mainChunk
-    ].join('\n');
+    return assemblePerturbationSource(fractal, coloring, maxIter, common);
   }
 
-  // Mandelbrot uses DS iteration for extended zoom precision
+  const defines = buildDefines(maxIter, common.isStripe);
   const useDS = fractal === 'mandelbrot';
   const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
   if (!iteration) return null;
 
-  const chunks = [
+  return [
     headerChunk,
-    ...(useDS ? [dsHeaderChunk, defines, doubleSingleChunk, screenToComplexDSChunk] :
-               [defines]),
-    screenToComplexChunk,
-    smoothEscapeChunk,
-    paletteChunk,
-    accumulator,
-    iteration,
-    coloringChunk,
-    mainChunk
-  ];
-
-  return chunks.join('\n');
+    ...(useDS ? [dsHeaderChunk, defines, doubleSingleChunk, screenToComplexDSChunk] : [defines]),
+    screenToComplexChunk, smoothEscapeChunk, common.paletteChunk,
+    common.accumulator, iteration, common.coloringChunk, mainChunk
+  ].join('\n');
 }
 
 // ---- Module-level caches (design debt acknowledged for v1) ------------------

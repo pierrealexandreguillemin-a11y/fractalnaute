@@ -41,7 +41,20 @@ vec2 applyBla(BLAEntry b, vec2 dz, vec2 dc) {
 int blaLookup(int m, float dz2, out BLAEntry result) {
   if (m <= 0) return 0;
   int k = m - 1;
-  int maxLevel = (k == 0) ? (u_blaNumLevels - 1) : min(findLSB(k), u_blaNumLevels - 1);
+  // Manual LSB: findLSB() missing on some WebGL2 drivers (AMD Radeon).
+  // k & (-k) isolates lowest set bit; count trailing zeros via shift.
+  int lsb = 0;
+  if (k != 0) {
+    int tmp = k;
+    // Unrolled: max 20 levels for maxIter up to 1M
+    for (int b = 0; b < 20; b++) {
+      if ((tmp & 1) != 0) break;
+      lsb++;
+      tmp >>= 1;
+    }
+  }
+  int limit = u_blaNumLevels - 1;
+  int maxLevel = (k == 0) ? limit : (lsb < limit ? lsb : limit);
   int ix = k >> maxLevel;
 
   for (int level = maxLevel; level >= u_blaFirstLevel; level--) {
