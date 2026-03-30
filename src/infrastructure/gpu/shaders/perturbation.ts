@@ -68,6 +68,40 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
   int refIter = 0;
 
   for (int i = 0; i < MAX_ITER; i++) {
+    #ifdef USE_BLA
+    // BLA phase: skip iterations via precomputed linear approximation
+    {
+      BLAEntry blaEntry;
+      int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
+      if (skipped > 0 && refIter + skipped < u_orbitLength && i + skipped < MAX_ITER) {
+        vec2 dz_bla = applyBla(blaEntry, vec2(u, v), vec2(dc_re, dc_im));
+        u = dz_bla.x;
+        v = dz_bla.y;
+        refIter += skipped;
+        i += skipped - 1; // -1 because for loop increments
+
+        // Recompute full position after BLA skip
+        vec4 postOrbit = getOrbitData(refIter);
+        z = postOrbit.xy + vec2(u, v);
+        float zz = z.x * z.x + z.y * z.y;
+
+        // Escape check
+        if (zz > BAILOUT_SQ) {
+          escaped = true; iter = i + 1;
+          smoothVal = smoothEscape(i + 1, zz);
+          return;
+        }
+
+        // Rebase check
+        float uu_vv = u*u + v*v;
+        if (zz < uu_vv) {
+          u = z.x; v = z.y;
+          refIter = 0;
+        }
+        continue; // skip to next iteration (BLA already advanced)
+      }
+    }
+    #endif
     if (refIter >= u_orbitLength) break;
 
     vec4 orbitData = getOrbitData(refIter);
@@ -153,6 +187,38 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
   int refIter = 0;
 
   for (int i = 0; i < MAX_ITER; i++) {
+    #ifdef USE_BLA
+    // BLA phase: skip iterations via precomputed linear approximation
+    // Julia: dc = 0 (c is constant, not per-pixel)
+    {
+      BLAEntry blaEntry;
+      int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
+      if (skipped > 0 && refIter + skipped < u_orbitLength && i + skipped < MAX_ITER) {
+        vec2 dz_bla = applyBla(blaEntry, vec2(u, v), vec2(0.0, 0.0));
+        u = dz_bla.x;
+        v = dz_bla.y;
+        refIter += skipped;
+        i += skipped - 1;
+
+        vec4 postOrbit = getOrbitData(refIter);
+        z = postOrbit.xy + vec2(u, v);
+        float zz = z.x * z.x + z.y * z.y;
+
+        if (zz > BAILOUT_SQ) {
+          escaped = true; iter = i + 1;
+          smoothVal = smoothEscape(i + 1, zz);
+          return;
+        }
+
+        float uu_vv = u*u + v*v;
+        if (zz < uu_vv) {
+          u = z.x; v = z.y;
+          refIter = 0;
+        }
+        continue;
+      }
+    }
+    #endif
     if (refIter >= u_orbitLength) break;
 
     vec4 orbitData = getOrbitData(refIter);

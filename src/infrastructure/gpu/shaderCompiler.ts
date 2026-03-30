@@ -33,6 +33,7 @@ import {
   mandelbrotPerturbationChunk, juliaPerturbationChunk,
   PERTURBATION_UNIFORM_NAMES
 } from './shaders/perturbation';
+import { blaHeaderChunk, blaLookupChunk, BLA_UNIFORM_NAMES } from './shaders/bla';
 
 // ---- Types ------------------------------------------------------------------
 
@@ -78,7 +79,8 @@ const UNIFORM_NAMES = [
   'u_center', 'u_scale', 'u_resolution', 'u_palette',
   'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring',
   ...DS_UNIFORM_NAMES,
-  ...PERTURBATION_UNIFORM_NAMES
+  ...PERTURBATION_UNIFORM_NAMES,
+  ...BLA_UNIFORM_NAMES
 ];
 
 // ---- Assembly (pure, testable) ----------------------------------------------
@@ -147,8 +149,14 @@ export function assembleFragmentSource(
     const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
     if (!iteration) return null;
 
+    // @tradeoff BLA disabled for stripe/orbitTrap/normalMap (need per-iteration accumulators)
+    const useBla = coloring === 'classic' || coloring === 'decomposition';
+    const blaDefine = useBla ? '#define USE_BLA\n' : '';
+    const blaChunks = useBla ? [blaHeaderChunk, blaLookupChunk] : [];
+
     return [
-      headerChunk, perturbationHeaderChunk, dsHeaderChunk, defines,
+      headerChunk, perturbationHeaderChunk, dsHeaderChunk, defines, blaDefine,
+      ...blaChunks,
       doubleSingleChunk, screenToComplexDSChunk, screenToComplexChunk,
       smoothEscapeChunk, paletteChunk, accumulator,
       orbitLookupChunk, iteration, coloringChunk, mainChunk
