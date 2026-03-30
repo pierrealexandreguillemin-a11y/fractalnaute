@@ -80,7 +80,8 @@ const UNIFORM_NAMES = [
   'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring',
   ...DS_UNIFORM_NAMES,
   ...PERTURBATION_UNIFORM_NAMES,
-  ...BLA_UNIFORM_NAMES
+  ...BLA_UNIFORM_NAMES,
+  'u_blaLevelOffsets[0]'
 ];
 
 // ---- Assembly (pure, testable) ----------------------------------------------

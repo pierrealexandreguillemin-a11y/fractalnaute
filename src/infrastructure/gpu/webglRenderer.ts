@@ -16,6 +16,7 @@ import {
 } from './shaderCompiler';
 import { createPaletteTexture, updatePaletteTexture } from './paletteTexture';
 import { createOrbitTexture, updateOrbitTexture, destroyOrbitTexture } from './orbitTexture';
+import { createBlaTexture, destroyBlaTexture } from './blaTexture';
 import {
   createScaledFBO, resizeScaledFBO,
   blitFBOToCanvas, destroyFBO,
@@ -150,6 +151,46 @@ function setOrbitUniforms(
     gl.uniform1i(orbitTexLoc, 1);
     gl.activeTexture(gl.TEXTURE0);
   }
+
+  setBlaUniforms(gl, locations, orbit);
+}
+
+/** Set BLA-specific uniforms (texture, dimensions, levels). */
+function setBlaUniforms(
+  gl: WebGL2RenderingContext,
+  locations: Map<string, WebGLUniformLocation>,
+  orbit: OrbitContext
+): void {
+  const loc = (name: string) => locations.get(name);
+
+  // BLA texture → TEXTURE2 (palette=0, orbit=1)
+  const blaTexLoc = loc('u_blaTexture');
+  if (blaTexLoc && orbit.blaTexture) {
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, orbit.blaTexture);
+    gl.uniform1i(blaTexLoc, 2);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
+  const blaTexSizeLoc = loc('u_blaTexSize');
+  if (blaTexSizeLoc && orbit.blaTexWidth > 0) {
+    gl.uniform2f(blaTexSizeLoc, orbit.blaTexWidth, orbit.blaTexHeight);
+  }
+
+  const blaLevelsLoc = loc('u_blaNumLevels');
+  if (blaLevelsLoc) gl.uniform1i(blaLevelsLoc, orbit.blaNumLevels);
+
+  const blaFirstLoc = loc('u_blaFirstLevel');
+  if (blaFirstLoc) gl.uniform1i(blaFirstLoc, 2); // FIRST_LEVEL = 2
+
+  const blaOffsetsLoc = loc('u_blaLevelOffsets[0]');
+  if (blaOffsetsLoc && orbit.blaLevelOffsets.length > 0) {
+    const padded = new Int32Array(16);
+    for (let i = 0; i < orbit.blaLevelOffsets.length && i < 16; i++) {
+      padded[i] = orbit.blaLevelOffsets[i]!;
+    }
+    gl.uniform1iv(blaOffsetsLoc, padded);
+  }
 }
 
 /** Orbit context for perturbation rendering — passed through to renderToTarget. */
@@ -158,10 +199,22 @@ interface OrbitContext {
   orbitTexture: WebGLTexture;
   orbitTexWidth: number;
   orbitTexHeight: number;
+  blaTexture: WebGLTexture | null;
+  blaTexWidth: number;
+  blaTexHeight: number;
+  blaNumLevels: number;
+  blaLevelOffsets: number[];
 }
 
 /** Mutable orbit texture state managed by the renderer closure. */
 interface OrbitTextureState {
+  texture: WebGLTexture | null;
+  width: number;
+  height: number;
+}
+
+/** Mutable BLA texture state managed by the renderer closure. */
+interface BlaTextureState {
   texture: WebGLTexture | null;
   width: number;
   height: number;
@@ -201,7 +254,48 @@ function buildOrbitContext(
     orbitData,
     orbitTexture: state.texture,
     orbitTexWidth: state.width,
-    orbitTexHeight: state.height
+    orbitTexHeight: state.height,
+    blaTexture: null,
+    blaTexWidth: 0,
+    blaTexHeight: 0,
+    blaNumLevels: 0,
+    blaLevelOffsets: []
+  };
+}
+
+/**
+ * Upload BLA data to GPU texture. Updates blaState in place.
+ * No-op if orbitData has no BLA data.
+ */
+function uploadBlaData(
+  gl: WebGL2RenderingContext,
+  blaState: BlaTextureState,
+  orbitData: OrbitData
+): void {
+  if (!orbitData.blaData || orbitData.blaNumLevels <= 0) return;
+  if (blaState.texture) destroyBlaTexture(gl, blaState.texture);
+  const entryCount = orbitData.blaData.length / 6;
+  const blaResult = createBlaTexture(gl, orbitData.blaData, entryCount);
+  if (blaResult) {
+    blaState.texture = blaResult.texture;
+    blaState.width = blaResult.width;
+    blaState.height = blaResult.height;
+  }
+}
+
+/** Build orbit context enriched with BLA texture state. */
+function buildOrbitWithBla(
+  ctx: OrbitContext,
+  blaState: BlaTextureState,
+  orbitData: OrbitData
+): OrbitContext {
+  return {
+    ...ctx,
+    blaTexture: blaState.texture,
+    blaTexWidth: blaState.width,
+    blaTexHeight: blaState.height,
+    blaNumLevels: orbitData.blaNumLevels,
+    blaLevelOffsets: orbitData.blaLevelOffsets,
   };
 }
 
@@ -502,7 +596,8 @@ function setupContextHandlers(
   progressive: ProgressiveController,
   getCurrentPalette: () => PaletteName,
   setPaletteTexture: (tex: WebGLTexture) => void,
-  setContextLost: (v: boolean) => void
+  setContextLost: (v: boolean) => void,
+  resetTextureState?: () => void
 ): { onContextLost: (e: Event) => void; onContextRestored: () => void } {
   const onContextLost = (e: Event): void => {
     e.preventDefault();
@@ -511,6 +606,7 @@ function setupContextHandlers(
   const onContextRestored = (): void => {
     setContextLost(false);
     progressive.resetState();
+    resetTextureState?.();
     initCompiler(gl);
     setPaletteTexture(createPaletteTexture(gl, getCurrentPalette()));
     getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
@@ -518,6 +614,23 @@ function setupContextHandlers(
   gpuCanvas.addEventListener('webglcontextlost', onContextLost);
   gpuCanvas.addEventListener('webglcontextrestored', onContextRestored);
   return { onContextLost, onContextRestored };
+}
+
+/** Clean up all renderer GL resources. */
+function destroyRendererResources(
+  gl: WebGL2RenderingContext,
+  progressive: ProgressiveController,
+  paletteTexture: WebGLTexture,
+  orbitState: OrbitTextureState,
+  blaState: BlaTextureState,
+  emptyVAO: WebGLVertexArrayObject | null
+): void {
+  progressive.destroy();
+  destroyAllPrograms(gl);
+  gl.deleteTexture(paletteTexture);
+  if (orbitState.texture) { destroyOrbitTexture(gl, orbitState.texture); orbitState.texture = null; }
+  if (blaState.texture) { destroyBlaTexture(gl, blaState.texture); blaState.texture = null; }
+  gl.deleteVertexArray(emptyVAO);
 }
 
 export function createWebGLRenderer(
@@ -531,23 +644,24 @@ export function createWebGLRenderer(
   const emptyVAO = gl.createVertexArray();
   gl.bindVertexArray(emptyVAO);
   initCompiler(gl);
-
   const palette = initialPalette ?? DEFAULT_PALETTE;
   let paletteTexture = createPaletteTexture(gl, palette);
   let currentPalette: PaletteName = palette;
   let contextLost = false;
   let destroyed = false;
-
   const orbitState: OrbitTextureState = { texture: null, width: 0, height: 0 };
-
+  const blaState: BlaTextureState = { texture: null, width: 0, height: 0 };
   const progressive = createProgressiveController(gl);
   getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
   precompileCommonVariants(gl, () => destroyed);
-
+  const resetTextures = (): void => {
+    orbitState.texture = null; orbitState.width = 0; orbitState.height = 0;
+    blaState.texture = null; blaState.width = 0; blaState.height = 0;
+  };
   const { onContextLost, onContextRestored } = setupContextHandlers(
     gl, gpuCanvas, progressive, () => currentPalette,
     (tex: WebGLTexture) => { paletteTexture = tex; },
-    (v: boolean) => { contextLost = v; }
+    (v: boolean) => { contextLost = v; }, resetTextures
   );
 
   return {
@@ -557,10 +671,8 @@ export function createWebGLRenderer(
       progressive.pollTimerQuery();
       pollCompilation(gl);
       const precision = options.precision ?? 'doubleSingle';
-      const compiled = getOrCompile(
-        gl, options.fractalType, options.coloringMode, options.maxIterations,
-        options.interiorColoring, precision
-      );
+      const compiled = getOrCompile(gl, options.fractalType, options.coloringMode,
+        options.maxIterations, options.interiorColoring, precision);
       if (!compiled) return false;
 
       // Build orbit context for perturbation rendering
@@ -568,7 +680,8 @@ export function createWebGLRenderer(
       if (precision === 'perturbation' && options.orbitData) {
         const ctx = buildOrbitContext(gl, orbitState, options.orbitData);
         if (!ctx) return false;
-        orbit = ctx;
+        uploadBlaData(gl, blaState, options.orbitData);
+        orbit = buildOrbitWithBla(ctx, blaState, options.orbitData);
       }
 
       if (progressive.shouldUseProgressive(options.maxIterations)) {
@@ -597,13 +710,9 @@ export function createWebGLRenderer(
 
     destroy(): void {
       destroyed = true;
-      progressive.destroy();
       gpuCanvas.removeEventListener('webglcontextlost', onContextLost);
       gpuCanvas.removeEventListener('webglcontextrestored', onContextRestored);
-      destroyAllPrograms(gl);
-      gl.deleteTexture(paletteTexture);
-      if (orbitState.texture) { destroyOrbitTexture(gl, orbitState.texture); orbitState.texture = null; }
-      gl.deleteVertexArray(emptyVAO);
+      destroyRendererResources(gl, progressive, paletteTexture, orbitState, blaState, emptyVAO);
       gpuCanvas.remove();
     },
 
