@@ -141,8 +141,10 @@ export function renderFractal(
     let stale = false;
     const isStale = () => stale;
 
-    // maxDc = viewport scale * canvas diagonal (approx max |δc| for BLA)
-    const maxDc = options.viewport.scale * 2; // conservative: 2× scale
+    // @tradeoff maxDc ≈ scale × 2 (conservative upper bound for max |δc|).
+    // Exact: max|pixel - ref| across viewport, but scale×2 covers the diagonal.
+    // Too large → BLA validity radii shrink (fewer skips). Too small → artifacts.
+    const maxDc = options.viewport.scale * 2;
 
     computeReferenceOrbit(
       refRe.toString(), refIm.toString(),

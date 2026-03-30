@@ -181,7 +181,8 @@ function setBlaUniforms(
   if (blaLevelsLoc) gl.uniform1i(blaLevelsLoc, orbit.blaNumLevels);
 
   const blaFirstLoc = loc('u_blaFirstLevel');
-  if (blaFirstLoc) gl.uniform1i(blaFirstLoc, 2); // FIRST_LEVEL = 2
+  // @mirror wasm/src/bla.rs:FIRST_LEVEL — must match Rust constant
+  if (blaFirstLoc) gl.uniform1i(blaFirstLoc, 2);
 
   const blaOffsetsLoc = loc('u_blaLevelOffsets[0]');
   if (blaOffsetsLoc && orbit.blaLevelOffsets.length > 0) {

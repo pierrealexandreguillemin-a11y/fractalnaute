@@ -69,7 +69,10 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     #ifdef USE_BLA
-    // BLA phase: skip iterations via precomputed linear approximation
+    // BLA phase: skip iterations via precomputed linear approximation.
+    // @tradeoff du,dv (derivative) NOT updated — BLA only enabled for
+    // classic/decomposition which don't use per-iteration derivative.
+    // If a future mode needs derivative + BLA, add derivative tracking here.
     {
       BLAEntry blaEntry;
       int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
@@ -92,13 +95,14 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
           return;
         }
 
-        // Rebase check
+        // Rebase: |z|² < |δ|² (differs from standard Heiland-Allen |z|²<G·|Z|²
+        // because BLA validity radius already encodes the linear approximation bound)
         float uu_vv = u*u + v*v;
         if (zz < uu_vv) {
           u = z.x; v = z.y;
           refIter = 0;
         }
-        continue; // skip to next iteration (BLA already advanced)
+        continue;
       }
     }
     #endif
@@ -188,8 +192,8 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   for (int i = 0; i < MAX_ITER; i++) {
     #ifdef USE_BLA
-    // BLA phase: skip iterations via precomputed linear approximation
-    // Julia: dc = 0 (c is constant, not per-pixel)
+    // BLA phase: Julia dc = 0 (c is constant, not per-pixel).
+    // @tradeoff du,dv NOT updated — see Mandelbrot BLA phase comment.
     {
       BLAEntry blaEntry;
       int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
@@ -210,6 +214,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
           return;
         }
 
+        // Rebase: |z|² < |δ|² (see Mandelbrot BLA comment for rationale)
         float uu_vv = u*u + v*v;
         if (zz < uu_vv) {
           u = z.x; v = z.y;
