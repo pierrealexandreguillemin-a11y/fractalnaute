@@ -78,19 +78,24 @@ int blaLookup(int m, float dz2, out BLAEntry result) {
 bool tryBlaSkip(inout float u, inout float v, inout int refIter, inout int i,
                 vec2 dc, inout vec2 z, out bool escaped, out int iter,
                 out float smoothVal) {
+  float invS = 1.0 / u_rescaleS;
   BLAEntry blaEntry;
-  int skipped = blaLookup(refIter, u*u + v*v, blaEntry);
+  // De-rescale |δ̃|² → |δ|² for BLA validity comparison
+  float dz2_real = (u*u + v*v) * invS * invS;
+  int skipped = blaLookup(refIter, dz2_real, blaEntry);
   if (skipped <= 0 || refIter + skipped >= u_orbitLength || i + skipped >= MAX_ITER) {
     return false;
   }
+  // BLA applies in rescaled space: δ̃_new = A·δ̃ + B·δ̃c
   vec2 dz_bla = applyBla(blaEntry, vec2(u, v), dc);
   u = dz_bla.x;
   v = dz_bla.y;
   refIter += skipped;
-  i += skipped - 1; // -1 because for loop increments
+  i += skipped - 1;
 
   vec4 postOrbit = getOrbitData(refIter);
-  z = postOrbit.xy + vec2(u, v);
+  // z in real coordinates (de-rescale)
+  z = postOrbit.xy + vec2(u, v) * invS;
   float zz = z.x * z.x + z.y * z.y;
 
   if (zz > BAILOUT_SQ) {
@@ -99,10 +104,10 @@ bool tryBlaSkip(inout float u, inout float v, inout int refIter, inout int i,
     return true;
   }
 
-  // Rebase: |z|^2 < |delta|^2
-  float uu_vv = u*u + v*v;
-  if (zz < uu_vv) {
-    u = z.x; v = z.y;
+  // Rebase: δ̃ = z × S (re-rescale to rescaled domain)
+  float uu_vv_real = (u*u + v*v) * invS * invS;
+  if (zz < uu_vv_real) {
+    u = z.x * u_rescaleS; v = z.y * u_rescaleS;
     refIter = 0;
   }
   return true;
