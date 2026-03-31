@@ -28,7 +28,7 @@ export class WorkerPool {
     this.workers = [];
     for (let i = 0; i < size; i++) {
       this.workers.push(
-        new Worker(new URL('./fractal.worker.ts', import.meta.url))
+        new Worker(new URL('./fractal.worker.ts', import.meta.url), { type: 'module' })
       );
     }
   }

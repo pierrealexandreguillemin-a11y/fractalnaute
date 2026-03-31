@@ -48,6 +48,7 @@ const PanelHeader: React.FC<{ onCollapse: () => void }> = ({ onCollapse }) => (
       Fractal Explorer
     </span>
     <button
+      type="button"
       onClick={onCollapse}
       aria-label="Réduire le panneau"
       className="px-2 py-1 bg-glass-card border border-glass-border rounded-md text-sm text-foreground cursor-pointer hover:bg-glass-bg"
@@ -63,6 +64,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
   if (isCollapsed) {
     return (
       <button
+        type="button"
         onClick={() => setIsCollapsed(false)}
         title="Afficher les contrôles"
         aria-label="Afficher les contrôles"

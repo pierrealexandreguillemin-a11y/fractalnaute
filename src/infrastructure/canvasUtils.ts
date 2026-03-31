@@ -24,25 +24,23 @@ export function exportCanvas(canvas: HTMLCanvasElement): string {
 }
 
 /**
- * Cached ImageData — reused when canvas dimensions haven't changed.
- * Avoids ~1.2MB allocation per render at 1920×1080.
+ * Cached ImageData per context — reused when canvas dimensions haven't changed.
+ * WeakMap keyed by ctx avoids cross-canvas corruption and allows GC when ctx is released.
  */
-let cachedImageData: ImageData | null = null;
-let cachedWidth = 0;
-let cachedHeight = 0;
+const imageDataCache = new WeakMap<CanvasRenderingContext2D, { data: ImageData; w: number; h: number }>();
 
 export function getOrCreateImageData(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number
 ): ImageData {
-  if (cachedImageData && cachedWidth === width && cachedHeight === height) {
-    return cachedImageData;
+  const entry = imageDataCache.get(ctx);
+  if (entry && entry.w === width && entry.h === height) {
+    return entry.data;
   }
-  cachedImageData = ctx.createImageData(width, height);
-  cachedWidth = width;
-  cachedHeight = height;
-  return cachedImageData;
+  const data = ctx.createImageData(width, height);
+  imageDataCache.set(ctx, { data, w: width, h: height });
+  return data;
 }
 
 /**

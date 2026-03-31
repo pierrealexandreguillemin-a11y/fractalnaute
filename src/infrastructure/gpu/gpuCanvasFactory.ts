@@ -42,6 +42,8 @@ export function createGpuCanvas(
   gpuCanvas.style.pointerEvents = 'none';
   gpuCanvas.style.display = 'none';
 
+  // @tradeoff preserveDrawingBuffer: true required for canvas.toDataURL() in exportImage().
+  // Prevents buffer swap optimization — GPU back-buffer must be preserved after compositing.
   const maybeGl = gpuCanvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true });
   if (!maybeGl) return null;
 
