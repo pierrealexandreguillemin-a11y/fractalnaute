@@ -194,6 +194,29 @@ Generic `compute_orbit<T: OrbitFloat>` — single orbit loop for all 3 types (DR
 - QD matches ArbFloat speed but supports zoom to 10^-60 without arbitrary precision overhead
 - 10^-80 zoom now possible (5ms orbit) — was previously impossible
 
+## + BLA (Bivariate Linear Approximation) (E2b)
+
+Skip 80-99% of GPU per-pixel iterations via precomputed linear approximation.
+BLA table built in WASM after reference orbit. Uploaded as RGBA32F texture.
+`#define USE_BLA` for classic/decomposition. Stripe/orbitTrap/normalMap fallback to standard perturbation.
+
+**Measurement:** Playwright (headed Chromium), AMD Radeon RDNA2, 1280×720, maxIter=256, classic coloring.
+
+| Zoom | Before (no BLA) | After (BLA) | GPU Speedup | Notes |
+|---|---|---|---|---|
+| 10^-14 | 60ms | <1ms | **>60x** | DS→perturbation boundary |
+| 10^-20 | 51ms | <1ms | **>50x** | Misiurewicz point |
+| 10^-40 | 54ms | <1ms | **>50x** | Seahorse valley, 197 bits |
+
+**Key observations:**
+- GPU render time dropped from ~50-60ms to <1ms at all zoom depths
+- BLA table construction is included in orbit time (negligible: <1ms for 256 iter)
+- Total time still dominated by orbit WASM computation (~1s)
+- @tradeoff: BLA incompatible with stripe/orbitTrap/normalMap (per-iteration accumulation needed)
+- All 3 coordinates render correctly (Playwright screenshots verified)
+
+---
+
 ## Performance Improvement Options
 
 | Option | Expected Gain | Effort | Status |

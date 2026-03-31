@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod arb;
+mod bla;
 mod control;
 mod dd;
 mod orbit;
@@ -74,6 +75,47 @@ pub fn compute_reference_orbit(
     let orbit_arr = Float32Array::new_with_length(data_len);
     orbit_arr.copy_from(&data);
     arr.set(&orbit_arr, header_len);
+
+    Ok(arr)
+}
+
+/// Compute BLA table from reference orbit data.
+///
+/// Returns `Float32Array`:
+///   `[num_levels (f32), level_offsets x num_levels, bla_table_data...]`
+///
+/// # Errors
+///
+/// Returns `JsValue` error if orbit data is invalid.
+#[wasm_bindgen]
+#[allow(clippy::cast_possible_truncation)]
+pub fn compute_bla_table(
+    orbit_data: &Float32Array,
+    orbit_length: u32,
+    max_dc: f32,
+    epsilon: f32,
+) -> Result<Float32Array, JsValue> {
+    let data: Vec<f32> = orbit_data.to_vec();
+    let (table, offsets, num_levels) =
+        bla::compute_bla_table(&data, orbit_length as usize, max_dc, epsilon);
+
+    // Pack: [num_levels, offsets..., table...]
+    let header_len = 1 + offsets.len();
+    let total = header_len + table.len();
+    let arr = Float32Array::new_with_length(total as u32);
+
+    #[allow(clippy::cast_precision_loss)]
+    arr.set_index(0, num_levels as f32);
+    for (i, &off) in offsets.iter().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        arr.set_index((1 + i) as u32, off as f32);
+    }
+
+    if !table.is_empty() {
+        let table_arr = Float32Array::new_with_length(table.len() as u32);
+        table_arr.copy_from(&table);
+        arr.set(&table_arr, header_len as u32);
+    }
 
     Ok(arr)
 }

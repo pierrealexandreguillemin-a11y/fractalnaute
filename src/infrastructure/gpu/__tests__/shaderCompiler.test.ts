@@ -230,6 +230,61 @@ describe('shaderCompiler', () => {
     });
   });
 
+  describe('BLA chunk inclusion', () => {
+    it('includes BLA chunks for perturbation + classic', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'perturbation');
+      expect(source).toContain('#define USE_BLA');
+      expect(source).toContain('u_blaTexture');
+      expect(source).toContain('BLAEntry');
+      expect(source).toContain('blaLookup');
+      expect(source).toContain('applyBla');
+    });
+
+    it('includes BLA chunks for perturbation + decomposition', () => {
+      const source = assembleFragmentSource('mandelbrot', 'decomposition', 256, false, 'perturbation');
+      expect(source).toContain('#define USE_BLA');
+      expect(source).toContain('u_blaTexture');
+    });
+
+    it('excludes BLA for perturbation + stripe (needs per-iter accumulator)', () => {
+      const source = assembleFragmentSource('mandelbrot', 'stripe', 256, false, 'perturbation');
+      expect(source).not.toContain('#define USE_BLA');
+      expect(source).not.toContain('u_blaTexture');
+    });
+
+    it('excludes BLA for perturbation + orbitTrap', () => {
+      const source = assembleFragmentSource('mandelbrot', 'orbitTrap', 256, false, 'perturbation');
+      expect(source).not.toContain('#define USE_BLA');
+    });
+
+    it('excludes BLA for perturbation + normalMap', () => {
+      const source = assembleFragmentSource('mandelbrot', 'normalMap', 256, false, 'perturbation');
+      expect(source).not.toContain('#define USE_BLA');
+    });
+
+    it('Julia perturbation + classic includes BLA', () => {
+      const source = assembleFragmentSource('julia', 'classic', 256, false, 'perturbation');
+      expect(source).toContain('#define USE_BLA');
+      expect(source).toContain('blaLookup');
+    });
+
+    it('non-perturbation shaders never include BLA', () => {
+      const ds = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'doubleSingle');
+      expect(ds).not.toContain('USE_BLA');
+      expect(ds).not.toContain('u_blaTexture');
+    });
+
+    it('perturbation shaders include u_rescaleS uniform', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'perturbation');
+      expect(source).toContain('u_rescaleS');
+    });
+
+    it('non-perturbation shaders do not include u_rescaleS', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'doubleSingle');
+      expect(source).not.toContain('u_rescaleS');
+    });
+  });
+
   describe('isGpuSupported', () => {
     it('returns true for Mandelbrot + Classic', () => {
       expect(isGpuSupported('mandelbrot', 'classic')).toBe(true);

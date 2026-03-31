@@ -1,8 +1,8 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===============================================================================
  * INFRASTRUCTURE LAYER - Canvas Renderer (Facade)
  * Feature-detects SharedArrayBuffer → parallel pool or single-thread fallback
- * ═══════════════════════════════════════════════════════════════════════════
+ * ===============================================================================
  */
 
 import type { Viewport, PaletteName, FractalType, FractalParams, ColoringMode, RenderBackend, PrecisionMode, OrbitData } from '../domain';
@@ -11,55 +11,7 @@ import type { WebGLRenderer } from './gpu';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
 import { needsPerturbation, computeReferenceOrbit, cancelOrbit } from './wasmBridge';
-
-/** Cancellable retry state for perturbation shader compile wait */
-let perturbationRetryId: number | null = null;
-
-function cancelPerturbationRetry(): void {
-  if (perturbationRetryId !== null) {
-    cancelAnimationFrame(perturbationRetryId);
-    perturbationRetryId = null;
-  }
-}
-
-/** DS GPU / CPU fallback when perturbation shader isn't ready yet. */
-function renderDsFallback(
-  canvas: HTMLCanvasElement, pool: WorkerPool | null,
-  gpu: WebGLRenderer, options: RenderOptions
-): void {
-  const t0 = performance.now();
-  const ok = gpu.render({
-    viewport: options.viewport,
-    fractalType: options.fractalType,
-    maxIterations: options.maxIterations,
-    coloringMode: options.coloringMode ?? 'classic',
-    interiorColoring: options.interiorColoring ?? false,
-    fractalParams: options.params,
-    ssaa: options.ssaa,
-  });
-  if (ok) {
-    gpu.setVisible(true);
-    options.onComplete?.(performance.now() - t0, 'gpu');
-    return;
-  }
-  // GPU DS also not ready — CPU fallback
-  if (pool) {
-    renderWithPool({
-      canvas, pool,
-      viewport: options.viewport,
-      fractalType: options.fractalType,
-      maxIterations: options.maxIterations,
-      palette: options.palette,
-      params: options.params,
-      coloringMode: options.coloringMode,
-      interiorColoring: options.interiorColoring,
-      onProgress: options.onProgress,
-      onComplete: options.onComplete,
-    });
-  } else {
-    options.onComplete?.(0, 'cpu');
-  }
-}
+import { handleOrbitResult, cancelPerturbationRetry, renderDsFallback } from './perturbationRenderer';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -77,6 +29,13 @@ export interface RenderOptions {
   onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
+/** Compute rescaling factor S = 2^k for float32 delta precision. */
+export function computeRescaleS(scale: number, canvasWidth: number): number {
+  const pixelSpacing = scale / canvasWidth;
+  const k = Math.max(0, -Math.floor(Math.log2(pixelSpacing)) - 4);
+  return 2 ** k;
+}
+
 /** Select precision mode based on zoom depth and fractal type. */
 function getPrecisionMode(viewport: Viewport, fractalType: FractalType): PrecisionMode {
   if (!needsPerturbation(viewport.scale)) {
@@ -84,42 +43,6 @@ function getPrecisionMode(viewport: Viewport, fractalType: FractalType): Precisi
   }
   return (fractalType === 'mandelbrot' || fractalType === 'julia')
     ? 'perturbation' : 'doubleSingle';
-}
-
-/** Handle perturbation orbit result: GPU render → DS preview + upgrade loop. */
-function handleOrbitResult(
-  gpu: WebGLRenderer, orbitData: OrbitData,
-  canvas: HTMLCanvasElement, pool: WorkerPool | null, options: RenderOptions,
-  isStale: () => boolean
-): void {
-  const perturbOpts = {
-    viewport: options.viewport, fractalType: options.fractalType,
-    maxIterations: options.maxIterations,
-    coloringMode: options.coloringMode ?? 'classic' as const,
-    interiorColoring: options.interiorColoring ?? false,
-    fractalParams: options.params, ssaa: options.ssaa,
-    precision: 'perturbation' as const, orbitData,
-  };
-  const t0 = performance.now();
-  if (gpu.render(perturbOpts)) {
-    gpu.setVisible(true);
-    options.onComplete?.(performance.now() - t0, 'gpu');
-    return;
-  }
-  // Shader compiling — DS preview now, upgrade to perturbation when ready
-  gpu.setVisible(false);
-  renderDsFallback(canvas, pool, gpu, options);
-  let attempt = 0;
-  const tryUpgrade = () => {
-    if (isStale() || attempt++ > 120) return;
-    if (gpu.render(perturbOpts)) {
-      gpu.setVisible(true);
-      options.onComplete?.(performance.now() - t0, 'gpu');
-      return;
-    }
-    perturbationRetryId = requestAnimationFrame(tryUpgrade);
-  };
-  perturbationRetryId = requestAnimationFrame(tryUpgrade);
 }
 
 /**
@@ -141,12 +64,21 @@ export function renderFractal(
     let stale = false;
     const isStale = () => stale;
 
+    // @tradeoff maxDc ≈ scale × 2 (conservative upper bound for max |δc|).
+    // Exact: max|pixel - ref| across viewport, but scale×2 covers the diagonal.
+    // Too large → BLA validity radii shrink (fewer skips). Too small → artifacts.
+    const maxDc = options.viewport.scale * 2;
+
     computeReferenceOrbit(
       refRe.toString(), refIm.toString(),
-      options.maxIterations, options.viewport.scale.toString()
-    ).then(({ data, length, cancelled }) => {
+      options.maxIterations, options.viewport.scale.toString(), maxDc
+    ).then(({ data, length, cancelled, blaData, blaNumLevels, blaLevelOffsets }) => {
       if (cancelled || stale) return;
-      const orbitData: OrbitData = { data, length, refPointRe: refRe, refPointIm: refIm };
+      const orbitData: OrbitData = {
+        data, length, refPointRe: refRe, refPointIm: refIm,
+        blaData, blaNumLevels, blaLevelOffsets,
+        rescaleS: computeRescaleS(options.viewport.scale, canvas.width),
+      };
       handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
     }).catch((err: unknown) => {
       if (stale) return;
@@ -184,7 +116,6 @@ export function renderFractal(
       options.onComplete?.(elapsed, 'gpu');
       return () => { gpuRenderer.cancelPending(); };
     }
-    // GPU not ready (compiling) — hide GPU canvas, fall through to CPU
     gpuRenderer.setVisible(false);
   }
 
@@ -224,7 +155,6 @@ function renderFallback(
   const startTime = performance.now();
   let cancelled = false;
   let currentY = 0;
-  /** Rows per animation frame in fallback (single-thread) mode. Balances responsiveness vs overhead. */
   const FALLBACK_CHUNK_HEIGHT = 12;
 
   const renderChunk = () => {

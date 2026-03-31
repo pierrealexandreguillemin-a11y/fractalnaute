@@ -125,10 +125,16 @@ grep -r @tradeoff src/
 6. ~~Stripe rewrite~~ — deep-mandelbrot quality (Re·Im/|z|², Catmull-Rom, cosine palette, bailout 300K)
 7. ~~P0 UX~~ — URL state, touch pinch, responsive mobile, adaptive debounce
 8. ~~Perturbation theory v1~~ — Rust/WASM dashu-float orbit + GPU perturbation shader.
-   Mandelbrot + Julia. Zoom 10^-40+ verified. SAB cancel/progress, WCAG progressbar.
+   Mandelbrot + Julia. Zoom 10^-14 verified (structure visible). SAB cancel/progress, WCAG progressbar.
    Measured: orbit ~1s @256iter, GPU ~50ms, total <1.5s. Plans A+B complete.
 9. ~~Precision ladder~~ — DD (2xf64, 0.03ms), QD (4xf64, 0.26ms), ArbFloat fallback.
    OrbitFloat trait (DRY). Orbit no longer bottleneck (<1ms). GPU render (~50ms) = new bottleneck.
+10. ~~Rescaling (F1)~~ — static S = 2^k per frame, δ̃ = δ×S keeps float32 precise at any depth.
+   Zoom 10^-14 verified: structure visible at (-1.749998, 0), 62ms GPU+Perturbation, 1024 iter.
+   Zoom 10^-40: renders without crash (70ms), but depth NOT visually verified (test point interior,
+   JS number coords limited to 15 digits — need interactive zoom to reach exterior at 10^-40).
+   BLA lookup simulation: >100/255 iter skipped (vitest). Rescale parity: de-rescaled == non-rescaled.
+   Default iter 256→1024, slider max→4096.
 
 ### Next (ordre par impact perf)
 
@@ -189,14 +195,17 @@ Ordre d'execution : E2a (tester hypothese texelFetch) → E2b (BLA) → E2c (pin
 
 | # | Feature | Gain | Effort | Reference |
 |---|---|---|---|---|
-| F1 | **Rescaling** | Anti-artefacts extreme zoom | 1 sem | Zhuoran 2021 |
+| ~~F1~~ | ~~**Rescaling**~~ | ~~Anti-artefacts extreme zoom~~ | ~~1 sem~~ | ~~Zhuoran 2021~~ |
 | F2 | **Histogram coloring** | Banding → 0 | 1 sem | mandelbrot.page (HCL) |
 | F3 | **Video export** | Feature (zoom animation) | 2 sem | mandelbrot.page |
 | F4 | **LLM-readable app (SEO)** | Discoverability | 1 sem | — |
 
-##### F1. Rescaling — float32 delta underflow
-- Extension range δ = S·w quand float32 underflow aux zooms extremes
-- Seulement si artefacts observes en pratique (pas encore le cas a 10^-40)
+##### ~~F1. Rescaling~~ — DONE
+- Static S = 2^k per frame. δ̃ = δ×S keeps float32 precise at any depth.
+  Zoom 10^-14 verified: structure visible at (-1.749998, 0). 10^-40: no crash, depth not visually
+  confirmed (JS coord precision limit). Overhead: negligible (4 FMUL/iter).
+  BLA compatible (de-rescale |δ̃|²). Mandelbrot + Julia.
+  Spec: docs/superpowers/specs/2026-03-31-rescaling-design.md
 
 ##### F2. Histogram coloring
 - Two-pass: count iteration histogram → build CDF → map colors uniformly

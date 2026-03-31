@@ -2,6 +2,18 @@
 /* eslint-disable */
 
 /**
+ * Compute BLA table from reference orbit data.
+ *
+ * Returns `Float32Array`:
+ *   `[num_levels (f32), level_offsets x num_levels, bla_table_data...]`
+ *
+ * # Errors
+ *
+ * Returns `JsValue` error if orbit data is invalid.
+ */
+export function compute_bla_table(orbit_data: Float32Array, orbit_length: number, max_dc: number, epsilon: number): Float32Array;
+
+/**
  * Compute Mandelbrot reference orbit at arbitrary precision.
  *
  * Returns `Float32Array`:
@@ -34,6 +46,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly compute_bla_table: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly compute_reference_orbit: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
     readonly verify_precision: (a: number, b: number) => void;
     readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
