@@ -376,23 +376,24 @@ float computeLightness(AccumState acc, vec2 z) { return 1.0; }
  */
 export const stripeColoringChunk = /* glsl */ `
 // Catmull-Rom cubic interpolation — C1 continuous across iteration boundaries
+// Standard: catmullRom(P0, P1, P2, P3, d) → d=0→P1, d=1→P2.
 float catmullRom(float s0, float s1, float s2, float s3, float d) {
   float d2 = d * d, d3 = d * d2;
   return 0.5 * (
-    s0 * (d3 - d2) +
-    s1 * (d + 4.0 * d2 - 3.0 * d3) +
-    s2 * (2.0 - 5.0 * d2 + 3.0 * d3) +
-    s3 * (-d + 2.0 * d2 - d3)
+    s0 * (-d + 2.0 * d2 - d3) +
+    s1 * (2.0 - 5.0 * d2 + 3.0 * d3) +
+    s2 * (d + 4.0 * d2 - 3.0 * d3) +
+    s3 * (d3 - d2)
   );
 }
 
 float mapToParam(float smoothVal, AccumState acc, vec2 z, int iter) {
   float frac = smoothVal - floor(smoothVal);
-  // Catmull-Rom: d=0→P1(stripePrev1), d=1→P2(stripeSum). P3 extrapolated.
-  float extrapolated = 2.0 * acc.stripeSum - acc.stripePrev1;
+  // P1=stripeSum (escape iter), P2=ext (next), P0=stripePrev1, P3=tangent after.
+  float ext = 2.0 * acc.stripeSum - acc.stripePrev1;
   float interpolated = acc.count >= 3
-    ? catmullRom(acc.stripePrev2, acc.stripePrev1, acc.stripeSum, extrapolated, frac)
-    : acc.stripePrev1 + frac * (acc.stripeSum - acc.stripePrev1);
+    ? catmullRom(acc.stripePrev1, acc.stripeSum, ext, 2.0 * ext - acc.stripeSum, frac)
+    : acc.stripeSum + frac * (ext - acc.stripeSum);
   float stripeRatio = acc.count > 0 ? interpolated / float(acc.count) : 0.0;
   // @mirror deep-mandelbrot: stripe amplitude + iteration-dependent frequency
   // Produces metallic depth banding instead of flat single-cycle color.

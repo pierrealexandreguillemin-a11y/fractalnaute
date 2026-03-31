@@ -23,8 +23,11 @@ export interface AccumulatorState {
 }
 
 /**
- * High bailout for stripe quality — smooth iteration converges better
+ * High bailout for accumulation paths — smooth iteration converges better
  * and stripe average gets more data. Matches deep-mandelbrot's 3e5.
+ * @tradeoff CPU accum paths use this for ALL modes (stripe, normalMap, orbitTrap, decomposition).
+ * GPU uses this only for stripe; other GPU modes use bailout=4. CPU quality is higher but
+ * diverges from GPU for non-stripe modes. Acceptable: CPU is the fallback renderer.
  * @see https://github.com/munrocket/deep-fractal
  */
 export const STRIPE_BAILOUT_SQ = 300000.0;
@@ -69,10 +72,10 @@ function catmullRom(s0: number, s1: number, s2: number, s3: number, d: number): 
   const d2 = d * d;
   const d3 = d * d2;
   return 0.5 * (
-    s0 * (d3 - d2) +
-    s1 * (d + 4 * d2 - 3 * d3) +
-    s2 * (2 - 5 * d2 + 3 * d3) +
-    s3 * (-d + 2 * d2 - d3)
+    s0 * (-d + 2 * d2 - d3) +
+    s1 * (2 - 5 * d2 + 3 * d3) +
+    s2 * (d + 4 * d2 - 3 * d3) +
+    s3 * (d3 - d2)
   );
 }
 
@@ -91,13 +94,13 @@ export function finalizeEscape(
   distanceEstimate: number;
 } {
   // Catmull-Rom interpolation of stripe history (C1 smooth)
-  // Standard Catmull-Rom: d=0→P1, d=1→P2. P0 and P3 are tangent neighbors.
-  // We interpolate from stripePrev1 (last complete) toward stripeSum (current).
-  // P0=stripePrev2 (tangent before), P3 extrapolated (tangent after).
+  // Standard: catmullRom(P0, P1, P2, P3, d) → d=0→P1, d=1→P2.
+  // P1=stripeSum (escape iter), P2=extrapolated (next), P0/P3=tangent neighbors.
   const frac = smoothValue - Math.floor(smoothValue);
+  const ext = 2 * state.stripeSum - state.stripePrev1;
   const interpolated = state.count >= 3
-    ? catmullRom(state.stripePrev2, state.stripePrev1, state.stripeSum, 2 * state.stripeSum - state.stripePrev1, frac)
-    : state.stripePrev1 + frac * (state.stripeSum - state.stripePrev1);
+    ? catmullRom(state.stripePrev1, state.stripeSum, ext, 2 * ext - state.stripeSum, frac)
+    : state.stripeSum + frac * (ext - state.stripeSum);
   const stripeValue = state.count > 0 ? interpolated / state.count : 0;
 
   const decompAngle = Math.atan2(zIm, zRe);

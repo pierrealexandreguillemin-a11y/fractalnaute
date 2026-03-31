@@ -174,10 +174,10 @@ function gpuUpdateAccumulator(zRe: number, zIm: number, acc: GpuAccumState): voi
 function catmullRom(s0: number, s1: number, s2: number, s3: number, d: number): number {
   const d2 = d * d, d3 = d * d2;
   return 0.5 * (
-    s0 * (d3 - d2) +
-    s1 * (d + 4 * d2 - 3 * d3) +
-    s2 * (2 - 5 * d2 + 3 * d3) +
-    s3 * (-d + 2 * d2 - d3)
+    s0 * (-d + 2 * d2 - d3) +
+    s1 * (2 - 5 * d2 + 3 * d3) +
+    s2 * (d + 4 * d2 - 3 * d3) +
+    s3 * (d3 - d2)
   );
 }
 
@@ -188,10 +188,10 @@ function catmullRom(s0: number, s1: number, s2: number, s3: number, d: number): 
  */
 function gpuStripeMapToParam(smoothVal: number, acc: GpuAccumState, maxIter: number = 256): number {
   const frac = smoothVal - Math.floor(smoothVal);
-  const extrapolated = 2 * acc.stripeSum - acc.stripePrev1;
+  const ext = 2 * acc.stripeSum - acc.stripePrev1;
   const interpolated = acc.count >= 3
-    ? catmullRom(acc.stripePrev2, acc.stripePrev1, acc.stripeSum, extrapolated, frac)
-    : acc.stripePrev1 + frac * (acc.stripeSum - acc.stripePrev1);
+    ? catmullRom(acc.stripePrev1, acc.stripeSum, ext, 2 * ext - acc.stripeSum, frac)
+    : acc.stripeSum + frac * (ext - acc.stripeSum);
   const stripeRatio = acc.count > 0 ? interpolated / acc.count : 0;
   // @mirror deep-mandelbrot: stripe amplitude + iteration frequency
   const amplitude = 0.7 + 2.5 * stripeRatio;
@@ -457,10 +457,10 @@ describe('GPU/CPU parity — stripe coloring', () => {
     it(`smoothVal=${tc.smoothVal}, count=${tc.count}`, () => {
       // CPU: finalizeEscape computes stripeValue via Catmull-Rom, then stripeToParam maps it
       const frac = tc.smoothVal - Math.floor(tc.smoothVal);
-      const extrapolated = 2 * tc.s - tc.s1;
+      const ext = 2 * tc.s - tc.s1;
       const interpolated = tc.count >= 3
-        ? catmullRom(tc.s2, tc.s1, tc.s, extrapolated, frac)
-        : tc.s1 + frac * (tc.s - tc.s1);
+        ? catmullRom(tc.s1, tc.s, ext, 2 * ext - tc.s, frac)
+        : tc.s + frac * (ext - tc.s);
       const stripeValue = tc.count > 0 ? interpolated / tc.count : 0;
       const cpuT = mapToColorParam(
         makeEscapedResult({ smoothValue: tc.smoothVal, stripeValue }),

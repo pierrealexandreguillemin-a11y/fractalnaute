@@ -13,7 +13,8 @@ import {
   initAccumulator,
   updateAccumulator,
   finalizeEscape,
-  finalizeInterior
+  finalizeInterior,
+  STRIPE_BAILOUT_SQ
 } from './coloringAccumulator';
 
 /** Build standard interior result — DRY: used by all calculators for cardioid/bulb/cycle/maxIter exits */
@@ -35,6 +36,13 @@ const LN2 = Math.LN2;
 function smoothEscape(iter: number, zRe2: number, zIm2: number, logBase: number = 2): number {
   const logZn = Math.log(zRe2 + zIm2) / 2;
   const logLogBase = logBase === 2 ? LN2 : Math.log(logBase);
+  return iter + 1 - Math.log(logZn / logLogBase) / logLogBase;
+}
+
+/** smoothEscape variant taking pre-computed |z|² directly (for Multibrot/general power). */
+function smoothEscapeMod2(iter: number, mod2: number, logBase: number): number {
+  const logZn = Math.log(mod2) / 2;
+  const logLogBase = Math.log(logBase);
   return iter + 1 - Math.log(logZn / logLogBase) / logLogBase;
 }
 
@@ -89,7 +97,7 @@ function mandelbrotAccumPath(cRe: number, cIm: number, maxIter: number): Fractal
   let dzRe = 0, dzIm = 0;
   let refRe = 0, refIm = 0, period = 1, counter = 0;
 
-  while (zRe2 + zIm2 <= 1e12 && iter < maxIter) {
+  while (zRe2 + zIm2 <= STRIPE_BAILOUT_SQ && iter < maxIter) {
     // dz = 2*z*dz + 1
     const newDzRe = 2 * (zRe * dzRe - zIm * dzIm) + 1;
     const newDzIm = 2 * (zRe * dzIm + zIm * dzRe);
@@ -190,7 +198,7 @@ function juliaAccumPath(
   let dzRe = 1, dzIm = 0;
   let refRe = z0Re, refIm = z0Im, period = 1, counter = 0;
 
-  while (zRe2 + zIm2 <= 1e12 && iter < maxIter) {
+  while (zRe2 + zIm2 <= STRIPE_BAILOUT_SQ && iter < maxIter) {
     // dz = 2*z*dz (no +1 — c is constant in Julia)
     const newDzRe = 2 * (zRe * dzRe - zIm * dzIm);
     const newDzIm = 2 * (zRe * dzIm + zIm * dzRe);
@@ -278,7 +286,7 @@ function burningShipAccumPath(cRe: number, cIm: number, maxIter: number): Fracta
   let dzRe = 0, dzIm = 0;
   let refRe = 0, refIm = 0, period = 1, counter = 0;
 
-  while (zRe2 + zIm2 <= 1e12 && iter < maxIter) {
+  while (zRe2 + zIm2 <= STRIPE_BAILOUT_SQ && iter < maxIter) {
     const absRe = Math.abs(zRe);
     const absIm = Math.abs(zIm);
 
@@ -369,7 +377,7 @@ function tricornAccumPath(cRe: number, cIm: number, maxIter: number): FractalRes
   let dzRe = 0, dzIm = 0;
   let refRe = 0, refIm = 0, period = 1, counter = 0;
 
-  while (zRe2 + zIm2 <= 1e12 && iter < maxIter) {
+  while (zRe2 + zIm2 <= STRIPE_BAILOUT_SQ && iter < maxIter) {
     // Approximate derivative (anti-holomorphic — not exact)
     const newDzRe = 2 * (zRe * dzRe + zIm * dzIm) + 1;
     const newDzIm = 2 * (-zRe * dzIm + zIm * dzRe);
@@ -450,7 +458,7 @@ function multibrotFastPath(
   const mod2 = zRe * zRe + zIm * zIm;
   return {
     iterations: iter, escaped: true,
-    smoothValue: smoothEscape(iter, mod2, 0, n),
+    smoothValue: smoothEscapeMod2(iter, mod2, n),
     ...INTERIOR_COLORING_DEFAULTS
   };
 }
@@ -467,7 +475,7 @@ function multibrotAccumPath(
   let dzRe = 0, dzIm = 0;
   let refRe = 0, refIm = 0, period = 1, counter = 0;
 
-  while (zRe * zRe + zIm * zIm <= 1e12 && iter < maxIter) {
+  while (zRe * zRe + zIm * zIm <= STRIPE_BAILOUT_SQ && iter < maxIter) {
     // z^n with z^(n-1) capture for derivative
     let pRe = zRe, pIm = zIm;
     let prevPRe = 1, prevPIm = 0; // z^0 = 1 (for n=1 edge case)
@@ -507,7 +515,7 @@ function multibrotAccumPath(
   }
 
   const mod2 = zRe * zRe + zIm * zIm;
-  const sv = smoothEscape(iter, mod2, 0, n);
+  const sv = smoothEscapeMod2(iter, mod2, n);
   const escape = finalizeEscape(acc, zRe, zIm, dzRe, dzIm, sv);
   return { iterations: iter, escaped: true, smoothValue: sv, ...escape };
 }
