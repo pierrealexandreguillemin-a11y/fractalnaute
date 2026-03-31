@@ -37,10 +37,6 @@ pub fn two_prod(a: f64, b: f64) -> (f64, f64) {
 /// Double-Double: 2xf64, ~106 bits precision.
 /// Represents exact value `hi + lo` where `|lo| <= 0.5 * ulp(hi)`.
 /// Zero heap allocation — stack only. ~20 FLOPs per add, ~28 per mul.
-///
-/// @tradeoff DD uses f64 parsing for center coordinates. Sufficient because
-/// JS sends f64-precision strings. The DD arithmetic precision (106 bits)
-/// keeps the orbit accurate during z^2+c iteration even though the seed is f64.
 #[derive(Clone, Copy)]
 pub struct DD {
     pub hi: f64,
@@ -121,11 +117,17 @@ impl OrbitFloat for DD {
         if f.is_finite() { f } else { 0.0_f32 }
     }
     fn parse_decimal(s: &str, _precision_bits: usize) -> Result<Self, String> {
-        let hi: f64 = s.parse().map_err(|e| format!("DD parse error '{s}': {e}"))?;
+        use dashu_float::DBig;
+        let exact: DBig = s.parse().map_err(|e| format!("DD parse error '{s}': {e}"))?;
+        let hi: f64 = format!("{exact}").parse().unwrap_or(0.0);
         if !hi.is_finite() {
             return Err(format!("DD parsed non-finite: {hi}"));
         }
-        Ok(DD { hi, lo: 0.0 })
+        // lo = exact - hi (the bits lost by f64 truncation)
+        let hi_exact: DBig = format!("{hi}").parse()
+            .map_err(|e| format!("DD reparse of '{hi}' failed: {e}"))?;
+        let lo: f64 = format!("{}", &exact - &hi_exact).parse().unwrap_or(0.0);
+        Ok(DD { hi, lo })
     }
 }
 

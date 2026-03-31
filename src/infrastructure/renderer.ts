@@ -50,6 +50,56 @@ function getPrecisionMode(viewport: Viewport, fractalType: FractalType): Precisi
  * If pool is provided, uses parallel workers.
  * Otherwise, falls back to single-thread chunked rendering.
  */
+/** Launch perturbation render (orbit + GPU). Returns cancel function. */
+function renderPerturbation(
+  canvas: HTMLCanvasElement, pool: WorkerPool | null,
+  gpuRenderer: WebGLRenderer, options: RenderOptions
+): () => void {
+  const refRe = options.zoomTargetRe ?? options.viewport.centerRe;
+  const refIm = options.zoomTargetIm ?? options.viewport.centerIm;
+  let stale = false;
+  const isStale = () => stale;
+
+  // @tradeoff maxDc ≈ scale × 2 (conservative upper bound for max |δc|).
+  const maxDc = options.viewport.scale * 2;
+
+  // Use deep strings only when ref point IS the viewport center (no zoom target override).
+  // When zoomTarget differs, deep strings describe a different point — use f64.toString().
+  const refReStr = (options.zoomTargetRe === undefined)
+    ? (options.viewport.deepRe ?? refRe.toString()) : refRe.toString();
+  const refImStr = (options.zoomTargetIm === undefined)
+    ? (options.viewport.deepIm ?? refIm.toString()) : refIm.toString();
+  const scaleStr = options.viewport.deepScale ?? options.viewport.scale.toString();
+
+  computeReferenceOrbit(
+    refReStr, refImStr,
+    options.maxIterations, scaleStr, maxDc
+  ).then(({ data, length, cancelled, blaData, blaNumLevels, blaLevelOffsets }) => {
+    if (cancelled || stale) return;
+    const orbitData: OrbitData = {
+      data, length, refPointRe: refRe, refPointIm: refIm,
+      blaData, blaNumLevels, blaLevelOffsets,
+      rescaleS: computeRescaleS(options.viewport.scale, canvas.width),
+    };
+    handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
+  }).catch((err: unknown) => {
+    if (stale) return;
+    const msg = String(err);
+    console.warn('[perturbation] orbit failed:', msg);
+    if (msg.includes('timed out')) {
+      options.onStatusMessage?.('Orbit computation timed out — using standard precision');
+    } else if (msg.includes('memory') || msg.includes('alloc')) {
+      options.onStatusMessage?.('Not enough memory for this zoom depth — try reducing iterations');
+    } else {
+      options.onStatusMessage?.('Deep zoom computation failed — using standard precision');
+    }
+    gpuRenderer.setVisible(false);
+    renderDsFallback(canvas, pool, gpuRenderer, options);
+  });
+
+  return () => { stale = true; cancelOrbit(); cancelPerturbationRetry(); gpuRenderer.cancelPending(); };
+}
+
 export function renderFractal(
   canvas: HTMLCanvasElement,
   pool: WorkerPool | null,
@@ -59,43 +109,7 @@ export function renderFractal(
   const precision = getPrecisionMode(options.viewport, options.fractalType);
 
   if (precision === 'perturbation' && gpuRenderer?.isReady()) {
-    const refRe = options.zoomTargetRe ?? options.viewport.centerRe;
-    const refIm = options.zoomTargetIm ?? options.viewport.centerIm;
-    let stale = false;
-    const isStale = () => stale;
-
-    // @tradeoff maxDc ≈ scale × 2 (conservative upper bound for max |δc|).
-    // Exact: max|pixel - ref| across viewport, but scale×2 covers the diagonal.
-    // Too large → BLA validity radii shrink (fewer skips). Too small → artifacts.
-    const maxDc = options.viewport.scale * 2;
-
-    computeReferenceOrbit(
-      refRe.toString(), refIm.toString(),
-      options.maxIterations, options.viewport.scale.toString(), maxDc
-    ).then(({ data, length, cancelled, blaData, blaNumLevels, blaLevelOffsets }) => {
-      if (cancelled || stale) return;
-      const orbitData: OrbitData = {
-        data, length, refPointRe: refRe, refPointIm: refIm,
-        blaData, blaNumLevels, blaLevelOffsets,
-        rescaleS: computeRescaleS(options.viewport.scale, canvas.width),
-      };
-      handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
-    }).catch((err: unknown) => {
-      if (stale) return;
-      const msg = String(err);
-      console.warn('[perturbation] orbit failed:', msg);
-      if (msg.includes('timed out')) {
-        options.onStatusMessage?.('Orbit computation timed out — using standard precision');
-      } else if (msg.includes('memory') || msg.includes('alloc')) {
-        options.onStatusMessage?.('Not enough memory for this zoom depth — try reducing iterations');
-      } else {
-        options.onStatusMessage?.('Deep zoom computation failed — using standard precision');
-      }
-      gpuRenderer.setVisible(false);
-      renderDsFallback(canvas, pool, gpuRenderer, options);
-    });
-
-    return () => { stale = true; cancelOrbit(); cancelPerturbationRetry(); gpuRenderer.cancelPending(); };
+    return renderPerturbation(canvas, pool, gpuRenderer, options);
   }
 
   // Try GPU path first

@@ -21,9 +21,9 @@ export type {
   RenderBackend
 } from './types';
 
-export { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, INTERIOR_COLORING_DEFAULTS } from './types';
+export { DEFAULT_JULIA_PARAMS, JULIA_PRESETS, INTERIOR_COLORING_DEFAULTS, PERTURBATION_THRESHOLD } from './types';
 
-export type { ColoringMode, PrecisionMode, OrbitData, DeepViewport } from './types';
+export type { ColoringMode, PrecisionMode, OrbitData } from './types';
 
 export {
   initAccumulator,

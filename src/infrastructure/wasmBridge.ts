@@ -7,13 +7,15 @@
  * Same pattern as workerPool.ts (ISO 9241-110: controllability).
  */
 
-const PERTURBATION_THRESHOLD = 1e-13;
+import { PERTURBATION_THRESHOLD } from '../domain';
+
 /** ISO 25010 Performance: orbit computation timeout. */
 const ORBIT_TIMEOUT_MS = 10_000;
 
 let orbitWorker: Worker | null = null;
 let controlBuffer: SharedArrayBuffer | null = null;
 let controlView: Int32Array | null = null;
+let activeReject: ((reason?: unknown) => void) | null = null;
 
 function isWasmSupported(): boolean {
   return typeof WebAssembly !== 'undefined';
@@ -51,6 +53,10 @@ export function cancelOrbit(): void {
   if (controlView) {
     Atomics.store(controlView, 0, 1);
   }
+  if (activeReject) {
+    activeReject(new Error('cancelled'));
+    activeReject = null;
+  }
   if (orbitWorker) {
     orbitWorker.terminate();
     orbitWorker = null;
@@ -76,6 +82,7 @@ export function computeReferenceOrbit(
   return new Promise((resolve, reject) => {
     cancelOrbit();
     ensureControlBuffer();
+    activeReject = reject;
 
     // Reset control buffer: cancel=0, progress=0
     Atomics.store(controlView!, 0, 0);
@@ -86,16 +93,21 @@ export function computeReferenceOrbit(
       worker = createOrbitWorker();
       orbitWorker = worker;
     } catch (e) {
+      activeReject = null;
       reject(e);
       return;
     }
 
     const timer = setTimeout(() => {
-      cancelOrbit();
+      // Don't call cancelOrbit() — it would reject with 'cancelled' before we can reject with 'timed out'.
+      activeReject = null;
+      if (controlView) Atomics.store(controlView, 0, 1);
+      if (orbitWorker) { orbitWorker.terminate(); orbitWorker = null; }
       reject(new Error(`Orbit computation timed out after ${ORBIT_TIMEOUT_MS}ms`));
     }, ORBIT_TIMEOUT_MS);
 
     const cleanup = () => {
+      activeReject = null;
       clearTimeout(timer);
       worker.removeEventListener('message', handler);
       worker.removeEventListener('error', errorHandler);
@@ -133,4 +145,4 @@ export function computeReferenceOrbit(
   });
 }
 
-export { PERTURBATION_THRESHOLD };
+export { PERTURBATION_THRESHOLD } from '../domain';

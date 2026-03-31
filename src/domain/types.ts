@@ -35,6 +35,10 @@ export interface Viewport {
   centerRe: number;
   centerIm: number;
   scale: number;
+  /** High-precision center (arbitrary decimal string) for deep zoom >10^-13 */
+  deepRe?: string;
+  deepIm?: string;
+  deepScale?: string;
 }
 
 /** RGB color tuple */
@@ -153,16 +157,8 @@ export const JULIA_PRESETS: JuliaPreset[] = [
 /** Precision mode for rendering — auto-selected based on zoom depth. */
 export type PrecisionMode = 'float32' | 'doubleSingle' | 'perturbation';
 
-/**
- * Extended viewport for deep zoom (beyond float64 precision).
- * String representations carry arbitrary-precision coordinates.
- * Used when scale < PERTURBATION_THRESHOLD (~1e-13).
- */
-export interface DeepViewport extends Viewport {
-  centerReStr: string;
-  centerImStr: string;
-  scaleStr: string;
-}
+/** Scale threshold below which perturbation theory / deep zoom encoding is used. */
+export const PERTURBATION_THRESHOLD = 1e-13;
 
 /** Reference orbit data for GPU perturbation rendering. */
 export interface OrbitData {

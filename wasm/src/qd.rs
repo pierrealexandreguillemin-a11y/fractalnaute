@@ -165,13 +165,24 @@ impl OrbitFloat for QD {
         let f = self.0 as f32;
         if f.is_finite() { f } else { 0.0_f32 }
     }
-    /// @tradeoff QD uses f64 parsing for center coordinates (same as DD).
-    /// Sufficient because JS sends f64-precision strings. QD arithmetic
-    /// (212 bits) keeps the orbit accurate during iteration.
     fn parse_decimal(s: &str, _precision_bits: usize) -> Result<Self, String> {
-        let hi: f64 = s.parse().map_err(|e| format!("QD parse error '{s}': {e}"))?;
-        if !hi.is_finite() { return Err(format!("QD parsed non-finite: {hi}")); }
-        Ok(QD(hi, 0.0, 0.0, 0.0))
+        use dashu_float::DBig;
+        let exact: DBig = s.parse().map_err(|e| format!("QD parse error '{s}': {e}"))?;
+        // Extract 4 f64 components: each captures bits lost by the previous
+        let x0: f64 = format!("{exact}").parse().unwrap_or(0.0);
+        if !x0.is_finite() { return Err(format!("QD parsed non-finite: {x0}")); }
+        let r0: DBig = format!("{x0}").parse()
+            .map_err(|e| format!("QD reparse x0 '{x0}' failed: {e}"))?;
+        let rem1 = &exact - &r0;
+        let x1: f64 = format!("{rem1}").parse().unwrap_or(0.0);
+        let r1: DBig = format!("{x1}").parse()
+            .map_err(|e| format!("QD reparse x1 '{x1}' failed: {e}"))?;
+        let rem2 = &rem1 - &r1;
+        let x2: f64 = format!("{rem2}").parse().unwrap_or(0.0);
+        let r2: DBig = format!("{x2}").parse()
+            .map_err(|e| format!("QD reparse x2 '{x2}' failed: {e}"))?;
+        let x3: f64 = format!("{}", &rem2 - &r2).parse().unwrap_or(0.0);
+        Ok(QD(x0, x1, x2, x3))
     }
 }
 

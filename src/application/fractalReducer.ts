@@ -61,6 +61,9 @@ export interface InitialFractalConfig {
   centerRe?: number;
   centerIm?: number;
   scale?: number;
+  deepRe?: string;
+  deepIm?: string;
+  deepScale?: string;
   coloringMode?: ColoringMode;
   interiorColoring?: boolean;
   ssaa?: boolean;
@@ -117,9 +120,9 @@ export function fractalReducer(state: FractalState, action: FractalAction): Frac
       };
     }
     case 'ZOOM':
-      return { ...state, viewport: zoomViewport(state.viewport, action.factor, action.focusRe, action.focusIm) };
+      return { ...state, viewport: deepZoom(state.viewport, action.factor, action.focusRe, action.focusIm) };
     case 'PAN':
-      return { ...state, viewport: panViewport(state.viewport, action.deltaRe, action.deltaIm) };
+      return { ...state, viewport: deepPan(state.viewport, action.deltaRe, action.deltaIm) };
     case 'RESET':
       return { ...state, viewport: getDefaultViewport(state.fractalType) };
     case 'SET_PALETTE':
@@ -172,8 +175,7 @@ function reducerExtras(state: FractalState, action: FractalAction): FractalState
 }
 
 // ---- Config override helpers ------------------------------------------------
-
-import { zoomViewport, panViewport } from '../domain';
+import { deepZoom, deepPan } from './deepArithmetic';
 
 /** Apply simple scalar overrides from initial config */
 function applyScalarOverrides(base: FractalState, initial?: InitialFractalConfig): FractalState {
@@ -207,7 +209,8 @@ function applyViewportOverrides(
   state: FractalState, initial?: InitialFractalConfig
 ): FractalState {
   if (!initial) return state;
-  const has = initial.centerRe !== undefined || initial.centerIm !== undefined || initial.scale !== undefined;
+  const has = initial.centerRe !== undefined || initial.centerIm !== undefined || initial.scale !== undefined
+    || initial.deepRe !== undefined || initial.deepIm !== undefined || initial.deepScale !== undefined;
   if (!has) return state;
   return {
     ...state,
@@ -215,6 +218,9 @@ function applyViewportOverrides(
       centerRe: initial.centerRe ?? state.viewport.centerRe,
       centerIm: initial.centerIm ?? state.viewport.centerIm,
       scale: initial.scale ?? state.viewport.scale,
+      deepRe: initial.deepRe ?? state.viewport.deepRe,
+      deepIm: initial.deepIm ?? state.viewport.deepIm,
+      deepScale: initial.deepScale ?? state.viewport.deepScale,
     },
   };
 }

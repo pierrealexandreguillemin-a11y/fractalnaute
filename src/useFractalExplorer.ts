@@ -26,14 +26,16 @@ function derivePrecisionMode(scale: number, fractalType: FractalType): Precision
 
 /** Build the UrlState object from fractal state for URL sync */
 function buildUrlState(state: {
-  viewport: { centerRe: number; centerIm: number; scale: number };
+  viewport: { centerRe: number; centerIm: number; scale: number; deepRe?: string; deepIm?: string; deepScale?: string };
   fractalType: FractalType; maxIterations: number; palette: string;
   coloringMode: string; interiorColoring: boolean; ssaa: boolean;
   juliaParams: { juliaRe?: number; juliaIm?: number };
 }) {
   return {
     centerRe: state.viewport.centerRe, centerIm: state.viewport.centerIm,
-    scale: state.viewport.scale, fractalType: state.fractalType,
+    scale: state.viewport.scale,
+    deepRe: state.viewport.deepRe, deepIm: state.viewport.deepIm, deepScale: state.viewport.deepScale,
+    fractalType: state.fractalType,
     maxIterations: state.maxIterations, palette: state.palette,
     coloringMode: state.coloringMode, interiorColoring: state.interiorColoring,
     ssaa: state.ssaa,
