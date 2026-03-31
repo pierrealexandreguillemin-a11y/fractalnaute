@@ -122,7 +122,7 @@ grep -r @tradeoff src/
 3. ~~Progressive FBO + timer query~~ — adaptive >16ms, EXT_disjoint_timer_query_webgl2
 4. ~~SSAA 2x2~~ — GPU 2x FBO, toggle, composes with progressive
 5. ~~Double-single emulation~~ — Mandelbrot DS (vec2 hi+lo), zoom 10^-15
-6. ~~Stripe rewrite~~ — deep-mandelbrot quality (Re·Im/|z|², Catmull-Rom, cosine palette, bailout 300K)
+6. ~~Stripe rewrite~~ — deep-mandelbrot quality (Re·Im/|z|², Catmull-Rom standard form, bailout 300K)
 7. ~~P0 UX~~ — URL state, touch pinch, responsive mobile, adaptive debounce
 8. ~~Perturbation theory v1~~ — Rust/WASM dashu-float orbit + GPU perturbation shader.
    Mandelbrot + Julia. Zoom 10^-14 verified (structure visible). SAB cancel/progress, WCAG progressbar.
@@ -131,10 +131,16 @@ grep -r @tradeoff src/
    OrbitFloat trait (DRY). Orbit no longer bottleneck (<1ms). GPU render (~50ms) = new bottleneck.
 10. ~~Rescaling (F1)~~ — static S = 2^k per frame, δ̃ = δ×S keeps float32 precise at any depth.
    Zoom 10^-14 verified: structure visible at (-1.749998, 0), 62ms GPU+Perturbation, 1024 iter.
-   Zoom 10^-40: renders without crash (70ms), but depth NOT visually verified (test point interior,
-   JS number coords limited to 15 digits — need interactive zoom to reach exterior at 10^-40).
    BLA lookup simulation: >100/255 iter skipped (vitest). Rescale parity: de-rescaled == non-rescaled.
    Default iter 256→1024, slider max→4096.
+11. ~~High-precision coordinate pipeline~~ — decimal.js-light (200 digits) for zoom/pan arithmetic.
+   Viewport.deepRe/deepIm/deepScale strings threaded URL→state→WASM.
+   DD/QD Rust parse via dashu DBig (hi+lo extraction, not f64-only).
+   PERTURBATION_THRESHOLD lifted to domain layer (single source of truth).
+   Verified interactively: zoom 10^23x, perturbation kicks in at ~5e-14, <1ms render at all depths.
+   URL encodes 32-digit coords in base64 (dre/dim/ds params).
+   Known limits: structure needs >1024 iter at deep zoom; focus-point zoom degrades past 10^-15
+   (f64 offset → 0, @tradeoff documented).
 
 ### Next (ordre par impact perf)
 
@@ -178,8 +184,8 @@ texelFetch teste et elimine (stub vec4(0.0) → pas de gain coherent).
 | # | Technique | Impact | Effort | Status |
 |---|---|---|---|---|
 | ~~E2a~~ | ~~Orbit uniform array~~ | ~~50ms→10ms~~ | ~~1 sem~~ | **ELIMINE** (texelFetch pas le bottleneck) |
-| E2b | **BLA (Bivariate Linear Approximation)** | Skip 80-99% iter | 3-4 sem | **NEXT** |
-| E2c | **Ping-pong multi-frame** | <1ms first visible | 1 sem | After E2b |
+| ~~E2b~~ | ~~BLA (Bivariate Linear Approximation)~~ | ~~Skip 80-99% iter~~ | ~~3-4 sem~~ | **DONE** |
+| E2c | **Ping-pong multi-frame** | <1ms first visible | 1 sem | Deprioritise (masque latence) |
 | E2d | **SA classique** | 2-3x | 2-3 sem | Supersede par BLA |
 
 Techniques eliminees (avec justification mathematique) :
@@ -189,7 +195,7 @@ Techniques eliminees (avec justification mathematique) :
 - Periodicity GPU : divergence warp annule le gain (deja documente)
 - Workgroup shared memory : pas disponible en WebGL 2 (WebGPU requis)
 
-Ordre d'execution : E2a (tester hypothese texelFetch) → E2b (BLA) → E2c (ping-pong)
+Ordre d'execution : ~~E2a~~ → ~~E2b~~ → E2c (deprioritise) | F2 (histogram) **NEXT**
 
 #### Phase F: Polish & features
 
@@ -247,15 +253,15 @@ Ordre d'execution : E2a (tester hypothese texelFetch) → E2b (BLA) → E2c (pin
 ### Competitive advantages (unique in market)
 - 5 fractals × 5 coloring modes GPU-rendered (all others are Mandelbrot-only)
 - WebGL 2 native (<1ms render, no library overhead)
-- Perturbation theory: Rust/WASM arbitrary precision orbit + GPU shader (zoom 10^-40+)
+- Perturbation theory: Rust/WASM arbitrary precision orbit + GPU shader + high-precision coords (Mandelbrot/Julia)
 - SSAA 2x2 toggle (no competitor has this)
 - Touch mobile (most are desktop-only)
-- URL state with Julia params (viewport + fractal + coloring + Julia c)
+- URL state with Julia params + deep zoom base64 strings (viewport + fractal + coloring + Julia c)
 - OKLCH perceptually uniform color system
 - Adaptive debounce (E) DONE — 40ms when GPU<1ms, 80ms otherwise
 
 ### UX Features
-- URL state persistence: hash-based (`#re=&im=&s=&f=&i=&p=&c=&ic=`), replaceState, debounced
+- URL state persistence: hash-based (`#re=&im=&s=` or `#dre=&dim=&ds=` base64 deep), replaceState, debounced
 - Touch: pinch-to-zoom + two-finger pan (single finger = no-op)
 - Responsive UI: mobile bottom-sheet layout <640px, scrollable, stacked panels
 - Adaptive debounce: 40ms when GPU renders <1ms (vs fixed 80ms)
@@ -263,8 +269,9 @@ Ordre d'execution : E2a (tester hypothese texelFetch) → E2b (BLA) → E2c (pin
 ## Testing
 
 - Framework: vitest (`npm test`)
-- 310 unit tests (14 test files) for domain + infrastructure + application layers
-- All pure functions, deterministic, ~333ms total
+- 228 unit tests (14 test files) for domain + infrastructure + application layers
+- 57 Rust cargo tests (DD/QD/ArbFloat/BLA/orbit/precision)
+- All pure functions, deterministic, <300ms total
 
 ## Deploy
 
