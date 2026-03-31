@@ -60,7 +60,7 @@ int blaLookup(int m, float dz2, out BLAEntry result) {
   for (int level = maxLevel; level >= u_blaFirstLevel; level--) {
     int entryIdx = u_blaLevelOffsets[level] + ix;
     BLAEntry entry = getBlaEntry(entryIdx);
-    if (dz2 < entry.r2) {
+    if (dz2 < entry.r2 * u_rescaleS2) {
       result = entry;
       return entry.l;
     }
@@ -80,9 +80,9 @@ bool tryBlaSkip(inout float u, inout float v, inout int refIter, inout int i,
                 out float smoothVal) {
   float invS = 1.0 / u_rescaleS;
   BLAEntry blaEntry;
-  // De-rescale |δ̃|² → |δ|² for BLA validity comparison
-  float dz2_real = (u*u + v*v) * invS * invS;
-  int skipped = blaLookup(refIter, dz2_real, blaEntry);
+  // Option A (spec): compare |δ̃|² < r²·S² — avoids per-pixel division
+  float dz2_tilde = u*u + v*v;
+  int skipped = blaLookup(refIter, dz2_tilde, blaEntry);
   if (skipped <= 0 || refIter + skipped >= u_orbitLength || i + skipped >= MAX_ITER) {
     return false;
   }
@@ -104,9 +104,8 @@ bool tryBlaSkip(inout float u, inout float v, inout int refIter, inout int i,
     return true;
   }
 
-  // Rebase: δ̃ = z × S (re-rescale to rescaled domain)
-  float uu_vv_real = (u*u + v*v) * invS * invS;
-  if (zz < uu_vv_real) {
+  // Rebase: |z|² < |δ|² → δ̃ = z × S
+  if (zz < dz2_tilde / u_rescaleS2) {
     u = z.x * u_rescaleS; v = z.y * u_rescaleS;
     refIter = 0;
   }

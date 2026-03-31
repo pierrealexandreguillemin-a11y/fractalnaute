@@ -14,6 +14,7 @@ uniform vec2 u_orbitTexSize;
 uniform vec2 u_refPoint;
 uniform vec2 u_refPointLo;
 uniform float u_rescaleS;
+uniform float u_rescaleS2;  // S² — avoids per-pixel division in BLA validity check
 `;
 
 /** Orbit texture lookup — one RGBA32F texel per iteration. */
@@ -239,5 +240,5 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 /** Uniform names added by perturbation chunks. */
 export const PERTURBATION_UNIFORM_NAMES = [
   'u_orbitTexture', 'u_orbitLength', 'u_orbitTexSize',
-  'u_refPoint', 'u_refPointLo', 'u_rescaleS'
-];
+  'u_refPoint', 'u_refPointLo', 'u_rescaleS', 'u_rescaleS2'
+] as const;

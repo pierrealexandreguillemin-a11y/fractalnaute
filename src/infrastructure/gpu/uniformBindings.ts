@@ -85,6 +85,8 @@ export function setOrbitUniforms(
 
   const rescaleLoc = loc('u_rescaleS');
   if (rescaleLoc) gl.uniform1f(rescaleLoc, orbit.rescaleS);
+  const rescaleS2Loc = loc('u_rescaleS2');
+  if (rescaleS2Loc) gl.uniform1f(rescaleS2Loc, orbit.rescaleS * orbit.rescaleS);
 
   const orbitTexLoc = loc('u_orbitTexture');
   if (orbitTexLoc) {

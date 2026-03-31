@@ -165,9 +165,13 @@ describe('BLA lookup simulation (mirrors GLSL blaLookup)', () => {
     return { entries, offsets, numLevels, tree };
   }
 
-  /** Mirror of GLSL blaLookup — find largest valid skip. */
+  /**
+   * Mirror of GLSL blaLookup — find largest valid skip.
+   * Option A (spec): compare dz2 < r2 * S² (S² passed as rescaleS2 param).
+   * @mirror bla.ts:blaLookup
+   */
   function blaLookup(
-    m: number, dz2: number,
+    m: number, dz2: number, rescaleS2: number,
     entries: Array<{ r2: number; l: number }>,
     offsets: number[], numLevels: number
   ): number {
@@ -189,7 +193,7 @@ describe('BLA lookup simulation (mirrors GLSL blaLookup)', () => {
     for (let level = maxLevel; level >= FIRST_LEVEL; level--) {
       const entryIdx = offsets[level]! + ix;
       const entry = entries[entryIdx];
-      if (entry && dz2 < entry.r2) {
+      if (entry && dz2 < entry.r2 * rescaleS2) {
         return entry.l;
       }
       ix = ix << 1;
@@ -203,14 +207,14 @@ describe('BLA lookup simulation (mirrors GLSL blaLookup)', () => {
     expect(nonZero.length).toBeGreaterThan(0);
   });
 
-  it('BLA lookup finds valid entries for small delta (deep zoom)', () => {
+  it('BLA lookup finds valid entries for small delta (deep zoom, S=1)', () => {
     const { entries, offsets, numLevels } = buildBlaTable(256, 1e-13);
-    // At deep zoom, |δ|² ≈ 10^-34 (much smaller than any r²)
+    // At deep zoom with S=1, |δ|² ≈ 10^-34 (much smaller than any r²)
     const dz2 = 1e-34;
     let totalSkipped = 0;
     let refIter = 1;
     for (let i = 0; i < 256 && refIter < 255; i++) {
-      const skipped = blaLookup(refIter, dz2, entries, offsets, numLevels);
+      const skipped = blaLookup(refIter, dz2, 1.0, entries, offsets, numLevels);
       if (skipped > 0) {
         totalSkipped += skipped;
         refIter += skipped;
@@ -218,30 +222,28 @@ describe('BLA lookup simulation (mirrors GLSL blaLookup)', () => {
         refIter++;
       }
     }
-    // BLA should skip a significant portion of 255 iterations
     expect(totalSkipped).toBeGreaterThan(100);
   });
 
   it('BLA lookup skips nothing when delta is too large', () => {
     const { entries, offsets, numLevels } = buildBlaTable(256, 1e-13);
-    // |δ|² = 1.0 (standard zoom, much larger than any r²)
     const dz2 = 1.0;
-    const skipped = blaLookup(1, dz2, entries, offsets, numLevels);
+    const skipped = blaLookup(1, dz2, 1.0, entries, offsets, numLevels);
     expect(skipped).toBe(0);
   });
 
-  it('BLA lookup with rescaling: de-rescaled dz2 matches non-rescaled', () => {
+  it('Option A: rescaled dz2_tilde with S² matches non-rescaled lookup', () => {
     const { entries, offsets, numLevels } = buildBlaTable(256, 1e-13);
-    const S = 2 ** 51; // rescaling factor at zoom 10^-14
-    const delta_real = 1e-17; // real delta
+    const S = 2 ** 51;
+    const S2 = S * S;
+    const delta_real = 1e-17;
     const dz2_real = delta_real * delta_real;
     const delta_tilde = delta_real * S;
     const dz2_tilde = delta_tilde * delta_tilde;
-    const dz2_derescaled = dz2_tilde / (S * S);
 
-    // De-rescaled lookup should match non-rescaled
-    const skip1 = blaLookup(1, dz2_real, entries, offsets, numLevels);
-    const skip2 = blaLookup(1, dz2_derescaled, entries, offsets, numLevels);
+    // Option A: pass dz2_tilde to lookup, r² multiplied by S² inside
+    const skip1 = blaLookup(1, dz2_real, 1.0, entries, offsets, numLevels);
+    const skip2 = blaLookup(1, dz2_tilde, S2, entries, offsets, numLevels);
     expect(skip2).toBe(skip1);
     expect(skip1).toBeGreaterThan(0);
   });
