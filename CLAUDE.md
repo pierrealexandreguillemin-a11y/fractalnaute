@@ -142,6 +142,33 @@ grep -r @tradeoff src/
    Known limits: structure needs >1024 iter at deep zoom; focus-point zoom degrades past 10^-15
    (f64 offset → 0, @tradeoff documented).
 
+### BROKEN PROMISES (audit 2026-04-01 — honnête)
+
+Engagements des plans/specs NON tenus à ce jour :
+
+1. **"Depth breakthrough at 10^-40: image has non-black pixels"** (rescaling spec L233)
+   — NON LIVRÉ. Aplat à 10^-40. 1024 iter insuffisant. Iteration auto-scaling absent.
+2. **"Manual verification: Zoom to 10^-60, 10^-100 via UI"** (rescaling spec L237)
+   — JAMAIS FAIT. Focus-point f64 dégradé à 10^-15.
+3. **"Unlimited zoom depth (10^-60+)"** (perturbation spec L6)
+   — FAUX. Structure visible à ~10^-14 max.
+4. **"GPU render @256iter <10ms with BLA"** (BLA spec L267)
+   — JAMAIS MESURÉ. Pas de benchmark BLA on/off.
+5. **"Cross-validation: BLA on vs off pixel match at 10^-14, 10^-40, 10^-80"** (BLA spec L259)
+   — JAMAIS FAIT.
+6. **"Overlap zone (10^-13): DS and perturbation identical output"** (perturbation spec L593)
+   — JAMAIS VÉRIFIÉ.
+7. **"Playwright benchmarks at 10^-14, 10^-20, 10^-40"** (perturbation plan B L554)
+   — JAMAIS FORMALISÉ. Ad-hoc seulement.
+8. **"10^-80: <50ms (malachite)"** (precision ladder plan L308)
+   — JAMAIS TESTÉ VISUELLEMENT.
+
+Causes racines :
+- Iteration fixe (max 4096 slider) → structure invisible en deep zoom
+- Focus-point zoom f64 → offset nul à 10^-15 → navigation impossible
+- Aucun test Playwright formalisé → aucune preuve mesurable
+- formatCoord bug (exposant strippé) → URLs corrompues (fixé 2026-03-31)
+
 ### Next (ordre par impact perf)
 
 Post-precision-ladder : orbite <1ms, GPU ~50ms = nouveau bottleneck.
