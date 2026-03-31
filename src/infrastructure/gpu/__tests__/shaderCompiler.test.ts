@@ -273,6 +273,16 @@ describe('shaderCompiler', () => {
       expect(ds).not.toContain('USE_BLA');
       expect(ds).not.toContain('u_blaTexture');
     });
+
+    it('perturbation shaders include u_rescaleS uniform', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'perturbation');
+      expect(source).toContain('u_rescaleS');
+    });
+
+    it('non-perturbation shaders do not include u_rescaleS', () => {
+      const source = assembleFragmentSource('mandelbrot', 'classic', 256, false, 'doubleSingle');
+      expect(source).not.toContain('u_rescaleS');
+    });
   });
 
   describe('isGpuSupported', () => {

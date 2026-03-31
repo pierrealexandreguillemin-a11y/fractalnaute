@@ -13,6 +13,7 @@ uniform int u_orbitLength;
 uniform vec2 u_orbitTexSize;
 uniform vec2 u_refPoint;
 uniform vec2 u_refPointLo;
+uniform float u_rescaleS;
 `;
 
 /** Orbit texture lookup — one RGBA32F texel per iteration. */
@@ -226,5 +227,5 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 /** Uniform names added by perturbation chunks. */
 export const PERTURBATION_UNIFORM_NAMES = [
   'u_orbitTexture', 'u_orbitLength', 'u_orbitTexSize',
-  'u_refPoint', 'u_refPointLo'
+  'u_refPoint', 'u_refPointLo', 'u_rescaleS'
 ];
