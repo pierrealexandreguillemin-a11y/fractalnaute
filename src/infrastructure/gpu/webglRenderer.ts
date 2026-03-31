@@ -7,7 +7,7 @@
  */
 
 import type { PaletteName } from '../../domain/types';
-import { initCompiler, getOrCompile, pollCompilation, hasCompiledProgram } from './shaderCompiler';
+import { initCompiler, getOrCompile, pollCompilation, hasCompiledProgram } from './shaderCache';
 import { createPaletteTexture, updatePaletteTexture } from './paletteTexture';
 import { buildOrbitContext, uploadBlaData, buildOrbitWithBla } from './orbitContextBuilder';
 import { createProgressiveController } from './progressiveController';

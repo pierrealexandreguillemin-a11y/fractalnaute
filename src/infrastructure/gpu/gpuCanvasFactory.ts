@@ -6,7 +6,7 @@
 import type { FractalType, PaletteName } from '../../domain/types';
 import type { OrbitTextureState, BlaTextureState } from './rendererTypes';
 import type { ProgressiveController } from './progressiveController';
-import { initCompiler, getOrCompile, destroyAllPrograms } from './shaderCompiler';
+import { initCompiler, getOrCompile, destroyAllPrograms } from './shaderCache';
 import { createPaletteTexture } from './paletteTexture';
 import { destroyOrbitTexture } from './orbitTexture';
 import { destroyBlaTexture } from './blaTexture';
