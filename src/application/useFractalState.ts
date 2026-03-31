@@ -72,7 +72,7 @@ type FractalAction =
 const initialState: FractalState = {
   fractalType: 'mandelbrot',
   viewport: getDefaultViewport('mandelbrot'),
-  maxIterations: 256,
+  maxIterations: 1024,
   palette: 'classic',
   coloringMode: 'classic',
   interiorColoring: false,

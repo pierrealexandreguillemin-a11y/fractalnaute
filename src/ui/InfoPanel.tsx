@@ -28,7 +28,7 @@ function formatRenderTime(ms: number): string {
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
-  stats, precisionMode, orbitComputing, orbitProgress = 0, maxIterations = 256,
+  stats, precisionMode, orbitComputing, orbitProgress = 0, maxIterations = 1024,
   onCancelOrbit, statusMessage,
 }) => (
   <div

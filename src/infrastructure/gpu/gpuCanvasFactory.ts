@@ -13,7 +13,7 @@ import { destroyBlaTexture } from './blaTexture';
 
 export const DEFAULT_PALETTE: PaletteName = 'classic';
 /** Default iteration count for eager pre-compilation. */
-export const PRECOMPILE_MAX_ITER = 256;
+export const PRECOMPILE_MAX_ITER = 1024;
 
 /** Fractal variants to pre-compile (classic coloring covers the default). */
 const PRECOMPILE_FRACTALS: FractalType[] = [

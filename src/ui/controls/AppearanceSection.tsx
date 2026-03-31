@@ -66,7 +66,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
       <Slider
         aria-labelledby="iterations-label"
         min={50}
-        max={1000}
+        max={4096}
         step={1}
         value={[maxIterations]}
         onValueChange={([v]) => { if (v !== undefined) onIterationsChange(v); }}
