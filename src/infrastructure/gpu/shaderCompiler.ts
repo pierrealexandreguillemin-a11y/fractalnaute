@@ -90,7 +90,7 @@ function buildDefines(maxIter: number, needsHighBailout: boolean): string {
   return [
     `#define MAX_ITER ${maxIter}`,
     `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
-    `#define BAILOUT_SQ ${needsHighBailout ? STRIPE_BAILOUT_SQ : '4.0'}`,
+    `#define BAILOUT_SQ ${needsHighBailout ? STRIPE_BAILOUT_SQ.toFixed(1) : '4.0'}`,
     `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
     `#define NORMAL_MAP_LIGHT_ANGLE (${NORMAL_MAP_LIGHT_ANGLE})`,
     `#define INTERIOR_ATTENUATION ${INTERIOR_ATTENUATION}`
