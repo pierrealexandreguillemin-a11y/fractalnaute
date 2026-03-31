@@ -197,13 +197,16 @@ export function buildHash(state: UrlState): string {
 /** Format a coordinate with enough precision to avoid drift */
 function formatCoord(n: number): string {
   const raw = n.toPrecision(15);
-  // Strip trailing zeros after decimal point, then trailing dot
-  const dotIdx = raw.indexOf('.');
-  if (dotIdx === -1) return raw;
-  let end = raw.length;
-  while (end > dotIdx + 1 && raw[end - 1] === '0') end--;
-  if (raw[end - 1] === '.') end--;
-  return raw.slice(0, end);
+  // Strip trailing zeros in mantissa only (stop before 'e' exponent)
+  const eIdx = raw.indexOf('e');
+  const mantissa = eIdx === -1 ? raw : raw.slice(0, eIdx);
+  const exponent = eIdx === -1 ? '' : raw.slice(eIdx);
+  const dotIdx = mantissa.indexOf('.');
+  if (dotIdx === -1) return mantissa + exponent;
+  let end = mantissa.length;
+  while (end > dotIdx + 1 && mantissa[end - 1] === '0') end--;
+  if (mantissa[end - 1] === '.') end--;
+  return mantissa.slice(0, end) + exponent;
 }
 
 // ── Hooks ────────────────────────────────────────────────────────
