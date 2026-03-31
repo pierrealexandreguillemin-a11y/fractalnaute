@@ -78,7 +78,7 @@ export interface RenderOptions {
 }
 
 /** Compute rescaling factor S = 2^k for float32 delta precision. */
-function computeRescaleS(scale: number, canvasWidth: number): number {
+export function computeRescaleS(scale: number, canvasWidth: number): number {
   const pixelSpacing = scale / canvasWidth;
   const k = Math.max(0, -Math.floor(Math.log2(pixelSpacing)) - 4);
   return 2 ** k;

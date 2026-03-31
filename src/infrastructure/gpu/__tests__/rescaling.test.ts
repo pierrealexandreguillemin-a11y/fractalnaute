@@ -1,19 +1,11 @@
 import { describe, it, expect } from 'vitest';
-
-/**
- * Mirror of renderer.ts:computeRescaleS — pure math, testable.
- * @mirror renderer.ts:computeRescaleS
- */
-function computeRescaleS(scale: number, canvasWidth: number): number {
-  const pixelSpacing = scale / canvasWidth;
-  const k = Math.max(0, -Math.floor(Math.log2(pixelSpacing)) - 4);
-  return 2 ** k;
-}
+import { computeRescaleS } from '../../renderer';
 
 describe('computeRescaleS', () => {
-  it('returns 1 at standard zoom (scale=2.8, 1920px)', () => {
+  it('returns 2^6 at standard zoom (scale=2.8, 1920px)', () => {
+    // pixelSpacing = 2.8/1920 ≈ 0.00146, log2 ≈ -9.42, floor → -10, k = max(0, 10-4) = 6
     const S = computeRescaleS(2.8, 1920);
-    expect(S).toBeGreaterThanOrEqual(1);
+    expect(S).toBe(64);
   });
 
   it('returns 1 when pixelSpacing is large (scale=120, 1920px)', () => {
@@ -45,9 +37,10 @@ describe('computeRescaleS', () => {
     }
   });
 
-  it('S=1 is a valid no-op (neutral rescaling)', () => {
+  it('S=1 at wide zoom is a neutral no-op', () => {
+    const S = computeRescaleS(120, 1920);
+    expect(S).toBe(1);
     const delta = 0.123;
-    const S = 1.0;
     expect(delta * delta / S).toBe(delta * delta);
   });
 });
