@@ -77,6 +77,13 @@ export interface RenderOptions {
   onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
+/** Compute rescaling factor S = 2^k for float32 delta precision. */
+function computeRescaleS(scale: number, canvasWidth: number): number {
+  const pixelSpacing = scale / canvasWidth;
+  const k = Math.max(0, -Math.floor(Math.log2(pixelSpacing)) - 4);
+  return 2 ** k;
+}
+
 /** Select precision mode based on zoom depth and fractal type. */
 function getPrecisionMode(viewport: Viewport, fractalType: FractalType): PrecisionMode {
   if (!needsPerturbation(viewport.scale)) {
@@ -154,6 +161,7 @@ export function renderFractal(
       const orbitData: OrbitData = {
         data, length, refPointRe: refRe, refPointIm: refIm,
         blaData, blaNumLevels, blaLevelOffsets,
+        rescaleS: computeRescaleS(options.viewport.scale, canvas.width),
       };
       handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
     }).catch((err: unknown) => {

@@ -55,6 +55,8 @@ export interface OrbitContext {
   blaNumLevels: number;
   /** Pre-padded Int32Array(16) for gl.uniform1iv — avoids allocation per frame. */
   blaLevelOffsetsGpu: Int32Array | null;
+  /** Rescaling factor S = 2^k — passed to GPU as u_rescaleS uniform. */
+  rescaleS: number;
 }
 
 /** Mutable orbit texture state managed by the renderer closure. */

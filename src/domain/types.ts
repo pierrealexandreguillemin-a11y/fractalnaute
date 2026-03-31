@@ -179,4 +179,6 @@ export interface OrbitData {
   blaNumLevels: number;
   /** Per-level entry offset into blaData (length = blaNumLevels) */
   blaLevelOffsets: number[];
+  /** Rescaling factor S = 2^k for float32 delta precision. S=1 at standard zoom. */
+  rescaleS: number;
 }

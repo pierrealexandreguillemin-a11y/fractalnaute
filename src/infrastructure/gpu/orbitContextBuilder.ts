@@ -47,7 +47,8 @@ export function buildOrbitContext(
     blaTexWidth: 0,
     blaTexHeight: 0,
     blaNumLevels: 0,
-    blaLevelOffsetsGpu: null
+    blaLevelOffsetsGpu: null,
+    rescaleS: orbitData.rescaleS,
   };
 }
 
@@ -99,5 +100,6 @@ export function buildOrbitWithBla(
     blaTexHeight: blaState.height,
     blaNumLevels: orbitData.blaNumLevels,
     blaLevelOffsetsGpu: padBlaOffsets(orbitData.blaLevelOffsets),
+    rescaleS: orbitData.rescaleS,
   };
 }
