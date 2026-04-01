@@ -5,8 +5,9 @@
  * ===============================================================================
  */
 
-/** Preview renders at 1/N of canvas resolution (each dimension). 4 = 1/16 pixels. */
-export const PREVIEW_SCALE = 0.25;
+/** Preview renders at 1/N of canvas resolution (each dimension). 0.125 = 1/64 pixels.
+ * At 1920×1080 → 240×135 = 32K pixels. Even at 6K iter, renders in ~80ms. */
+export const PREVIEW_SCALE = 0.125;
 
 /** SSAA renders at Nx canvas resolution (each dimension). 2 = 4x pixels. */
 export const SSAA_SCALE = 2;

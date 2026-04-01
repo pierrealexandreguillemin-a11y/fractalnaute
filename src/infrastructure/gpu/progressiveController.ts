@@ -18,8 +18,9 @@ import type { GPUFramebuffer } from './gpuFramebuffer';
 /** GPU frame budget — one vsync at 60Hz */
 const GPU_FRAME_BUDGET_MS = 16;
 
-/** Conservative threshold for FIRST render (no GPU timing yet). */
-const CONSERVATIVE_ITER_THRESHOLD = 2048;
+/** Conservative threshold for FIRST render (no GPU timing yet).
+ * Lowered to 1024 to ensure progressive preview at deep zoom entry. */
+const CONSERVATIVE_ITER_THRESHOLD = 1024;
 
 function needsProgressiveRender(
   maxIterations: number,
