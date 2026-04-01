@@ -61,15 +61,20 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
 
     <div className="mb-3.5">
       <label id="iterations-label" className={LABEL_CLASS}>
-        Itérations max: {maxIterations}
+        Itérations min: {maxIterations}
       </label>
       <Slider
         aria-labelledby="iterations-label"
-        min={50}
-        max={100000}
+        min={0}
+        max={100}
         step={1}
-        value={[maxIterations]}
-        onValueChange={([v]) => { if (v !== undefined) onIterationsChange(v); }}
+        value={[Math.round(Math.log2(Math.max(50, maxIterations)) / Math.log2(100000) * 100)]}
+        onValueChange={([v]) => {
+          if (v !== undefined) {
+            const iter = Math.round(Math.pow(100000, v / 100));
+            onIterationsChange(Math.max(50, Math.min(100000, iter)));
+          }
+        }}
       />
     </div>
   </fieldset>
