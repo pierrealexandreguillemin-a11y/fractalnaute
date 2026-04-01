@@ -27,7 +27,11 @@ export function renderToTarget(
   const res = compiled.uniformLocations.get('u_resolution');
   if (res) gl.uniform2f(res, target.width, target.height);
   const maxIterLoc = compiled.uniformLocations.get('u_maxIter');
-  if (maxIterLoc) gl.uniform1i(maxIterLoc, maxIterations ?? 1024);
+  if (maxIterLoc) {
+    gl.uniform1i(maxIterLoc, maxIterations ?? 1024);
+  } else {
+    console.warn('[renderToTarget] u_maxIter uniform NOT FOUND — shader will use 0 iterations');
+  }
   setFractalParams(gl, compiled.uniformLocations, fractalParams);
   const intColor = compiled.uniformLocations.get('u_interiorColoring');
   if (intColor) gl.uniform1i(intColor, interiorColoring ? 1 : 0);
