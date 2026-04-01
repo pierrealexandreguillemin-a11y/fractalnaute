@@ -85,9 +85,9 @@ function renderPerturbation(
     ? (options.viewport.deepIm ?? refIm.toString()) : refIm.toString();
   const scaleStr = options.viewport.deepScale ?? options.viewport.scale.toString();
 
-  // Render DS fallback IMMEDIATELY so user sees something while orbit computes.
-  // This prevents the 1-5s blank screen during WASM orbit computation.
-  renderDsFallback(canvas, pool, gpuRenderer, options);
+  // Don't render DS fallback at perturbation depths — DS precision is exhausted,
+  // producing garbled pixels. CSS transform shows the previous (correct) image
+  // stretched, which is better UX than garbled data.
   options.onStatusMessage?.('Computing deep zoom orbit…');
 
   computeReferenceOrbit(
