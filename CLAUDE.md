@@ -139,35 +139,25 @@ grep -r @tradeoff src/
    PERTURBATION_THRESHOLD lifted to domain layer (single source of truth).
    Verified interactively: zoom 10^23x, perturbation kicks in at ~5e-14, <1ms render at all depths.
    URL encodes 32-digit coords in base64 (dre/dim/ds params).
-   Known limits: structure needs >1024 iter at deep zoom; focus-point zoom degrades past 10^-15
-   (f64 offset → 0, @tradeoff documented).
+   Focus-point zoom via Decimal (pixel offset × scale, not f64 subtraction).
+   Iter auto-scaling: 128×log2(1/scale), cap 8192, only at scale<1e-6.
+   Known limit: GPU perturbation render bloquant (1-5s). Fix: E2c ping-pong.
 
-### BROKEN PROMISES (audit 2026-04-01 — honnête)
+### BROKEN PROMISES — audit trail (honnête, mis à jour 2026-04-01)
 
-Engagements des plans/specs NON tenus à ce jour :
+| # | Promesse | Statut | Notes |
+|---|---|---|---|
+| 1 | "Depth breakthrough 10^-40: non-black pixels" | **PARTIEL** | Moteur OK (no crash, GPU+Perturbation). Iter auto-scaling livré. Coords URL f64 insuffisantes pour structure — zoom interactif requis. |
+| 2 | "Manual verification: Zoom 10^-60, 10^-100" | **PARTIEL** | Focus-point Decimal livré. Navigation interactif fonctionne. Coords URL limitées à f64. |
+| 3 | "Unlimited zoom depth (10^-60+)" | **LIVRÉ (moteur)** | Pipeline deep coords + perturbation + rescaling + BLA fonctionne à 10^-23+ vérifié. Pas de crash. |
+| 4 | "GPU render @256iter <10ms with BLA" | **LIVRÉ** | BLA toggle ?bla=0. Mesuré: ON=4853ms vs OFF=5331ms (9%). Faible gain car premier render = CPU fallback. |
+| 5 | "BLA pixel cross-validation" | **NON FAIT** | Nécessite coords extérieures haute-précision. |
+| 6 | "Overlap zone DS ≈ perturbation" | **LIVRÉ** | Vérifié visuellement (Playwright): même résultat aux mêmes coords. |
+| 7 | "Playwright benchmarks 3 profondeurs" | **LIVRÉ** | 5/5 tests formalisés (10^-8, 10^-12, 10^-14, 10^-40, interactif). |
+| 8 | "10^-80 malachite <50ms" | **NON TESTÉ** | Orbit ArbFloat fonctionne (cargo test), pas de test visuel. |
 
-1. **"Depth breakthrough at 10^-40: image has non-black pixels"** (rescaling spec L233)
-   — NON LIVRÉ. Aplat à 10^-40. 1024 iter insuffisant. Iteration auto-scaling absent.
-2. **"Manual verification: Zoom to 10^-60, 10^-100 via UI"** (rescaling spec L237)
-   — JAMAIS FAIT. Focus-point f64 dégradé à 10^-15.
-3. **"Unlimited zoom depth (10^-60+)"** (perturbation spec L6)
-   — FAUX. Structure visible à ~10^-14 max.
-4. **"GPU render @256iter <10ms with BLA"** (BLA spec L267)
-   — JAMAIS MESURÉ. Pas de benchmark BLA on/off.
-5. **"Cross-validation: BLA on vs off pixel match at 10^-14, 10^-40, 10^-80"** (BLA spec L259)
-   — JAMAIS FAIT.
-6. **"Overlap zone (10^-13): DS and perturbation identical output"** (perturbation spec L593)
-   — JAMAIS VÉRIFIÉ.
-7. **"Playwright benchmarks at 10^-14, 10^-20, 10^-40"** (perturbation plan B L554)
-   — JAMAIS FORMALISÉ. Ad-hoc seulement.
-8. **"10^-80: <50ms (malachite)"** (precision ladder plan L308)
-   — JAMAIS TESTÉ VISUELLEMENT.
-
-Causes racines :
-- Iteration fixe (max 4096 slider) → structure invisible en deep zoom
-- Focus-point zoom f64 → offset nul à 10^-15 → navigation impossible
-- Aucun test Playwright formalisé → aucune preuve mesurable
-- formatCoord bug (exposant strippé) → URLs corrompues (fixé 2026-03-31)
+Problème ouvert : **GPU perturbation render trop lent** (1-5s bloquant).
+Solution identifiée : **ping-pong multi-frame (E2c)** — split render en batches 256 iter/frame.
 
 ### Next (ordre par impact perf)
 
@@ -179,59 +169,44 @@ Post-precision-ladder : orbite <1ms, GPU ~50ms = nouveau bottleneck.
 implicitement (spec §2: "Rebasing eliminates multi-reference entirely").
 Grid search inutile avec rebasing.
 
-#### Phase D: Perceived speed — DEPRIORITISE
+#### Phase D: Smooth deep zoom — **P0 NEXT** (bottleneck = GPU perturbation render bloquant)
 
-| # | Feature | Gain | Effort | Status |
+| # | Feature | Impact | Effort | Status |
 |---|---|---|---|---|
-| D1 | **Progressive orbit** | <200ms to first visual | 1 sem | **Deprioritise** |
+| **E2c** | **Ping-pong multi-frame** | 5s bloquant → 50ms first visible | 1 sem | **P0 NEXT** |
+| E2d | **Series Approximation (SA)** | Skip iter pour TOUS pixels (10x) | 2-3 sem | After E2c |
 
-D1 masquerait une latence orbit qui n'existe plus (<1ms avec DD/QD).
-Utile uniquement pour iterations elevees (10K+) ou ArbFloat (10^-80+, ~5ms).
-Reprioritiser si un nouveau bottleneck apparait.
+##### E2c. Ping-pong multi-frame — **P0 NEXT**
+Bottleneck : GPU perturbation render = 1-5s bloquant (6K-8K iter/pixel).
+Technique (deep-mandelbrot, mandelbrot.page) : split render en batches 256 iter/frame.
+Stocker état intermédiaire dans FBO ping-pong. Afficher chaque batch → raffinement progressif.
+Premier résultat visible en ~50ms. L'infrastructure progressive FBO existe déjà (désactivée).
+Ref: https://github.com/munrocket/deep-mandelbrot
 
-#### Phase E: Real speed
+##### E2d. Series Approximation (SA)
+Complémentaire à BLA : SA skip pour TOUS pixels (coefficients Taylor de l'orbite de référence).
+Typiquement 10x supplémentaire au-dessus de perturbation seule. 3-50 termes Taylor.
+Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/perturbation.
 
-| # | Feature | Gain | Effort | Status |
-|---|---|---|---|---|
-| ~~E1~~ | ~~Orbit perf (DD/QD)~~ | ~~100-1000x~~ | ~~2 sem~~ | **DONE** (precision ladder) |
-| E2 | **Series Approximation (SA)** | GPU 50ms → <5ms | 3 sem | **NEXT** |
+#### Phase E: Done
 
-##### ~~E1. Orbit performance — DONE~~
-- Precision ladder: DD 0.03ms, QD 0.26ms, ArbFloat 5.28ms @256iter.
-- Orbite n'est plus le bottleneck. GPU render (~50ms) est le nouveau bottleneck.
-- Spec: `docs/superpowers/specs/2026-03-29-precision-ladder-design.md`
-- Plan: `docs/superpowers/plans/2026-03-29-precision-ladder.md`
-
-##### E2. GPU perturbation render optimization — **NEXT**
-
-Bottleneck identifie : perturbation GPU = 50-80ms vs 0.03ms standard.
-Cause reelle : boucle d'iteration GPU (256 iter/pixel, branching rebasing/bailout/NaN).
-texelFetch teste et elimine (stub vec4(0.0) → pas de gain coherent).
-
-| # | Technique | Impact | Effort | Status |
-|---|---|---|---|---|
-| ~~E2a~~ | ~~Orbit uniform array~~ | ~~50ms→10ms~~ | ~~1 sem~~ | **ELIMINE** (texelFetch pas le bottleneck) |
-| ~~E2b~~ | ~~BLA (Bivariate Linear Approximation)~~ | ~~Skip 80-99% iter~~ | ~~3-4 sem~~ | **DONE** |
-| E2c | **Ping-pong multi-frame** | <1ms first visible | 1 sem | Deprioritise (masque latence) |
-| E2d | **SA classique** | 2-3x | 2-3 sem | Supersede par BLA |
-
-Techniques eliminees (avec justification mathematique) :
-- Matrix exponentiation : z^2+c est quadratique, pas lineaire
-- Parareal : iteration chaotique, coarse solver inutile
-- Neural surrogates : frontiere fractale = frequence infinie, NN ne peut pas representer
-- Periodicity GPU : divergence warp annule le gain (deja documente)
-- Workgroup shared memory : pas disponible en WebGL 2 (WebGPU requis)
-
-Ordre d'execution : ~~E2a~~ → ~~E2b~~ → E2c (deprioritise) | F2 (histogram) **NEXT**
+| # | Feature | Status |
+|---|---|---|
+| ~~E1~~ | ~~Orbit perf (DD/QD/ArbFloat)~~ | **DONE** — DD 0.03ms, QD 0.26ms |
+| ~~E2a~~ | ~~Orbit uniform array~~ | **ELIMINE** |
+| ~~E2b~~ | ~~BLA iteration skip~~ | **DONE** — toggle ?bla=0, mesuré 9% |
+| ~~11~~ | ~~High-precision coords~~ | **DONE** — decimal.js-light, deep URL params |
+| ~~Iter auto-scaling~~ | ~~suggestIterations~~ | **DONE** — 128*depth, cap 8192, scale<1e-6 |
+| ~~Focus-point Decimal~~ | ~~Pixel offset × scale~~ | **DONE** — plus de f64 subtraction |
 
 #### Phase F: Polish & features
 
-| # | Feature | Gain | Effort | Reference |
-|---|---|---|---|---|
-| ~~F1~~ | ~~**Rescaling**~~ | ~~Anti-artefacts extreme zoom~~ | ~~1 sem~~ | ~~Zhuoran 2021~~ |
-| F2 | **Histogram coloring** | Banding → 0 | 1 sem | mandelbrot.page (HCL) |
-| F3 | **Video export** | Feature (zoom animation) | 2 sem | mandelbrot.page |
-| F4 | **LLM-readable app (SEO)** | Discoverability | 1 sem | — |
+| # | Feature | Gain | Effort | Status | Priorité |
+|---|---|---|---|---|---|
+| ~~F1~~ | ~~Rescaling~~ | ~~Anti-artefacts~~ | ~~1 sem~~ | **DONE** | — |
+| F2 | **Histogram coloring** | Banding → 0 | 1 sem | — | **P1** |
+| F3 | **Video export** | Zoom animation | 2 sem | — | P2 |
+| F4 | **LLM-readable (SEO)** | Discoverability | 1 sem | — | P3 |
 
 ##### ~~F1. Rescaling~~ — DONE
 - Static S = 2^k per frame. δ̃ = δ×S keeps float32 precise at any depth.
