@@ -74,7 +74,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   int refIter = 0;
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     #ifdef USE_BLA
     if (tryBlaSkip(u, v, refIter, i, vec2(dc_re, dc_im), z, escaped, iter, smoothVal)) {
       if (escaped) return;
@@ -170,7 +170,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   int refIter = 0;
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     #ifdef USE_BLA
     // Julia: dc = 0 (c is constant, not per-pixel)
     if (tryBlaSkip(u, v, refIter, i, vec2(0.0, 0.0), z, escaped, iter, smoothVal)) {

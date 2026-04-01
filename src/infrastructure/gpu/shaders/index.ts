@@ -30,6 +30,8 @@ uniform float u_juliaIm;
 uniform int u_power;
 uniform int u_interiorColoring;
 uniform int u_maxIter;
+// Some GPU drivers need a compile-time loop cap for dynamic uniform bounds.
+const int MAX_ITER_CAP = 100000;
 
 out vec4 fragColor;
 `;
@@ -167,7 +169,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   float x_plus_one = c.x + 1.0;
   if (x_plus_one * x_plus_one + y2 <= 0.0625) { iter = u_maxIter; return; }
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     float x2 = z.x * z.x;
     float y2_iter = z.y * z.y;
     if (x2 + y2_iter > BAILOUT_SQ) {
@@ -194,7 +196,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(1.0, 0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
@@ -218,7 +220,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     z = abs(z);
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > BAILOUT_SQ) {
@@ -243,7 +245,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
@@ -268,7 +270,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     float mod2 = z.x * z.x + z.y * z.y;
     if (mod2 > BAILOUT_SQ) {
       escaped = true; iter = i;
@@ -327,7 +329,7 @@ void iterate(vec2 c_unused, out vec2 z, out int iter, out bool escaped,
   vec2 ds_zre = vec2(0.0);
   vec2 ds_zim = vec2(0.0);
 
-  for (int i = 0; i < u_maxIter; i++) {
+  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
     // Escape test on float32 hi parts
     float x2 = ds_zre.x * ds_zre.x;
     float y2 = ds_zim.x * ds_zim.x;
