@@ -31,13 +31,14 @@ export interface RenderOptions {
 
 /** Auto-scale iterations for deep zoom only (scale < 1e-6).
  * At moderate zoom, user's setting is preserved (no visual regression).
- * Logarithmic ramp: ~256 extra iter per zoom doubling past the threshold.
- * 1e-6→5K, 1e-8→7K, 1e-14→12K, 1e-20→17K, 1e-40→34K. */
+ * Logarithmic ramp: ~128 extra iter per zoom doubling past the threshold.
+ * Cap at 8192 for responsive GPU render (<500ms). User can raise via slider.
+ * 1e-6→2.5K, 1e-8→3.5K, 1e-14→6K, 1e-20→8K (cap). */
 export function suggestIterations(scale: number, userMax: number): number {
   if (scale >= 1e-6) return userMax;
   const depth = -Math.log2(scale);
-  const suggested = Math.ceil(256 * depth);
-  return Math.min(100000, Math.max(userMax, suggested));
+  const suggested = Math.ceil(128 * depth);
+  return Math.min(8192, Math.max(userMax, suggested));
 }
 
 /** Compute rescaling factor S = 2^k for float32 delta precision. */
