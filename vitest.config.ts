@@ -7,6 +7,7 @@ export default defineConfig({
       '**/dist/**',
       '**/.next/**',
       '**/.worktrees/**',
+      '**/e2e/**',
     ],
   },
 });
