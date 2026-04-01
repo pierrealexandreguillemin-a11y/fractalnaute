@@ -36,7 +36,7 @@ export interface RenderOptions {
 export function suggestIterations(scale: number, userMax: number): number {
   const depth = Math.max(0, -Math.log2(scale));
   const suggested = Math.ceil(512 * depth);
-  return Math.min(100000, Math.max(userMax, suggested));
+  return Math.min(32768, Math.max(userMax, suggested));
 }
 
 /** Compute rescaling factor S = 2^k for float32 delta precision. */

@@ -30,8 +30,9 @@ uniform float u_juliaIm;
 uniform int u_power;
 uniform int u_interiorColoring;
 uniform int u_maxIter;
-// Some GPU drivers need a compile-time loop cap for dynamic uniform bounds.
-const int MAX_ITER_CAP = 100000;
+// GPU drivers need a compile-time loop cap. 32768 is safe on all WebGL2 GPUs.
+// Actual iteration count is controlled by u_maxIter uniform (breaks early).
+const int MAX_ITER_CAP = 32768;
 
 out vec4 fragColor;
 `;

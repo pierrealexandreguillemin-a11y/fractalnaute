@@ -99,9 +99,13 @@ function finalizePending(
   ) as boolean;
 
   if (!linked) {
+    const vertCompiled = gl.getShaderParameter(pending.vertShader, gl.COMPILE_STATUS) as boolean;
+    const fragCompiled = gl.getShaderParameter(pending.fragShader, gl.COMPILE_STATUS) as boolean;
     const fragLog = gl.getShaderInfoLog(pending.fragShader) ?? '';
+    const vertLog = gl.getShaderInfoLog(pending.vertShader) ?? '';
     const log = gl.getProgramInfoLog(pending.program) ?? 'unknown error';
-    console.error(`Shader link failed [${pending.key}]: ${log} | frag: ${fragLog}`);
+    console.error(`Shader failed [${pending.key}]: link=${linked} vert=${vertCompiled} frag=${fragCompiled}`);
+    console.error(`  vert: ${vertLog} | frag: ${fragLog} | program: ${log}`);
     gl.deleteProgram(pending.program);
     cleanupShaders(gl, pending);
     return false;
