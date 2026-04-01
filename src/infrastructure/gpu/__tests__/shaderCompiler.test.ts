@@ -15,19 +15,20 @@ describe('shaderCompiler', () => {
     it('assembles Mandelbrot + Classic with correct #defines', () => {
       const source = assembleFragmentSource('mandelbrot', 'classic', 256, false);
       expect(source).toContain('#version 300 es');
-      expect(source).toContain('#define MAX_ITER 256');
+      expect(source).toContain('uniform int u_maxIter');
       expect(source).toContain('#define COLOR_CYCLE_PERIOD 256.0');
       expect(source).toContain('void iterate(');
       expect(source).toContain('float mapToParam(');
       expect(source).toContain('void main()');
     });
 
-    it('injects different MAX_ITER values', () => {
+    it('uses u_maxIter uniform (not #define) for iteration count', () => {
       const s512 = assembleFragmentSource('mandelbrot', 'classic', 512, false);
       const s1024 = assembleFragmentSource('mandelbrot', 'classic', 1024, false);
-      expect(s512).toContain('#define MAX_ITER 512');
-      expect(s1024).toContain('#define MAX_ITER 1024');
-      expect(s512).not.toContain('#define MAX_ITER 1024');
+      // Both produce the same shader source — maxIter is a uniform, not a #define
+      expect(s512).toContain('uniform int u_maxIter');
+      expect(s1024).toContain('uniform int u_maxIter');
+      expect(s512).not.toContain('#define MAX_ITER');
     });
 
     it('includes smoothEscape function', () => {
@@ -49,7 +50,7 @@ describe('shaderCompiler', () => {
         const source = assembleFragmentSource(fractal, 'classic', 256, false);
         expect(source).not.toBeNull();
         expect(source).toContain('void iterate(');
-        expect(source).toContain('#define MAX_ITER 256');
+        expect(source).toContain('uniform int u_maxIter');
         expect(source).toContain('void main()');
       });
     }

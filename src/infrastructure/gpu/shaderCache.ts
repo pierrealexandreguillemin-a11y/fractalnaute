@@ -11,7 +11,7 @@ import { UNIFORM_NAMES } from './shaderCompiler';
 
 // ---- Types ------------------------------------------------------------------
 
-type ShaderKey = `${FractalType}_${ColoringMode}_${number}_${boolean}_${PrecisionMode}`;
+type ShaderKey = `${FractalType}_${ColoringMode}_${boolean}_${PrecisionMode}`;
 
 interface CompiledProgram {
   program: WebGLProgram;
@@ -36,11 +36,11 @@ let parallelExt: KHR_parallel_shader_compile | null = null;
 function makeShaderKey(
   fractal: FractalType,
   coloring: ColoringMode,
-  maxIter: number,
   interiorColoring: boolean,
   precision: PrecisionMode = 'doubleSingle'
 ): ShaderKey {
-  return `${fractal}_${coloring}_${maxIter}_${interiorColoring}_${precision}`;
+  // maxIter removed — now a uniform, not a #define. One shader per fractal/coloring/precision.
+  return `${fractal}_${coloring}_${interiorColoring}_${precision}`;
 }
 
 function createShader(
@@ -134,12 +134,13 @@ export function getOrCompile(
   interiorColoring: boolean = false,
   precision: PrecisionMode = 'doubleSingle'
 ): CompiledProgram | null {
-  const key = makeShaderKey(fractal, coloring, maxIter, interiorColoring, precision);
+  const key = makeShaderKey(fractal, coloring, interiorColoring, precision);
   const existing = cache.get(key);
   if (existing) return existing;
 
   if (pendingCompiles.some(p => p.key === key)) return null;
 
+  // maxIter still passed to assembler for non-MAX_ITER defines, but no longer in cache key
   const fragSource = assembleFragmentSource(fractal, coloring, maxIter, interiorColoring, precision);
   if (!fragSource) return null;
 

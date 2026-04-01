@@ -74,7 +74,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   int refIter = 0;
 
-  for (int i = 0; i < MAX_ITER; i++) {
+  for (int i = 0; i < u_maxIter; i++) {
     #ifdef USE_BLA
     if (tryBlaSkip(u, v, refIter, i, vec2(dc_re, dc_im), z, escaped, iter, smoothVal)) {
       if (escaped) return;
@@ -93,7 +93,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
     // NaN/Inf guard (IEEE 754-2019)
     if (isnan(u) || isnan(v) || isinf(u) || isinf(v)) {
-      iter = MAX_ITER;
+      iter = u_maxIter;
       return;
     }
 
@@ -138,7 +138,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
     updateAccumulator(z, dz, acc);
   }
 
-  iter = MAX_ITER;
+  iter = u_maxIter;
 }
 `;
 
@@ -170,7 +170,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
 
   int refIter = 0;
 
-  for (int i = 0; i < MAX_ITER; i++) {
+  for (int i = 0; i < u_maxIter; i++) {
     #ifdef USE_BLA
     // Julia: dc = 0 (c is constant, not per-pixel)
     if (tryBlaSkip(u, v, refIter, i, vec2(0.0, 0.0), z, escaped, iter, smoothVal)) {
@@ -189,7 +189,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
     float zz = z.x * z.x + z.y * z.y;
 
     if (isnan(u) || isnan(v) || isinf(u) || isinf(v)) {
-      iter = MAX_ITER;
+      iter = u_maxIter;
       return;
     }
 
@@ -233,7 +233,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
     updateAccumulator(z, dz, acc);
   }
 
-  iter = MAX_ITER;
+  iter = u_maxIter;
 }
 `;
 

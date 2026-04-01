@@ -60,7 +60,7 @@ const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
 
 export const UNIFORM_NAMES = [
   'u_center', 'u_scale', 'u_resolution', 'u_palette',
-  'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring',
+  'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring', 'u_maxIter',
   ...DS_UNIFORM_NAMES,
   ...PERTURBATION_UNIFORM_NAMES,
   ...BLA_UNIFORM_NAMES,
@@ -69,9 +69,9 @@ export const UNIFORM_NAMES = [
 
 // ---- Assembly (pure, testable) ----------------------------------------------
 
-function buildDefines(maxIter: number, needsHighBailout: boolean): string {
+function buildDefines(needsHighBailout: boolean): string {
+  // MAX_ITER is now a uniform (u_maxIter) — no shader recompilation when iter changes.
   return [
-    `#define MAX_ITER ${maxIter}`,
     `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
     `#define BAILOUT_SQ ${needsHighBailout ? STRIPE_BAILOUT_SQ.toFixed(1) : '4.0'}`,
     `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
@@ -124,7 +124,7 @@ const BLA_ELIGIBLE_MODES = new Set<ColoringMode>(['classic', 'decomposition']);
 /** Assemble perturbation fragment shader. */
 function assemblePerturbationSource(
   fractal: FractalType, coloring: ColoringMode,
-  maxIter: number, common: NonNullable<ReturnType<typeof resolveCommonChunks>>
+  _maxIter: number, common: NonNullable<ReturnType<typeof resolveCommonChunks>>
 ): string | null {
   const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
   if (!iteration) return null;
@@ -132,7 +132,7 @@ function assemblePerturbationSource(
   const blaDisabledByUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bla') === '0';
   const useBla = BLA_ELIGIBLE_MODES.has(coloring) && !blaDisabledByUrl;
   const blaDefine = useBla ? '#define USE_BLA\n' : '';
-  const defines = buildDefines(maxIter, common.isStripe);
+  const defines = buildDefines(common.isStripe);
 
   // GLSL declaration order: tryBlaSkip() calls getOrbitData() + smoothEscape(),
   // so blaLookupChunk must come AFTER orbitLookupChunk + smoothEscapeChunk.
@@ -153,7 +153,7 @@ function assemblePerturbationSource(
 export function assembleFragmentSource(
   fractal: FractalType,
   coloring: ColoringMode,
-  maxIter: number,
+  _maxIter: number,
   interiorColoring: boolean,
   precision: PrecisionMode = 'doubleSingle'
 ): string | null {
@@ -161,10 +161,10 @@ export function assembleFragmentSource(
   if (!common) return null;
 
   if (precision === 'perturbation') {
-    return assemblePerturbationSource(fractal, coloring, maxIter, common);
+    return assemblePerturbationSource(fractal, coloring, _maxIter, common);
   }
 
-  const defines = buildDefines(maxIter, common.isStripe);
+  const defines = buildDefines(common.isStripe);
   const useDS = fractal === 'mandelbrot';
   const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
   if (!iteration) return null;

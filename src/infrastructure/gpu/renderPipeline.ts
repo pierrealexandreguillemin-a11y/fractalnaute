@@ -16,7 +16,8 @@ export function renderToTarget(
   paletteTexture: WebGLTexture,
   fractalParams: FractalParams,
   interiorColoring: boolean = false,
-  orbit?: OrbitContext
+  orbit?: OrbitContext,
+  maxIterations?: number
 ): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
   gl.viewport(0, 0, target.width, target.height);
@@ -25,6 +26,8 @@ export function renderToTarget(
   if (orbit) setOrbitUniforms(gl, compiled.uniformLocations, orbit);
   const res = compiled.uniformLocations.get('u_resolution');
   if (res) gl.uniform2f(res, target.width, target.height);
+  const maxIterLoc = compiled.uniformLocations.get('u_maxIter');
+  if (maxIterLoc) gl.uniform1i(maxIterLoc, maxIterations ?? 1024);
   setFractalParams(gl, compiled.uniformLocations, fractalParams);
   const intColor = compiled.uniformLocations.get('u_interiorColoring');
   if (intColor) gl.uniform1i(intColor, interiorColoring ? 1 : 0);
