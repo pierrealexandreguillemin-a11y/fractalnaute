@@ -127,10 +127,17 @@ export function renderFractal(
   gpuRenderer: WebGLRenderer | null,
   options: RenderOptions
 ): () => void {
-  // Auto-scale iterations at ALL zoom depths (not just perturbation)
+  // Auto-scale iterations at ALL zoom depths
   const effectiveIter = suggestIterations(options.viewport.scale, options.maxIterations);
   const opts = effectiveIter !== options.maxIterations
     ? { ...options, maxIterations: effectiveIter } : options;
+
+  // Debug: show effective iter in status bar when auto-scaled
+  if (effectiveIter > options.maxIterations) {
+    options.onStatusMessage?.(`iter: ${effectiveIter} (auto)`);
+  } else {
+    options.onStatusMessage?.(null);
+  }
 
   const precision = getPrecisionMode(opts.viewport, opts.fractalType);
 
