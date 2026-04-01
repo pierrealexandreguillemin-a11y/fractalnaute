@@ -29,11 +29,12 @@ export interface RenderOptions {
   onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
-/** Auto-scale iterations for deep zoom: more depth → more iterations needed. */
+/** Auto-scale iterations for deep zoom: more depth → more iterations needed.
+ * Logarithmic ramp: ~128 extra iter per zoom doubling. Smooth, no sudden jumps.
+ * scale 1e-4→3K, 1e-8→7K, 1e-14→12K, 1e-20→17K, 1e-40→34K. */
 export function suggestIterations(scale: number, userMax: number): number {
-  // sqrt(2/scale) gives a good heuristic for iteration count at depth
-  const suggested = Math.ceil(Math.sqrt(2 / scale));
-  // Use the larger of user setting and auto suggestion, cap at 100000
+  const depth = -Math.log2(scale);
+  const suggested = Math.ceil(256 * Math.max(0, depth));
   return Math.min(100000, Math.max(userMax, suggested));
 }
 
