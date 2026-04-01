@@ -29,12 +29,14 @@ export interface RenderOptions {
   onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
-/** Auto-scale iterations for deep zoom: more depth → more iterations needed.
- * Logarithmic ramp: ~128 extra iter per zoom doubling. Smooth, no sudden jumps.
- * scale 1e-4→3K, 1e-8→7K, 1e-14→12K, 1e-20→17K, 1e-40→34K. */
+/** Auto-scale iterations for deep zoom only (scale < 1e-6).
+ * At moderate zoom, user's setting is preserved (no visual regression).
+ * Logarithmic ramp: ~256 extra iter per zoom doubling past the threshold.
+ * 1e-6→5K, 1e-8→7K, 1e-14→12K, 1e-20→17K, 1e-40→34K. */
 export function suggestIterations(scale: number, userMax: number): number {
+  if (scale >= 1e-6) return userMax;
   const depth = -Math.log2(scale);
-  const suggested = Math.ceil(256 * Math.max(0, depth));
+  const suggested = Math.ceil(256 * depth);
   return Math.min(100000, Math.max(userMax, suggested));
 }
 
