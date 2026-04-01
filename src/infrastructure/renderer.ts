@@ -119,28 +119,33 @@ export function renderFractal(
   gpuRenderer: WebGLRenderer | null,
   options: RenderOptions
 ): () => void {
-  const precision = getPrecisionMode(options.viewport, options.fractalType);
+  // Auto-scale iterations at ALL zoom depths (not just perturbation)
+  const effectiveIter = suggestIterations(options.viewport.scale, options.maxIterations);
+  const opts = effectiveIter !== options.maxIterations
+    ? { ...options, maxIterations: effectiveIter } : options;
+
+  const precision = getPrecisionMode(opts.viewport, opts.fractalType);
 
   if (precision === 'perturbation' && gpuRenderer?.isReady()) {
-    return renderPerturbation(canvas, pool, gpuRenderer, options);
+    return renderPerturbation(canvas, pool, gpuRenderer, opts);
   }
 
   // Try GPU path first
   if (gpuRenderer?.isReady()) {
     const startTime = performance.now();
     const rendered = gpuRenderer.render({
-      viewport: options.viewport,
-      fractalType: options.fractalType,
-      maxIterations: options.maxIterations,
-      coloringMode: options.coloringMode ?? 'classic',
-      interiorColoring: options.interiorColoring ?? false,
-      fractalParams: options.params,
-      ssaa: options.ssaa
+      viewport: opts.viewport,
+      fractalType: opts.fractalType,
+      maxIterations: opts.maxIterations,
+      coloringMode: opts.coloringMode ?? 'classic',
+      interiorColoring: opts.interiorColoring ?? false,
+      fractalParams: opts.params,
+      ssaa: opts.ssaa
     });
     if (rendered) {
       gpuRenderer.setVisible(true);
       const elapsed = performance.now() - startTime;
-      options.onComplete?.(elapsed, 'gpu');
+      opts.onComplete?.(elapsed, 'gpu');
       return () => { gpuRenderer.cancelPending(); };
     }
     gpuRenderer.setVisible(false);
@@ -149,18 +154,18 @@ export function renderFractal(
   if (pool) {
     return renderWithPool({
       canvas, pool,
-      viewport: options.viewport,
-      fractalType: options.fractalType,
-      maxIterations: options.maxIterations,
-      palette: options.palette,
-      params: options.params,
-      coloringMode: options.coloringMode,
-      interiorColoring: options.interiorColoring,
-      onProgress: options.onProgress,
-      onComplete: options.onComplete
+      viewport: opts.viewport,
+      fractalType: opts.fractalType,
+      maxIterations: opts.maxIterations,
+      palette: opts.palette,
+      params: opts.params,
+      coloringMode: opts.coloringMode,
+      interiorColoring: opts.interiorColoring,
+      onProgress: opts.onProgress,
+      onComplete: opts.onComplete
     });
   }
-  return renderFallback(canvas, options);
+  return renderFallback(canvas, opts);
 }
 
 /** Single-thread fallback (chunked requestAnimationFrame) */
