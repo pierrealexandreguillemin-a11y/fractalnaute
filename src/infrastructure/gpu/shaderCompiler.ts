@@ -129,7 +129,8 @@ function assemblePerturbationSource(
   const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
   if (!iteration) return null;
 
-  const useBla = BLA_ELIGIBLE_MODES.has(coloring);
+  const blaDisabledByUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bla') === '0';
+  const useBla = BLA_ELIGIBLE_MODES.has(coloring) && !blaDisabledByUrl;
   const blaDefine = useBla ? '#define USE_BLA\n' : '';
   const defines = buildDefines(maxIter, common.isStripe);
 
