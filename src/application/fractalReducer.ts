@@ -34,7 +34,7 @@ export interface FractalState {
 /** Action types */
 export type FractalAction =
   | { type: 'SET_FRACTAL_TYPE'; fractalType: FractalType }
-  | { type: 'ZOOM'; factor: number; focusRe: number; focusIm: number }
+  | { type: 'ZOOM'; factor: number; nxOff: number; nyOff: number; aspectRatio: number }
   | { type: 'PAN'; deltaRe: number; deltaIm: number }
   | { type: 'RESET' }
   | { type: 'SET_PALETTE'; palette: PaletteName }
@@ -120,7 +120,7 @@ export function fractalReducer(state: FractalState, action: FractalAction): Frac
       };
     }
     case 'ZOOM':
-      return { ...state, viewport: deepZoom(state.viewport, action.factor, action.focusRe, action.focusIm) };
+      return { ...state, viewport: deepZoom(state.viewport, action.factor, action.nxOff, action.nyOff, action.aspectRatio) };
     case 'PAN':
       return { ...state, viewport: deepPan(state.viewport, action.deltaRe, action.deltaIm) };
     case 'RESET':

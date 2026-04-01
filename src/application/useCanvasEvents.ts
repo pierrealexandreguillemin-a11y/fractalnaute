@@ -56,9 +56,12 @@ function useMouseHandlers(
     e.preventDefault();
     const dims = getCanvasDims(canvasRef.current);
     const pos = toCanvasCoords(e.clientX, e.clientY, dims);
-    const c = screenToComplex(pos.x, pos.y, dims.width, dims.height, viewport);
-    actions.zoom(e.deltaY > 0 ? 1.4 : 0.7, c.re, c.im);
-  }, [canvasRef, viewport, actions]);
+    // Pass normalized pixel offset (0=left/top, 1=right/bottom) for deep zoom precision
+    const nxOff = dims.width > 0 ? pos.x / dims.width - 0.5 : 0;
+    const nyOff = dims.height > 0 ? pos.y / dims.height - 0.5 : 0;
+    const ar = dims.width / (dims.height || 1);
+    actions.zoom(e.deltaY > 0 ? 1.4 : 0.7, nxOff, nyOff, ar);
+  }, [canvasRef, actions]);
 
   const handleMouseDown = useCallback((e: MouseEvent) => {
     isDragging.current = true;
@@ -94,9 +97,11 @@ function useMouseHandlers(
     if (isPickingJulia) return;
     const dims = getCanvasDims(canvasRef.current);
     const pos = toCanvasCoords(e.clientX, e.clientY, dims);
-    const c = screenToComplex(pos.x, pos.y, dims.width, dims.height, viewport);
-    actions.zoom(0.5, c.re, c.im);
-  }, [isPickingJulia, canvasRef, viewport, actions]);
+    const nxOff = dims.width > 0 ? pos.x / dims.width - 0.5 : 0;
+    const nyOff = dims.height > 0 ? pos.y / dims.height - 0.5 : 0;
+    const ar = dims.width / (dims.height || 1);
+    actions.zoom(0.5, nxOff, nyOff, ar);
+  }, [isPickingJulia, canvasRef, actions]);
 
   return { handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, handleClick, handleDoubleClick };
 }
@@ -141,12 +146,13 @@ function useTouchHandlers(
     const dy = (cy - pinchCenter.current.y) / dims.rect.height * viewport.scale;
     actions.pan(-dx, -dy);
 
-    // Pinch zoom around midpoint
+    // Pinch zoom around midpoint (normalized pixel offset for deep precision)
     const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     if (pinchDist.current > 0 && dist > 0) {
       const pos = toCanvasCoords(cx, cy, dims);
-      const c = screenToComplex(pos.x, pos.y, dims.width, dims.height, viewport);
-      actions.zoom(pinchDist.current / dist, c.re, c.im);
+      const nxOff = dims.width > 0 ? pos.x / dims.width - 0.5 : 0;
+      const nyOff = dims.height > 0 ? pos.y / dims.height - 0.5 : 0;
+      actions.zoom(pinchDist.current / dist, nxOff, nyOff, ar);
     }
 
     pinchDist.current = dist;
@@ -171,7 +177,6 @@ function useTouchHandlers(
 /** Hook: keyboard shortcuts */
 function useKeyboardHandler(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  viewport: Viewport,
   isPickingJulia: boolean,
   actions: FractalActions,
   onEscapeCancel?: () => void
@@ -186,10 +191,11 @@ function useKeyboardHandler(
       onEscapeCancel?.();
     } else if (e.key === '+' || e.key === '=' || e.key === '-') {
       const dims = getCanvasDims(canvasRef.current);
-      const c = screenToComplex(dims.width / 2, dims.height / 2, dims.width, dims.height, viewport);
-      actions.zoom(e.key === '-' ? 1.4 : 0.7, c.re, c.im);
+      const ar = dims.width / (dims.height || 1);
+      // Center zoom: nxOff=0, nyOff=0
+      actions.zoom(e.key === '-' ? 1.4 : 0.7, 0, 0, ar);
     }
-  }, [canvasRef, viewport, actions, isPickingJulia, onEscapeCancel]);
+  }, [canvasRef, actions, isPickingJulia, onEscapeCancel]);
 }
 
 /**
@@ -206,7 +212,7 @@ export function useCanvasEvents({
 }: UseCanvasEventsOptions) {
   const mouse = useMouseHandlers(canvasRef, viewport, isPickingJulia, actions, onJuliaPick);
   const touch = useTouchHandlers(canvasRef, viewport, actions);
-  const handleKeyDown = useKeyboardHandler(canvasRef, viewport, isPickingJulia, actions, onEscapeCancel);
+  const handleKeyDown = useKeyboardHandler(canvasRef, isPickingJulia, actions, onEscapeCancel);
 
   useEffect(() => {
     const canvas = canvasRef.current;

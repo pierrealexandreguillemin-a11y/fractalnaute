@@ -25,8 +25,8 @@ export function useFractalState(initial?: InitialFractalConfig) {
   const setFractalType = useCallback((fractalType: FractalType) => {
     dispatch({ type: 'SET_FRACTAL_TYPE', fractalType });
   }, []);
-  const zoom = useCallback((factor: number, focusRe: number, focusIm: number) => {
-    dispatch({ type: 'ZOOM', factor, focusRe, focusIm });
+  const zoom = useCallback((factor: number, nxOff: number, nyOff: number, aspectRatio: number) => {
+    dispatch({ type: 'ZOOM', factor, nxOff, nyOff, aspectRatio });
   }, []);
   const pan = useCallback((deltaRe: number, deltaIm: number) => {
     dispatch({ type: 'PAN', deltaRe, deltaIm });

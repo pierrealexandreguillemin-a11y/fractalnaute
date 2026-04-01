@@ -29,6 +29,14 @@ export interface RenderOptions {
   onComplete?: (renderTime: number, backend: RenderBackend) => void;
 }
 
+/** Auto-scale iterations for deep zoom: more depth → more iterations needed. */
+export function suggestIterations(scale: number, userMax: number): number {
+  // sqrt(2/scale) gives a good heuristic for iteration count at depth
+  const suggested = Math.ceil(Math.sqrt(2 / scale));
+  // Use the larger of user setting and auto suggestion, cap at 100000
+  return Math.min(100000, Math.max(userMax, suggested));
+}
+
 /** Compute rescaling factor S = 2^k for float32 delta precision. */
 export function computeRescaleS(scale: number, canvasWidth: number): number {
   const pixelSpacing = scale / canvasWidth;
@@ -60,6 +68,9 @@ function renderPerturbation(
   let stale = false;
   const isStale = () => stale;
 
+  // Auto-scale iterations for deep zoom
+  const effectiveMaxIter = suggestIterations(options.viewport.scale, options.maxIterations);
+
   // @tradeoff maxDc ≈ scale × 2 (conservative upper bound for max |δc|).
   const maxDc = options.viewport.scale * 2;
 
@@ -73,7 +84,7 @@ function renderPerturbation(
 
   computeReferenceOrbit(
     refReStr, refImStr,
-    options.maxIterations, scaleStr, maxDc
+    effectiveMaxIter, scaleStr, maxDc
   ).then(({ data, length, cancelled, blaData, blaNumLevels, blaLevelOffsets }) => {
     if (cancelled || stale) return;
     const orbitData: OrbitData = {
@@ -81,7 +92,9 @@ function renderPerturbation(
       blaData, blaNumLevels, blaLevelOffsets,
       rescaleS: computeRescaleS(options.viewport.scale, canvas.width),
     };
-    handleOrbitResult(gpuRenderer, orbitData, canvas, pool, options, isStale);
+    // Pass effectiveMaxIter to GPU render via options override
+    const perturbOpts = { ...options, maxIterations: effectiveMaxIter };
+    handleOrbitResult(gpuRenderer, orbitData, canvas, pool, perturbOpts, isStale);
   }).catch((err: unknown) => {
     if (stale) return;
     const msg = String(err);

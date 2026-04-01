@@ -34,18 +34,20 @@ function toViewport(re: Decimal, im: Decimal, scale: Decimal): Viewport {
 
 /**
  * Deep-precision zoom: newCenter = center + offset * (1 - factor).
- * offsetRe/Im are f64 (pixel delta from center — always small, precise in f64).
+ * nxOff/nyOff are normalized pixel offsets (0 = center, ±0.5 = edge).
+ * Offset computed in Decimal: offset = nxOff * scale * aspectRatio.
+ * This avoids f64 subtraction (focusRe - centerRe → 0 at deep zoom).
  */
 export function deepZoom(
-  vp: Viewport, factor: number, focusRe: number, focusIm: number
+  vp: Viewport, factor: number, nxOff: number, nyOff: number, aspectRatio: number
 ): Viewport {
   const { re, im, scale } = ensureDeep(vp);
-  const offsetRe = focusRe - vp.centerRe;
-  const offsetIm = focusIm - vp.centerIm;
   const shift = 1 - factor;
+  const offsetRe = scale.times(nxOff * aspectRatio * shift);
+  const offsetIm = scale.times(nyOff * shift);
   return toViewport(
-    re.plus(offsetRe * shift),
-    im.plus(offsetIm * shift),
+    re.plus(offsetRe),
+    im.plus(offsetIm),
     scale.times(factor),
   );
 }
