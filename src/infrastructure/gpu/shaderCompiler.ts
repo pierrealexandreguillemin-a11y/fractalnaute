@@ -34,7 +34,7 @@ import {
 } from './shaders/perturbation';
 import { blaHeaderChunk, blaLookupChunk, BLA_UNIFORM_NAMES } from './shaders/bla';
 import {
-  multiFrameBatchHeaderChunk, multiFrameDSHeaderChunk,
+  multiFrameBatchHeaderChunk,
   multiFrameJuliaHeaderChunk, multiFrameMultibrotHeaderChunk,
   mandelbrotDSBatchChunk, juliaBatchChunk,
   burningshipBatchChunk, tricornBatchChunk, multibrotBatchChunk,
@@ -225,7 +225,8 @@ const MULTI_FRAME_RESOLVE_CHUNKS: Partial<Record<ColoringMode, string>> = {
 /** Return fractal-specific header extensions for multi-frame batch. */
 function getBatchHeaderExtensions(fractal: FractalType): string[] {
   if (fractal === 'mandelbrot') {
-    return [multiFrameDSHeaderChunk, dsHeaderChunk, doubleSingleChunk, screenToComplexDSChunk];
+    // dsHeaderChunk declares u_centerLo/u_scaleLo — don't also include multiFrameDSHeaderChunk (redefinition)
+    return [dsHeaderChunk, doubleSingleChunk, screenToComplexDSChunk];
   }
   if (fractal === 'julia') return [multiFrameJuliaHeaderChunk];
   if (fractal === 'multibrot3') return [multiFrameMultibrotHeaderChunk];

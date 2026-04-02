@@ -114,14 +114,22 @@ function compileMfProgram(
   gl.linkProgram(program);
 
   const linked = gl.getProgramParameter(program, gl.LINK_STATUS) as boolean;
-  gl.deleteShader(vert);
-  gl.deleteShader(frag);
 
   if (!linked) {
-    console.error(`[multiFrame] link failed: ${gl.getProgramInfoLog(program) ?? ''}`);
+    const fragOk = gl.getShaderParameter(frag, gl.COMPILE_STATUS) as boolean;
+    const vertOk = gl.getShaderParameter(vert, gl.COMPILE_STATUS) as boolean;
+    console.error(`[multiFrame] link failed: vert=${String(vertOk)} frag=${String(fragOk)}`);
+    if (!fragOk) console.error(`[multiFrame] frag: ${gl.getShaderInfoLog(frag) ?? ''}`);
+    if (!vertOk) console.error(`[multiFrame] vert: ${gl.getShaderInfoLog(vert) ?? ''}`);
+    console.error(`[multiFrame] program: ${gl.getProgramInfoLog(program) ?? ''}`);
+    gl.deleteShader(vert);
+    gl.deleteShader(frag);
     gl.deleteProgram(program);
     return null;
   }
+
+  gl.deleteShader(vert);
+  gl.deleteShader(frag);
 
   return { program, uniformLocations: enumerateUniforms(gl, program) };
 }
