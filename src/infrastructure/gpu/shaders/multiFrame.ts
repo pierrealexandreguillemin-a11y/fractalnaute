@@ -424,3 +424,195 @@ ${ACCUMULATOR_UPDATE}
 ${WRITE_CONTINUE}
 }
 `;
+
+// ---- Resolve GLSL chunks ----------------------------------------------------
+// Each resolve shader is a complete void main() that reads final iteration
+// state from 4 textures (batch output) and maps to a color via fragColor.
+// @see shaders/index.ts for single-pass equivalents (coloring chunks + mainChunk)
+
+// ---- Shared resolve GLSL fragments (DRY: sonarjs/no-duplicate-string) -------
+
+/** #version + precision for all resolve shaders. */
+export const resolveHeaderChunk = /* glsl */ `#version 300 es
+precision highp float;
+precision highp int;
+
+uniform sampler2D u_stateZ;
+uniform sampler2D u_stateInfo;
+uniform sampler2D u_stateAcc;
+uniform sampler2D u_stateHist;
+uniform sampler2D u_palette;
+uniform int u_interiorColoring;
+
+out vec4 fragColor;
+`;
+
+/**
+ * #define constants shared by all resolve shaders.
+ * Values imported from domain layer by the assembler (Task 4).
+ * Provided as a raw string here; the assembler will prepend after the header.
+ */
+export const RESOLVE_DEFINES = `#define COLOR_CYCLE_PERIOD 256.0
+#define ORBIT_TRAP_CYCLE 64.0
+#define NORMAL_MAP_LIGHT_ANGLE (-0.7854)
+#define INTERIOR_ATTENUATION 0.4`;
+
+/** Read final state from 4 textures — shared by all 5 resolve shaders. */
+const RESOLVE_READ_STATE = `  ivec2 fc = ivec2(gl_FragCoord.xy);
+  vec4 sZ    = texelFetch(u_stateZ,    fc, 0);
+  vec4 sInfo = texelFetch(u_stateInfo,  fc, 0);
+  vec4 sAcc  = texelFetch(u_stateAcc,  fc, 0);
+
+  vec2 z          = sZ.xy;
+  float smoothVal = sInfo.b;
+  int count       = int(sInfo.a);
+  bool escaped    = sInfo.g > 0.5;
+  vec2 dz         = sAcc.xy;
+  float stripeSum = sAcc.z;
+  float trapDistSq = sAcc.w;`;
+
+/**
+ * Interior path — shared by all 5 resolve shaders.
+ * @mirror shaders/index.ts:mainChunk — interior path
+ * Stripe resolve passes texture lookup (not cosine) for interior — see note below.
+ */
+const RESOLVE_INTERIOR_TEXTURE = `  // @mirror shaders/index.ts:mainChunk — interior path
+  if (!escaped) {
+    if (u_interiorColoring > 0) {
+      float trapDist = sqrt(trapDistSq);
+      float t = min(trapDist, 2.0) / 2.0;
+      vec3 color = texture(u_palette, vec2(t, 0.5)).rgb * INTERIOR_ATTENUATION;
+      fragColor = vec4(color, 1.0);
+    } else {
+      fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    return;
+  }`;
+
+// ---- Per-coloring resolve shaders -------------------------------------------
+
+/**
+ * Classic resolve: mod(smoothVal, 256) / 256 -> texture palette.
+ * @mirror shaders/index.ts:classicColoringChunk — mapToParam
+ * @mirror shaders/index.ts:mainChunk — escape dispatch
+ */
+export const resolveClassicChunk = /* glsl */ `
+void main() {
+${RESOLVE_READ_STATE}
+${RESOLVE_INTERIOR_TEXTURE}
+
+  // @mirror shaders/index.ts:classicColoringChunk — mapToParam
+  float t = mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+  vec3 color = texture(u_palette, vec2(t, 0.5)).rgb;
+  fragColor = vec4(color, 1.0);
+}
+`;
+
+/**
+ * Stripe resolve: Catmull-Rom interpolation + cosine palette.
+ * Interior uses texture palette (not cosine) for perceptual consistency.
+ * @mirror shaders/index.ts:stripeColoringChunk — catmullRom + mapToParam
+ * @mirror shaders/index.ts:mainChunk — escape dispatch
+ */
+export const resolveStripeChunk = /* glsl */ `
+// @mirror shaders/index.ts:stripeColoringChunk — Catmull-Rom cubic interpolation
+float catmullRom(float s0, float s1, float s2, float s3, float d) {
+  float d2 = d * d, d3 = d * d2;
+  return 0.5 * (
+    s0 * (-d + 2.0 * d2 - d3) +
+    s1 * (2.0 - 5.0 * d2 + 3.0 * d3) +
+    s2 * (d + 4.0 * d2 - 3.0 * d3) +
+    s3 * (d3 - d2)
+  );
+}
+
+void main() {
+${RESOLVE_READ_STATE}
+  vec4 sHist = texelFetch(u_stateHist, fc, 0);
+  float sp1 = sHist.x;
+${RESOLVE_INTERIOR_TEXTURE}
+
+  // @mirror shaders/index.ts:stripeColoringChunk — mapToParam
+  float frac = smoothVal - floor(smoothVal);
+  float ext = 2.0 * stripeSum - sp1;
+  float interpolated = count >= 3
+    ? catmullRom(sp1, stripeSum, ext, 2.0 * ext - stripeSum, frac)
+    : stripeSum + frac * (ext - stripeSum);
+  float stripeRatio = count > 0 ? interpolated / float(count) : 0.0;
+  float amplitude = 0.7 + 2.5 * stripeRatio;
+  float frequency = 50.0 * smoothVal / COLOR_CYCLE_PERIOD;
+  float t = amplitude + frequency;
+  // @mirror shaders/index.ts:cosinePaletteLookupChunk — Inigo Quilez cosine palette
+  vec3 color = 0.5 + 0.5 * sin(t + vec3(4.0, 4.6, 5.2));
+  fragColor = vec4(color, 1.0);
+}
+`;
+
+/**
+ * Decomposition resolve: binary angle -> texture palette.
+ * @mirror shaders/index.ts:decompositionColoringChunk — mapToParam
+ * @mirror shaders/index.ts:mainChunk — escape dispatch
+ */
+export const resolveDecompositionChunk = /* glsl */ `
+void main() {
+${RESOLVE_READ_STATE}
+${RESOLVE_INTERIOR_TEXTURE}
+
+  // @mirror shaders/index.ts:decompositionColoringChunk — mapToParam
+  float angle = atan(z.y, z.x);
+  float t = angle >= 0.0 ? 0.15 : 0.65;
+  vec3 color = texture(u_palette, vec2(t, 0.5)).rgb;
+  fragColor = vec4(color, 1.0);
+}
+`;
+
+/**
+ * OrbitTrap resolve: log-scaled trap distance + smoothVal blend -> texture palette.
+ * @mirror shaders/index.ts:orbitTrapColoringChunk — mapToParam
+ * @mirror shaders/index.ts:mainChunk — escape dispatch
+ */
+export const resolveOrbitTrapChunk = /* glsl */ `
+void main() {
+${RESOLVE_READ_STATE}
+${RESOLVE_INTERIOR_TEXTURE}
+
+  // @mirror shaders/index.ts:orbitTrapColoringChunk — mapToParam
+  float d = min(sqrt(trapDistSq), 4.0);
+  float logMapped = log(1.0 + d) / log(5.0);
+  float base = mod(smoothVal, ORBIT_TRAP_CYCLE) / ORBIT_TRAP_CYCLE;
+  float t = mod(logMapped * 0.6 + base * 0.4, 1.0);
+  vec3 color = texture(u_palette, vec2(t, 0.5)).rgb;
+  fragColor = vec4(color, 1.0);
+}
+`;
+
+/**
+ * NormalMap resolve: DE lightness + angle-blended palette -> texture palette.
+ * @mirror shaders/index.ts:normalMapColoringChunk — mapToParam + computeLightness
+ * @mirror shaders/index.ts:mainChunk — escape dispatch
+ */
+export const resolveNormalMapChunk = /* glsl */ `
+void main() {
+${RESOLVE_READ_STATE}
+${RESOLVE_INTERIOR_TEXTURE}
+
+  // @mirror shaders/index.ts:normalMapColoringChunk — mapToParam
+  float base = mod(smoothVal, COLOR_CYCLE_PERIOD) / COLOR_CYCLE_PERIOD;
+  float angle = atan(z.y, z.x);
+  float angleNorm = (angle + 3.14159265) / (2.0 * 3.14159265);
+  float t = mod(base * 0.7 + angleNorm * 0.3, 1.0);
+  vec3 color = texture(u_palette, vec2(t, 0.5)).rgb;
+
+  // @mirror shaders/index.ts:normalMapColoringChunk — computeLightness (DE)
+  float zMod = length(z);
+  float dzMod = length(dz);
+  float de = dzMod > 0.0 ? zMod * log(zMod) / dzMod : 0.0;
+  float dotL = cos(atan(z.y, z.x) - NORMAL_MAP_LIGHT_ANGLE);
+  float logDE = log(1.0 + de * 10.0);
+  float height = min(logDE / 3.0, 1.0);
+  float lightness = de <= 0.0 ? 0.5 : 0.2 + 1.2 * (dotL * 0.5 + 0.5) * (0.3 + 0.7 * height);
+  color *= lightness;
+
+  fragColor = vec4(color, 1.0);
+}
+`;
