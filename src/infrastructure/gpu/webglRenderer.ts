@@ -11,6 +11,7 @@ import { initCompiler, getOrCompile, pollCompilation, hasCompiledProgram } from 
 import { createPaletteTexture, updatePaletteTexture } from './paletteTexture';
 import { buildOrbitContext, uploadBlaData, buildOrbitWithBla } from './orbitContextBuilder';
 import { createProgressiveController } from './progressiveController';
+import { createMultiFrameController } from './multiFrameRenderer';
 import {
   createGpuCanvas, precompileCommonVariants, setupContextHandlers,
   destroyRendererResources, DEFAULT_PALETTE, PRECOMPILE_MAX_ITER
@@ -44,9 +45,9 @@ export function createWebGLRenderer(
   const orbitState: OrbitTextureState = { texture: null, width: 0, height: 0 };
   const blaState: BlaTextureState = { texture: null, width: 0, height: 0 };
   const progressive = createProgressiveController(gl);
+  const multiFrame = createMultiFrameController(gl);
   getOrCompile(gl, 'mandelbrot', 'classic', PRECOMPILE_MAX_ITER);
   precompileCommonVariants(gl, () => destroyed);
-
   const resetTextures = (): void => {
     orbitState.texture = null; orbitState.width = 0; orbitState.height = 0;
     blaState.texture = null; blaState.width = 0; blaState.height = 0;
@@ -67,7 +68,6 @@ export function createWebGLRenderer(
       const compiled = getOrCompile(gl, options.fractalType, options.coloringMode,
         options.maxIterations, options.interiorColoring, precision);
       if (!compiled) return false;
-
       let orbit: OrbitContext | undefined;
       if (precision === 'perturbation' && options.orbitData) {
         const ctx = buildOrbitContext(gl, orbitState, options.orbitData);
@@ -84,34 +84,32 @@ export function createWebGLRenderer(
       return true;
     },
 
+    renderMultiFrame(options, onBatchProgress, onComplete) {
+      if (contextLost || !multiFrame) return null;
+      return multiFrame.start(options, emptyVAO, paletteTexture, onBatchProgress, onComplete);
+    },
+
     cancelPending(): void { progressive.cancelPending(); },
 
     updatePalette(name: PaletteName): void {
       currentPalette = name;
       if (!contextLost) updatePaletteTexture(gl, paletteTexture, name);
     },
-
-    resize(width: number, height: number): void {
-      gpuCanvas.width = width;
-      gpuCanvas.height = height;
-    },
-
-    setVisible(visible: boolean): void {
-      gpuCanvas.style.display = visible ? 'block' : 'none';
-    },
+    resize(w: number, h: number): void { gpuCanvas.width = w; gpuCanvas.height = h; },
+    setVisible(visible: boolean): void { gpuCanvas.style.display = visible ? 'block' : 'none'; },
 
     destroy(): void {
       destroyed = true;
       gpuCanvas.removeEventListener('webglcontextlost', onContextLost);
       gpuCanvas.removeEventListener('webglcontextrestored', onContextRestored);
       destroyRendererResources(gl, progressive, paletteTexture, orbitState, blaState, emptyVAO);
+      multiFrame?.destroy();
       gpuCanvas.remove();
     },
 
     isReady(): boolean {
       if (contextLost) return false;
-      pollCompilation(gl);
-      return hasCompiledProgram();
+      pollCompilation(gl); return hasCompiledProgram();
     },
 
     getCanvas(): HTMLCanvasElement { return gpuCanvas; }

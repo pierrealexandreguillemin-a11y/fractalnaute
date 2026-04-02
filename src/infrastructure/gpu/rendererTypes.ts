@@ -22,6 +22,12 @@ export interface GPURenderOptions {
 
 export interface WebGLRenderer {
   render(options: GPURenderOptions): boolean;
+  /** Multi-frame progressive GPU render. Returns cancel fn, or null if unsupported combo. */
+  renderMultiFrame(
+    options: GPURenderOptions,
+    onBatchProgress?: (batch: number, total: number) => void,
+    onComplete?: (renderTimeMs: number) => void
+  ): (() => void) | null;
   cancelPending(): void;
   updatePalette(palette: PaletteName): void;
   resize(width: number, height: number): void;

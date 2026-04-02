@@ -55,19 +55,53 @@ function getPrecisionMode(viewport: Viewport, fractalType: FractalType): Precisi
     ? 'perturbation' : 'doubleSingle';
 }
 
-// @tradeoff GPU DS shader + large loops produces driver bugs on AMD ANGLE.
-// Cap GPU iterations at 4096; fall back to CPU workers for higher counts.
-// E2c ping-pong multi-frame will lift this limit.
-const GPU_MAX_ITER = 4096;
+// @tradeoff GPU DS shader + large loops breaks AMD ANGLE.
+// Single-pass: ≤4096 iter. Multi-frame: >4096 iter (256 iter/batch).
+// Unsupported combos fall back to CPU.
+const GPU_SINGLE_PASS_MAX_ITER = 4096;
 
 /** Try GPU render. Returns cancel function on success, null if GPU unavailable/skipped. */
 function tryGpuRender(
   gpuRenderer: WebGLRenderer | null, opts: RenderOptions
 ): (() => void) | null {
-  if (!gpuRenderer?.isReady() || opts.maxIterations > GPU_MAX_ITER) {
-    if (gpuRenderer) gpuRenderer.setVisible(false);
+  if (!gpuRenderer?.isReady()) {
+    gpuRenderer?.setVisible(false);
     return null;
   }
+  if (opts.maxIterations > GPU_SINGLE_PASS_MAX_ITER) {
+    return tryMultiFrame(gpuRenderer, opts);
+  }
+  return trySinglePass(gpuRenderer, opts);
+}
+
+/** Multi-frame progressive GPU render for high iteration counts. */
+function tryMultiFrame(
+  gpuRenderer: WebGLRenderer, opts: RenderOptions
+): (() => void) | null {
+  const cancel = gpuRenderer.renderMultiFrame(
+    {
+      viewport: opts.viewport,
+      fractalType: opts.fractalType,
+      maxIterations: opts.maxIterations,
+      coloringMode: opts.coloringMode ?? 'classic',
+      interiorColoring: opts.interiorColoring ?? false,
+      fractalParams: opts.params,
+    },
+    undefined,
+    (elapsed) => { opts.onComplete?.(elapsed, 'gpu'); }
+  );
+  if (cancel) {
+    gpuRenderer.setVisible(true);
+    return cancel;
+  }
+  gpuRenderer.setVisible(false);
+  return null;
+}
+
+/** Single-pass GPU render for ≤4096 iterations. */
+function trySinglePass(
+  gpuRenderer: WebGLRenderer, opts: RenderOptions
+): (() => void) | null {
   const startTime = performance.now();
   const rendered = gpuRenderer.render({
     viewport: opts.viewport,
