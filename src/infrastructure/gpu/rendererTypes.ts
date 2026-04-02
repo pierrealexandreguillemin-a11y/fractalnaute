@@ -72,3 +72,14 @@ export interface BlaTextureState {
   width: number;
   height: number;
 }
+
+/** Ping-pong FBO for multi-frame rendering (4× RGBA32F textures via MRT). */
+export interface MultiFrameFBO {
+  fbo: WebGLFramebuffer;
+  texZ: WebGLTexture;      // RGBA32F: z state (DS or float32)
+  texInfo: WebGLTexture;   // RGBA32F: iter, escaped, smoothVal, count
+  texAcc: WebGLTexture;    // RGBA32F: dz.x, dz.y, stripeSum, trapDistSq
+  texHist: WebGLTexture;   // RGBA32F: stripePrev1, stripePrev2, stripePrev3, 0
+  width: number;
+  height: number;
+}
