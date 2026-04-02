@@ -196,7 +196,7 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 | ~~E2a~~ | ~~Orbit uniform array~~ | **ELIMINE** |
 | ~~E2b~~ | ~~BLA iteration skip~~ | **DONE** — toggle ?bla=0, mesuré 9% |
 | ~~11~~ | ~~High-precision coords~~ | **DONE** — decimal.js-light, deep URL params |
-| ~~Iter auto-scaling~~ | ~~suggestIterations~~ | **DONE** — 128*depth, cap 8192, scale<1e-6 |
+| ~~Iter auto-scaling~~ | ~~suggestIterations~~ | **DONE** — 512*depth, cap 32768, all depths |
 | ~~Focus-point Decimal~~ | ~~Pixel offset × scale~~ | **DONE** — plus de f64 subtraction |
 
 #### Phase F: Polish & features
@@ -237,6 +237,7 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 - Canvas context exclusif: un canvas ne peut avoir qu'UN type de context (webgl2 OU 2d). Solution: dual canvas overlay.
 - WebGL Y-axis: gl_FragCoord.y=0 est le BAS du viewport. Negate uv.y dans screenToComplex.
 - Periodicity checking (Brent) sur GPU: NE PAS PORTER. Divergence warp annule le gain. Brute-force GPU est suffisant.
+- `uniform int` loop break: NE PAS UTILISER. `for(i<CAP){if(i>=uniform)break;}` est cassé sur ANGLE/AMD (la boucle ne s'exécute pas). Utiliser `#define MAX_ITER N` avec buckets (8 tiers: 256→32768). Max 8 compilations par combo fractal/coloring/precision.
 - gl.finish()/gl.flush(): NE PAS appeler en production. Browser compose au vsync. Seulement pour benchmark.
 - GLSL string constants en TypeScript (pas de raw loader) — compatible Turbopack sans config.
 - Shader compilation async (KHR_parallel_shader_compile): premier render tombe sur CPU, GPU prend le relais ensuite.

@@ -102,12 +102,12 @@ function renderWithSSAA(
     const fbo = ssaaFBO ? resizeScaledFBO(gl, ssaaFBO, SSAA_SCALE) : createScaledFBO(gl, SSAA_SCALE);
     if (fbo) {
       const target: DrawTarget = { fbo: fbo.fbo, width: fbo.width, height: fbo.height };
-      renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit, options.maxIterations);
+      renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
       blitFBOToCanvas(gl, fbo);
       return fbo;
     }
   }
-  renderToTarget(gl, canvasTarget(gl), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit, options.maxIterations);
+  renderToTarget(gl, canvasTarget(gl), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
   return ssaaFBO;
 }
 
@@ -156,10 +156,10 @@ export function createProgressiveController(
       gl.bindVertexArray(vao);
       if (previewFBO) {
         const target: DrawTarget = { fbo: previewFBO.fbo, width: previewFBO.width, height: previewFBO.height };
-        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit, options.maxIterations);
+        renderToTarget(gl, target, compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
         blitFBOToCanvas(gl, previewFBO);
       } else {
-        renderToTarget(gl, canvasTarget(gl), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit, options.maxIterations);
+        renderToTarget(gl, canvasTarget(gl), compiled, options.viewport, paletteTexture, options.fractalParams, options.interiorColoring, orbit);
       }
       pendingFullResRAF = requestAnimationFrame(() => {
         pendingFullResRAF = null;

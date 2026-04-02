@@ -56,11 +56,27 @@ const COLORING_CHUNKS: Partial<Record<ColoringMode, string>> = {
   normalMap: normalMapColoringChunk,
 };
 
+// ---- Iteration bucket tiers -------------------------------------------------
+
+/** Fixed set of MAX_ITER values to limit shader recompilations.
+ * 8 tiers → at most 8 compiled variants per fractal/coloring/precision combo.
+ * @tradeoff Some wasted iterations (e.g. 3000 requested → 4096 compiled)
+ * vs. reliable cross-driver behavior (uniform int break was broken on AMD ANGLE). */
+const ITER_BUCKETS = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768] as const;
+
+/** Round up maxIter to the next bucket tier. */
+export function bucketMaxIter(maxIter: number): number {
+  for (const bucket of ITER_BUCKETS) {
+    if (maxIter <= bucket) return bucket;
+  }
+  return 32768;
+}
+
 // ---- Uniform names to cache -------------------------------------------------
 
 export const UNIFORM_NAMES = [
   'u_center', 'u_scale', 'u_resolution', 'u_palette',
-  'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring', 'u_maxIter',
+  'u_juliaRe', 'u_juliaIm', 'u_power', 'u_interiorColoring',
   ...DS_UNIFORM_NAMES,
   ...PERTURBATION_UNIFORM_NAMES,
   ...BLA_UNIFORM_NAMES,
@@ -69,9 +85,9 @@ export const UNIFORM_NAMES = [
 
 // ---- Assembly (pure, testable) ----------------------------------------------
 
-function buildDefines(needsHighBailout: boolean): string {
-  // MAX_ITER is now a uniform (u_maxIter) — no shader recompilation when iter changes.
+function buildDefines(needsHighBailout: boolean, maxIter: number): string {
   return [
+    `#define MAX_ITER ${maxIter}`,
     `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
     `#define BAILOUT_SQ ${needsHighBailout ? STRIPE_BAILOUT_SQ.toFixed(1) : '4.0'}`,
     `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
@@ -124,7 +140,7 @@ const BLA_ELIGIBLE_MODES = new Set<ColoringMode>(['classic', 'decomposition']);
 /** Assemble perturbation fragment shader. */
 function assemblePerturbationSource(
   fractal: FractalType, coloring: ColoringMode,
-  _maxIter: number, common: NonNullable<ReturnType<typeof resolveCommonChunks>>
+  maxIter: number, common: NonNullable<ReturnType<typeof resolveCommonChunks>>
 ): string | null {
   const iteration = PERTURBATION_CHUNKS[fractal] ?? null;
   if (!iteration) return null;
@@ -132,7 +148,7 @@ function assemblePerturbationSource(
   const blaDisabledByUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bla') === '0';
   const useBla = BLA_ELIGIBLE_MODES.has(coloring) && !blaDisabledByUrl;
   const blaDefine = useBla ? '#define USE_BLA\n' : '';
-  const defines = buildDefines(common.isStripe);
+  const defines = buildDefines(common.isStripe, maxIter);
 
   // GLSL declaration order: tryBlaSkip() calls getOrbitData() + smoothEscape(),
   // so blaLookupChunk must come AFTER orbitLookupChunk + smoothEscapeChunk.
@@ -153,7 +169,7 @@ function assemblePerturbationSource(
 export function assembleFragmentSource(
   fractal: FractalType,
   coloring: ColoringMode,
-  _maxIter: number,
+  maxIter: number,
   interiorColoring: boolean,
   precision: PrecisionMode = 'doubleSingle'
 ): string | null {
@@ -161,10 +177,10 @@ export function assembleFragmentSource(
   if (!common) return null;
 
   if (precision === 'perturbation') {
-    return assemblePerturbationSource(fractal, coloring, _maxIter, common);
+    return assemblePerturbationSource(fractal, coloring, maxIter, common);
   }
 
-  const defines = buildDefines(common.isStripe);
+  const defines = buildDefines(common.isStripe, maxIter);
   const useDS = fractal === 'mandelbrot';
   const iteration = useDS ? mandelbrotDSIterationChunk : getIterationChunk(fractal);
   if (!iteration) return null;

@@ -83,7 +83,7 @@ bool tryBlaSkip(inout float u, inout float v, inout int refIter, inout int i,
   // Option A (spec): compare |δ̃|² < r²·S² — avoids per-pixel division
   float dz2_tilde = u*u + v*v;
   int skipped = blaLookup(refIter, dz2_tilde, blaEntry);
-  if (skipped <= 0 || refIter + skipped >= u_orbitLength || i + skipped >= u_maxIter) {
+  if (skipped <= 0 || refIter + skipped >= u_orbitLength || i + skipped >= MAX_ITER) {
     return false;
   }
   // BLA applies in rescaled space: δ̃_new = A·δ̃ + B·δ̃c

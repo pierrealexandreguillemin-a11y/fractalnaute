@@ -5,13 +5,13 @@
  */
 
 import type { FractalType, ColoringMode, PrecisionMode } from '../../domain/types';
-import { assembleFragmentSource } from './shaderCompiler';
+import { assembleFragmentSource, bucketMaxIter } from './shaderCompiler';
 import { fullscreenVert } from './shaders';
 import { UNIFORM_NAMES } from './shaderCompiler';
 
 // ---- Types ------------------------------------------------------------------
 
-type ShaderKey = `${FractalType}_${ColoringMode}_${boolean}_${PrecisionMode}`;
+type ShaderKey = `${FractalType}_${ColoringMode}_${boolean}_${PrecisionMode}_${number}`;
 
 interface CompiledProgram {
   program: WebGLProgram;
@@ -36,11 +36,12 @@ let parallelExt: KHR_parallel_shader_compile | null = null;
 function makeShaderKey(
   fractal: FractalType,
   coloring: ColoringMode,
+  maxIter: number,
   interiorColoring: boolean,
   precision: PrecisionMode = 'doubleSingle'
 ): ShaderKey {
-  // maxIter removed — now a uniform, not a #define. One shader per fractal/coloring/precision.
-  return `${fractal}_${coloring}_${interiorColoring}_${precision}`;
+  // maxIter bucketed — 8 tiers max, so at most 8 compiled variants per combo.
+  return `${fractal}_${coloring}_${interiorColoring}_${precision}_${bucketMaxIter(maxIter)}`;
 }
 
 function createShader(
@@ -138,14 +139,14 @@ export function getOrCompile(
   interiorColoring: boolean = false,
   precision: PrecisionMode = 'doubleSingle'
 ): CompiledProgram | null {
-  const key = makeShaderKey(fractal, coloring, interiorColoring, precision);
+  const bucketed = bucketMaxIter(maxIter);
+  const key = makeShaderKey(fractal, coloring, bucketed, interiorColoring, precision);
   const existing = cache.get(key);
   if (existing) return existing;
 
   if (pendingCompiles.some(p => p.key === key)) return null;
 
-  // maxIter still passed to assembler for non-MAX_ITER defines, but no longer in cache key
-  const fragSource = assembleFragmentSource(fractal, coloring, maxIter, interiorColoring, precision);
+  const fragSource = assembleFragmentSource(fractal, coloring, bucketed, interiorColoring, precision);
   if (!fragSource) return null;
 
   const vert = createShader(gl, gl.VERTEX_SHADER, fullscreenVert);

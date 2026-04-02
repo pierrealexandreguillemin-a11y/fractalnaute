@@ -29,10 +29,8 @@ uniform float u_juliaRe;
 uniform float u_juliaIm;
 uniform int u_power;
 uniform int u_interiorColoring;
-uniform int u_maxIter;
-// GPU drivers need a compile-time loop cap. 32768 is safe on all WebGL2 GPUs.
-// Actual iteration count is controlled by u_maxIter uniform (breaks early).
-const int MAX_ITER_CAP = 32768;
+// MAX_ITER injected as #define from TypeScript (bucketed: 256–32768).
+// Compile-time loop bound — reliable across all GPU drivers (no uniform break).
 
 out vec4 fragColor;
 `;
@@ -165,12 +163,12 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   float x_minus_quarter = c.x - 0.25;
   float y2 = c.y * c.y;
   float q = x_minus_quarter * x_minus_quarter + y2;
-  if (q * (q + x_minus_quarter) <= 0.25 * y2) { iter = u_maxIter; return; }
+  if (q * (q + x_minus_quarter) <= 0.25 * y2) { iter = MAX_ITER; return; }
 
   float x_plus_one = c.x + 1.0;
-  if (x_plus_one * x_plus_one + y2 <= 0.0625) { iter = u_maxIter; return; }
+  if (x_plus_one * x_plus_one + y2 <= 0.0625) { iter = MAX_ITER; return; }
 
-  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
+  for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x;
     float y2_iter = z.y * z.y;
     if (x2 + y2_iter > BAILOUT_SQ) {
@@ -184,7 +182,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
     updateAccumulator(z, dz, acc);
   }
 
-  iter = u_maxIter;
+  iter = MAX_ITER;
 }
 `;
 
@@ -197,7 +195,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(1.0, 0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
+  for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
@@ -209,7 +207,7 @@ void iterate(vec2 c_pixel, out vec2 z, out int iter, out bool escaped,
     z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
     updateAccumulator(z, dz, acc);
   }
-  iter = u_maxIter;
+  iter = MAX_ITER;
 }
 `;
 
@@ -221,7 +219,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
+  for (int i = 0; i < MAX_ITER; i++) {
     z = abs(z);
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > BAILOUT_SQ) {
@@ -234,7 +232,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
     z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
     updateAccumulator(z, dz, acc);
   }
-  iter = u_maxIter;
+  iter = MAX_ITER;
 }
 `;
 
@@ -246,7 +244,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
+  for (int i = 0; i < MAX_ITER; i++) {
     float x2 = z.x * z.x, y2 = z.y * z.y;
     if (x2 + y2 > BAILOUT_SQ) {
       escaped = true; iter = i;
@@ -259,7 +257,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
     z = vec2(x2 - y2, 2.0 * z.x * z.y) + c;
     updateAccumulator(z, dz, acc);
   }
-  iter = u_maxIter;
+  iter = MAX_ITER;
 }
 `;
 
@@ -271,7 +269,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
   vec2 dz = vec2(0.0);
   iter = 0; escaped = false; smoothVal = 0.0;
 
-  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
+  for (int i = 0; i < MAX_ITER; i++) {
     float mod2 = z.x * z.x + z.y * z.y;
     if (mod2 > BAILOUT_SQ) {
       escaped = true; iter = i;
@@ -294,7 +292,7 @@ void iterate(vec2 c, out vec2 z, out int iter, out bool escaped,
     z = zn + c;
     updateAccumulator(z, dz, acc);
   }
-  iter = u_maxIter;
+  iter = MAX_ITER;
 }
 `;
 
@@ -322,15 +320,15 @@ void iterate(vec2 c_unused, out vec2 z, out int iter, out bool escaped,
   float xmq = cx - 0.25;
   float cy2 = cy * cy;
   float q = xmq * xmq + cy2;
-  if (q * (q + xmq) <= 0.25 * cy2) { iter = u_maxIter; return; }
+  if (q * (q + xmq) <= 0.25 * cy2) { iter = MAX_ITER; return; }
   float xp1 = cx + 1.0;
-  if (xp1 * xp1 + cy2 <= 0.0625) { iter = u_maxIter; return; }
+  if (xp1 * xp1 + cy2 <= 0.0625) { iter = MAX_ITER; return; }
 
   // DS iteration: z = z² + c
   vec2 ds_zre = vec2(0.0);
   vec2 ds_zim = vec2(0.0);
 
-  for (int i = 0; i < MAX_ITER_CAP; i++) { if (i >= u_maxIter) break;
+  for (int i = 0; i < MAX_ITER; i++) {
     // Escape test on float32 hi parts
     float x2 = ds_zre.x * ds_zre.x;
     float y2 = ds_zim.x * ds_zim.x;
@@ -355,7 +353,7 @@ void iterate(vec2 c_unused, out vec2 z, out int iter, out bool escaped,
   }
 
   z = vec2(ds_zre.x, ds_zim.x);
-  iter = u_maxIter;
+  iter = MAX_ITER;
 }
 `;
 
