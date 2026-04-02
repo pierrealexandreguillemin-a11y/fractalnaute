@@ -1,61 +1,92 @@
 # Session Handoff — 2026-04-02
 
-## E2c Multi-Frame Ping-Pong — État
+## Résumé session
 
-### Branch: `feature/e2c-multiframe` (worktree `.worktrees/e2c-multiframe`)
+**Bug d'entrée :** GPU shader ne rendait pas les itérations au-delà de ~4096 (mur noir/uniforme à deep zoom). Cause : le pattern GLSL `for(i<CAP){if(i>=uniform)break;}` cassé sur ANGLE/AMD.
 
-### Commits (8 sur la branche)
-1. `feat(e2c): 4-MRT FBO infrastructure`
-2. `feat(e2c): batch GLSL — 5 fractals, 4-MRT, IEEE 754 guards, @mirror tags`
-3. `feat(e2c): resolve GLSL — 5 colorings + interior, @mirror tags`
-4. `feat(e2c): shader assembly — 25 combos, Record maps, TDD`
-5. `feat(e2c): multi-frame controller — 10 programs, RAF ping-pong, cancel`
-6. `feat(e2c): integrate multi-frame — lifts GPU cap, 25 combos dispatch`
-7. `fix(e2c): remove duplicate u_centerLo/u_scaleLo declaration in DS batch assembly`
-8. `fix(e2c): batch progress status bar (ISO 9241-110), remove dead DS header export`
+**Fix 1 (commit `daec946`) :** Revert `u_maxIter` uniform → `#define MAX_ITER N` avec 8 tiers bucketed (256→32768).
 
-### Vérifié (preuve screenshot)
-- Mandelbrot DS deep zoom 2.8Mx → GPU 2280ms (vs CPU 5380ms)
-- Mandelbrot DS deep zoom 466Kx → GPU 771ms, spirales visibles
-- Default zoom → CPU first render, pas de régression
-- Build prod → OK
-- 262 tests → OK
+**Fix 2 (commit `ad074a0`) :** Cap GPU à 4096 iter, fallback CPU au-delà.
 
-### NON vérifié (Playwright session fermée)
-- [ ] Julia deep zoom GPU multi-frame
+**Fix 3 — E2c multi-frame (10 commits, mergé dans main) :** Ping-pong multi-frame — split render en batches 256 iter/frame via 4 MRT RGBA32F FBOs. Lève le cap GPU. 25 fractal×coloring combos.
+
+**Canonisation normes :** 14 normes projet (7 ISO + 7 opérationnelles) canonisées dans CLAUDE.md — étaient enterrées dans une spec de mars.
+
+## État git
+
+- **Branch :** main
+- **Worktree :** `.worktrees/e2c-multiframe` (peut être nettoyé : `git worktree remove .worktrees/e2c-multiframe`)
+- **PAS pushé** — attendre instruction utilisateur
+
+## E2c — Benchmarks mesurés
+
+| Scénario | GPU multi-frame | CPU | Speedup |
+|----------|----------------|-----|---------|
+| Mandelbrot DS @10K iter, zoom 2.8Mx | 2280ms | 5380ms | 2.4x |
+| Mandelbrot DS @8.8K iter, zoom 466Kx | 771ms | ~4000ms | 5.2x |
+| Default zoom (256 iter) | <1ms single-pass | — | Pas de régression |
+
+## Vérifié (preuve screenshot)
+
+- [x] Mandelbrot DS deep zoom 2.8Mx — GPU, détail visible
+- [x] Mandelbrot DS deep zoom 466Kx — GPU, spirales visibles
+- [x] Julia deep zoom — GPU multi-frame, badge GPU
+- [x] Default zoom — pas de régression
+
+## NON vérifié (Playwright session fermée)
+
 - [ ] BurningShip deep zoom GPU multi-frame
 - [ ] Non-classic coloring (stripe, orbitTrap, normalMap) en multi-frame
-- [ ] Cancel mid-render (navigate pendant multi-frame)
-- [ ] orbitTrap coloring (vérifie trapDistSq init = 1e20)
+- [ ] Cancel mid-render (navigate pendant multi-frame → pas de crash)
+- [ ] orbitTrap coloring (trapDistSq init = 1e20)
 
-### Audité (code review, pas visuel)
-- CPU fallback quand EXT_color_buffer_float absent → PASS
-- Cancel implementation (stale flag + cancelAnimationFrame) → PASS
+## Audité par code review
 
-### Pour reprendre
-```bash
-cd C:/Dev/fractal-explorer/.worktrees/e2c-multiframe
-npm run dev -- -p 3003
+- CPU fallback EXT absent → **PASS**
+- Cancel implementation → **PASS**
+- ISO audit 8 fichiers × 14 normes → **PASS** (0 critique)
+
+## 2 points importants à corriger
+
+1. **BATCH_SIZE en double** — `multiFrameRenderer.ts:91` (JS) et `shaderCompiler.ts:207` (GLSL). Risque divergence. Extraire constante partagée.
+2. **`_coloring`/`_interiorColoring` non documentés** dans `assembleMultiFrameBatchSource` — ajouter JSDoc expliquant : accumulator toujours réel en batch, coloring = resolve-time.
+
+## Pour reprendre
+
+### Étape 1 : Fixer les 2 points importants
+```
+# Extraire BATCH_SIZE en constante partagée
+# Ajouter JSDoc sur assembleMultiFrameBatchSource
+npm run typecheck && npm run lint && npm test
+git commit -m "fix(e2c): shared BATCH_SIZE constant, document unused batch params"
 ```
 
-Tests visuels à faire manuellement :
-1. `http://localhost:3003/#f=julia&re=0&im=0&s=0.00001` → GPU multi-frame ?
-2. `http://localhost:3003/#f=burningship&re=-1.75&im=0&s=0.00001` → GPU ?
-3. `http://localhost:3003/#re=0.3219&im=-0.0352&s=0.000006&c=stripe` → stripe correct ?
-4. `http://localhost:3003/#re=0.3219&im=-0.0352&s=0.000006&c=orbitTrap` → orbitTrap correct ?
-5. Navigate deep → navigate default rapidement → pas de crash ?
+### Étape 2 : Tests visuels manquants (4 combos)
+```
+npm run dev
+# Via Playwright ou manuellement :
+# 1. http://localhost:3000/#f=burningship&re=-1.75&im=-0.02&s=0.00001
+# 2. http://localhost:3000/#re=0.3219&im=-0.0352&s=0.000006&c=stripe
+# 3. http://localhost:3000/#re=0.3219&im=-0.0352&s=0.000006&c=orbitTrap
+# 4. Navigate deep → navigate default rapidement → pas de crash
+```
 
-### 14 normes — conformité
-- IEEE 754: NaN/Inf guards dans 5 batch shaders ✓
-- ISO 5055: 262 tests, 0 lint warnings ✓
-- ISO 25010: GPU 771ms, CPU fallback ✓
-- ISO 9241-110: batch N/M status bar ✓ (commit aff018a)
-- ISO 40500: aria-live="polite" ✓ (commit aff018a)
-- ISO 27001: pas de nouveau input, EXT check ✓
-- ISO 80000-2: @mirror tags ✓
-- Playwright benchmarks: Task 7 only (norme 8 partielle)
-- Perf history: mis à jour ✓
-- Verified = preuve: 2 screenshots Mandelbrot, 5 combos non vérifiés visuellement (honnête)
-- Plan respecté: batch progress ajouté post-hoc (fix aff018a)
-- Pas de push: ✓
-- Ton code = tes bugs: fix redefinition appliqué ✓
+### Étape 3 : Push (quand utilisateur le demande)
+```
+git push  # pre-push hook : typecheck → lint → build → audit
+```
+
+### Étape 4 : Cleanup worktree
+```
+git worktree remove .worktrees/e2c-multiframe
+```
+
+## Commandes utiles
+```
+npm run dev          # Dev server
+npm test             # 262 vitest
+npm run typecheck    # tsc
+npm run lint         # eslint
+npm run build        # Build prod
+cargo test --manifest-path wasm/Cargo.toml  # 57 rust tests
+```
