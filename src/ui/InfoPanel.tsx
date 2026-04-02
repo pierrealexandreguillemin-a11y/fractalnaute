@@ -83,7 +83,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
         </div>
       )}
       {statusMessage && (
-        <span role="alert" className="text-[9px] text-amber-400/80">
+        <span aria-live="polite" className="text-[9px] text-amber-400/80">
           {statusMessage}
         </span>
       )}

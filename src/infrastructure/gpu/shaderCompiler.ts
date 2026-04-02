@@ -225,7 +225,7 @@ const MULTI_FRAME_RESOLVE_CHUNKS: Partial<Record<ColoringMode, string>> = {
 /** Return fractal-specific header extensions for multi-frame batch. */
 function getBatchHeaderExtensions(fractal: FractalType): string[] {
   if (fractal === 'mandelbrot') {
-    // dsHeaderChunk declares u_centerLo/u_scaleLo — don't also include multiFrameDSHeaderChunk (redefinition)
+    // dsHeaderChunk declares u_centerLo/u_scaleLo (reuses single-pass DS header)
     return [dsHeaderChunk, doubleSingleChunk, screenToComplexDSChunk];
   }
   if (fractal === 'julia') return [multiFrameJuliaHeaderChunk];

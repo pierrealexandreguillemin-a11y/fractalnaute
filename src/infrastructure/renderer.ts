@@ -87,7 +87,9 @@ function tryMultiFrame(
       interiorColoring: opts.interiorColoring ?? false,
       fractalParams: opts.params,
     },
-    undefined,
+    (batch, total) => {
+      opts.onStatusMessage?.(`iter: ${opts.maxIterations} (auto) — GPU batch ${batch}/${total}`);
+    },
     (elapsed) => { opts.onComplete?.(elapsed, 'gpu'); }
   );
   if (cancel) {

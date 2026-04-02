@@ -140,11 +140,6 @@ ${PREV_TEXTURE_UNIFORMS}
 ${MRT_OUTPUTS}
 `;
 
-/** DS header extension: adds lo-part correction uniforms. */
-export const multiFrameDSHeaderChunk = /* glsl */ `
-uniform vec2 u_centerLo;
-uniform float u_scaleLo;
-`;
 
 /** Julia header extension: adds Julia c constant uniforms. */
 export const multiFrameJuliaHeaderChunk = /* glsl */ `
