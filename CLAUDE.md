@@ -52,13 +52,41 @@ Jamais d'import inverse.
 - `noUnusedLocals: true`, `noUnusedParameters: true`
 - Zero `any` — `@typescript-eslint/no-explicit-any: error`
 
-### ESLint (ISO 5055)
+### ESLint (ISO 5055 — qualite code source)
 
 - `complexity: 15` max
 - `max-lines-per-function: 80` (skipBlankLines, skipComments)
 - `sonarjs/cognitive-complexity: 15` max
+- `sonarjs/no-nested-functions: error`
+- `sonarjs/no-nested-conditional: error`
+- `sonarjs/no-duplicate-string: error`
+- `max-depth: 4` max
 - `no-console: error` (sauf warn/error)
 - Zero warnings autorise (`--max-warnings 0`)
+
+### Normes ISO applicables (canonisees depuis spec perturbation 2026-03-26 §8)
+
+| Norme | Sujet | Application dans le projet |
+|-------|-------|---------------------------|
+| **IEEE 754-2019** | Arithmetique flottante | Guards NaN/Inf dans tous les shaders GPU. DS twoSum/twoProd rely on round-to-nearest-even. Denormals mitigated par rescaling. |
+| **ISO 5055** | Qualite code source | ESLint rules ci-dessus. Zero warnings, zero any, complexity capped. |
+| **ISO 25010** | Modele qualite (8 caracteristiques) | Performance (<1ms GPU), Compatibility (Chrome 91+, Firefox 89+, Safari 15.2+), Reliability (fallback CPU, timeout orbit), Security (cargo audit, CSP), Maintainability (SRP, DRY, @mirror tags). |
+| **ISO 9241-110** | Ergonomie interaction (7 principes) | Controllability (cancel orbit, cancel multi-frame). Self-descriptiveness (badges GPU/CPU/DS/Perturbation). Conformity to expectations (zoom just works at every depth). |
+| **ISO 40500 (WCAG 2.1)** | Accessibilite | `role="progressbar"` + `aria-valuenow` pour operations longues. `aria-live="polite"` pour changements de mode. Keyboard-accessible cancel. Couleur jamais seul indicateur (WCAG 1.4.1). `fieldset/legend` (WCAG 1.3.1). |
+| **ISO 27001 / OWASP** | Securite | CSP (script-src wasm-unsafe-eval), COOP/COEP, input validation (Result not panic), cargo audit, Cargo.lock committe. |
+| **ISO 80000-2** | Notation mathematique | Formules en notation standard dans les commentaires. `@mirror` tags liant GLSL a la formule math et au CPU equivalent. Variables GLSL documentees dans glossaire (spec §0). |
+
+### Normes operationnelles (feedback utilisateur — meme force que ISO)
+
+| Norme | Regle | Verification |
+|-------|-------|-------------|
+| **Playwright benchmarks** | Mesurer render time (Playwright) a chaque task significative, pas seulement a la fin. | Screenshot + temps dans le commit message ou perf-history. |
+| **Performance history** | `docs/performance-history.md` mis a jour a chaque push avec les nouvelles mesures. Ne pas ecraser les anciennes. | Diff du fichier dans le commit. |
+| **Meilleur du marche** | Chaque formule = meilleure ref connue (pas generique). Lire la recherche AVANT d'implementer. | Ref documentee (`@mirror` ou `@see`) pour chaque formule. |
+| **Jamais verified sans preuve** | "Verified" = screenshot ou pixel check. "Renders" = no crash + compile. "Untested" = explicite. | Preuve visible (screenshot, output) AVANT de claim done. |
+| **Jamais devier du plan** | Suivre le plan mot par mot. Si un step ne peut pas etre implemente tel quel, DEMANDER avant. | Audit chaque fichier contre le plan ligne par ligne apres implementation. |
+| **Pas de push auto** | Ne JAMAIS push sans instruction explicite de l'utilisateur. Commiter localement, attendre. | Pas de `git push` dans les scripts de plan sauf si l'utilisateur le demande. |
+| **Ton code = tes bugs** | Pas de "pre-existant hors scope". Si le code existe dans le repo, c'est ta responsabilite. | Corriger tout bug trouve, meme dans du code ancien. |
 
 ### Commits
 
