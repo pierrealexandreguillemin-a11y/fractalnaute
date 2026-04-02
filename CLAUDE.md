@@ -201,14 +201,14 @@ Grid search inutile avec rebasing.
 
 | # | Feature | Impact | Effort | Status |
 |---|---|---|---|---|
-| **E2c** | **Ping-pong multi-frame** | 5s bloquant → 50ms first visible | 1 sem | **P0 NEXT** |
+| ~~E2c~~ | ~~Ping-pong multi-frame~~ | **DONE** — 256 iter/batch, 4 MRT RGBA32F, GPU 771ms @8.8K iter (vs CPU 5380ms). 25 combos. | — | — |
 | E2d | **Series Approximation (SA)** | Skip iter pour TOUS pixels (10x) | 2-3 sem | After E2c |
 
-##### E2c. Ping-pong multi-frame — **P0 NEXT**
-Bottleneck : GPU perturbation render = 1-5s bloquant (6K-8K iter/pixel).
-Technique (deep-mandelbrot, mandelbrot.page) : split render en batches 256 iter/frame.
-Stocker état intermédiaire dans FBO ping-pong. Afficher chaque batch → raffinement progressif.
-Premier résultat visible en ~50ms. L'infrastructure progressive FBO existe déjà (désactivée).
+##### ~~E2c. Ping-pong multi-frame~~ — DONE
+256 iter/batch, 4 MRT RGBA32F state textures, ping-pong FBO swap.
+GPU 771ms @8.8K iter (vs CPU 5380ms). All 25 fractal×coloring combos.
+Lazy compilation (10 programs: 5 batch × 5 resolve). RAF scheduling ~16ms/batch.
+EXT_color_buffer_float required, CPU fallback.
 Ref: https://github.com/munrocket/deep-mandelbrot
 
 ##### E2d. Series Approximation (SA)
@@ -272,6 +272,7 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 - assembleFragmentSource retourne null (pas throw) pour fallback gracieux vers CPU.
 - EXT_disjoint_timer_query_webgl2: async result (available next frame). Check GPU_DISJOINT_EXT before reading. Not available on all browsers (Safari). Fallback: conservative threshold at 2048 iter.
 - Progressive FBO: quarter-res preview → blit → RAF → full-res. Prevents browser freeze at high iterations. Self-adaptive via measured GPU time.
+- Multi-frame ping-pong: BATCH_SIZE=256 #define (safe loop bound), u_totalMaxIter uniform (safe: early exit, not loop bound). 4 MRT RGBA32F state textures. EXT_color_buffer_float required, CPU fallback. Lazy compilation (10 programs: 5 batch × 5 resolve). RAF scheduling ~16ms/batch.
 
 ### Performance options evaluated
 - See docs/performance-history.md for full comparison table

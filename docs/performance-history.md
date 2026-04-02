@@ -242,3 +242,17 @@ BLA table built in WASM after reference orbit. Uploaded as RGBA32F texture.
 - **BenjaminAster WebGPU Mandelbrot** — minimal WebGPU reference.
 
 See `docs/curation/README.md` for full evaluation with screenshots.
+
+---
+
+## Multi-frame ping-pong (E2c) — 2026-04-02
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Batch size | 256 iter/frame | #define, safe on all drivers |
+| Mandelbrot DS @10K iter, zoom 2.8Mx | GPU 2280ms | vs CPU 5380ms (2.4x speedup) |
+| Mandelbrot DS @8.8K iter, zoom 466Kx | GPU 771ms | vs CPU ~4000ms (5.2x speedup) |
+| Default zoom (256 iter) | Single-pass <1ms | No regression, multi-frame not triggered |
+| VRAM (1920×1080) | ~265 MB | 4 textures × 2 ping-pong × RGBA32F |
+| Programs compiled | 10 | 5 batch (1 per fractal) × 5 resolve (1 per coloring), lazy |
+| Combos supported | 25 | 5 fractals × 5 colorings, all multi-frame GPU |
