@@ -55,11 +55,38 @@ function getPrecisionMode(viewport: Viewport, fractalType: FractalType): Precisi
     ? 'perturbation' : 'doubleSingle';
 }
 
-/**
- * Render a fractal to canvas.
- * If pool is provided, uses parallel workers.
- * Otherwise, falls back to single-thread chunked rendering.
- */
+// @tradeoff GPU DS shader + large loops produces driver bugs on AMD ANGLE.
+// Cap GPU iterations at 4096; fall back to CPU workers for higher counts.
+// E2c ping-pong multi-frame will lift this limit.
+const GPU_MAX_ITER = 4096;
+
+/** Try GPU render. Returns cancel function on success, null if GPU unavailable/skipped. */
+function tryGpuRender(
+  gpuRenderer: WebGLRenderer | null, opts: RenderOptions
+): (() => void) | null {
+  if (!gpuRenderer?.isReady() || opts.maxIterations > GPU_MAX_ITER) {
+    if (gpuRenderer) gpuRenderer.setVisible(false);
+    return null;
+  }
+  const startTime = performance.now();
+  const rendered = gpuRenderer.render({
+    viewport: opts.viewport,
+    fractalType: opts.fractalType,
+    maxIterations: opts.maxIterations,
+    coloringMode: opts.coloringMode ?? 'classic',
+    interiorColoring: opts.interiorColoring ?? false,
+    fractalParams: opts.params,
+    ssaa: opts.ssaa
+  });
+  if (rendered) {
+    gpuRenderer.setVisible(true);
+    opts.onComplete?.(performance.now() - startTime, 'gpu');
+    return () => { gpuRenderer.cancelPending(); };
+  }
+  gpuRenderer.setVisible(false);
+  return null;
+}
+
 /** Launch perturbation render (orbit + GPU). Returns cancel function. */
 function renderPerturbation(
   canvas: HTMLCanvasElement, pool: WorkerPool | null,
@@ -145,26 +172,8 @@ export function renderFractal(
     return renderPerturbation(canvas, pool, gpuRenderer, opts);
   }
 
-  // Try GPU path first
-  if (gpuRenderer?.isReady()) {
-    const startTime = performance.now();
-    const rendered = gpuRenderer.render({
-      viewport: opts.viewport,
-      fractalType: opts.fractalType,
-      maxIterations: opts.maxIterations,
-      coloringMode: opts.coloringMode ?? 'classic',
-      interiorColoring: opts.interiorColoring ?? false,
-      fractalParams: opts.params,
-      ssaa: opts.ssaa
-    });
-    if (rendered) {
-      gpuRenderer.setVisible(true);
-      const elapsed = performance.now() - startTime;
-      opts.onComplete?.(elapsed, 'gpu');
-      return () => { gpuRenderer.cancelPending(); };
-    }
-    gpuRenderer.setVisible(false);
-  }
+  const gpuCancel = tryGpuRender(gpuRenderer, opts);
+  if (gpuCancel) return gpuCancel;
 
   if (pool) {
     return renderWithPool({
