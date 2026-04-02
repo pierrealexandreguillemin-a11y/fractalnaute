@@ -33,6 +33,15 @@ import {
   PERTURBATION_UNIFORM_NAMES
 } from './shaders/perturbation';
 import { blaHeaderChunk, blaLookupChunk, BLA_UNIFORM_NAMES } from './shaders/bla';
+import {
+  multiFrameBatchHeaderChunk, multiFrameDSHeaderChunk,
+  multiFrameJuliaHeaderChunk, multiFrameMultibrotHeaderChunk,
+  mandelbrotDSBatchChunk, juliaBatchChunk,
+  burningshipBatchChunk, tricornBatchChunk, multibrotBatchChunk,
+  resolveHeaderChunk, RESOLVE_DEFINES,
+  resolveClassicChunk, resolveStripeChunk,
+  resolveDecompositionChunk, resolveOrbitTrapChunk, resolveNormalMapChunk,
+} from './shaders/multiFrame';
 
 // ---- Supported shader sets --------------------------------------------------
 
@@ -191,5 +200,72 @@ export function assembleFragmentSource(
     screenToComplexChunk, smoothEscapeChunk, common.paletteChunk,
     common.accumulator, iteration, common.coloringChunk, mainChunk
   ].join('\n');
+}
+
+// ---- Multi-frame batch/resolve assembly ------------------------------------
+
+const BATCH_DEFINE = '#define BATCH_SIZE 256';
+
+const MULTI_FRAME_BATCH_CHUNKS: Partial<Record<FractalType, string>> = {
+  mandelbrot: mandelbrotDSBatchChunk,
+  julia: juliaBatchChunk,
+  burningship: burningshipBatchChunk,
+  tricorn: tricornBatchChunk,
+  multibrot3: multibrotBatchChunk,
+};
+
+const MULTI_FRAME_RESOLVE_CHUNKS: Partial<Record<ColoringMode, string>> = {
+  classic: resolveClassicChunk,
+  stripe: resolveStripeChunk,
+  decomposition: resolveDecompositionChunk,
+  orbitTrap: resolveOrbitTrapChunk,
+  normalMap: resolveNormalMapChunk,
+};
+
+/** Return fractal-specific header extensions for multi-frame batch. */
+function getBatchHeaderExtensions(fractal: FractalType): string[] {
+  if (fractal === 'mandelbrot') {
+    return [multiFrameDSHeaderChunk, dsHeaderChunk, doubleSingleChunk, screenToComplexDSChunk];
+  }
+  if (fractal === 'julia') return [multiFrameJuliaHeaderChunk];
+  if (fractal === 'multibrot3') return [multiFrameMultibrotHeaderChunk];
+  return [];
+}
+
+/**
+ * Assemble a multi-frame batch fragment shader.
+ * Renders BATCH_SIZE iterations per frame, writing state to 4 MRT outputs.
+ * Pure function — no WebGL dependency, fully testable.
+ */
+export function assembleMultiFrameBatchSource(
+  fractal: FractalType,
+  _coloring: ColoringMode,
+  _interiorColoring: boolean
+): string | null {
+  const batchMain = MULTI_FRAME_BATCH_CHUNKS[fractal] ?? null;
+  if (!batchMain) return null;
+
+  const extensions = getBatchHeaderExtensions(fractal);
+  return [
+    multiFrameBatchHeaderChunk,
+    BATCH_DEFINE,
+    ...extensions,
+    batchMain,
+  ].join('\n');
+}
+
+/**
+ * Assemble a resolve fragment shader that maps final iteration state to color.
+ * Reads from 4 state textures (batch output) and writes to fragColor.
+ * Pure function — no WebGL dependency, fully testable.
+ */
+export function assembleResolveSource(
+  coloring: ColoringMode,
+  _interiorColoring: boolean
+): string | null {
+  const resolveMain = MULTI_FRAME_RESOLVE_CHUNKS[coloring] ?? null;
+  if (!resolveMain) return null;
+
+  return [resolveHeaderChunk, RESOLVE_DEFINES, resolveMain].join('\n');
 }
 
