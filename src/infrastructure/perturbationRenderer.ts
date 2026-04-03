@@ -57,15 +57,22 @@ export function renderDsFallback(
   }
 }
 
+// @tradeoff AMD ANGLE can't run GLSL loops >4096 even with #define.
+// Cap perturbation GPU shader to 4096 iter (orbit has full data, shader uses first N).
+// Multi-frame perturbation (E2e) would lift this — not yet implemented.
+const PERTURBATION_GPU_MAX_ITER = 4096;
+
 /** Handle perturbation orbit result: GPU render → DS preview + upgrade loop. */
 export function handleOrbitResult(
   gpu: WebGLRenderer, orbitData: OrbitData,
   canvas: HTMLCanvasElement, pool: WorkerPool | null, options: RenderOptions,
   isStale: () => boolean
 ): void {
+  // Cap shader iter to avoid AMD ANGLE loop limit, but orbit retains full data.
+  const gpuMaxIter = Math.min(options.maxIterations, PERTURBATION_GPU_MAX_ITER, orbitData.length);
   const perturbOpts = {
     viewport: options.viewport, fractalType: options.fractalType,
-    maxIterations: options.maxIterations,
+    maxIterations: gpuMaxIter,
     coloringMode: options.coloringMode ?? 'classic' as const,
     interiorColoring: options.interiorColoring ?? false,
     fractalParams: options.params, ssaa: options.ssaa,

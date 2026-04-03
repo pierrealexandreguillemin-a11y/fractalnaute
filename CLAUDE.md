@@ -184,10 +184,15 @@ grep -r @tradeoff src/
 | 7 | "Playwright benchmarks 3 profondeurs" | **LIVRÉ** | 5/5 tests formalisés (10^-8, 10^-12, 10^-14, 10^-40, interactif). |
 | 8 | "10^-80 malachite <50ms" | **BLOQUE PAR #1** | Depend de SA (E2d) + fix orbit ArbFloat. |
 
-Problème ouvert : **Orbite Rust ArbFloat produit des donnees incorrectes a 10^-30+**.
-Symptome : rendu uniforme (tous pixels meme couleur) au lieu de structure fractale.
-Fonctionne parfaitement a 10^-14 (screenshot prouve). Bug localise dans `wasm/src/orbit.rs`.
-Coords ref haute-precision testees : ckormanyos/mandelbrot "Deep Dive #2" (40 digits).
+Problème ouvert : **Perturbation GPU > 10^-14 — non verifiable en Playwright**.
+Diagnostic (2026-04-03, debugging systematique Phase 1-4) :
+- Orbite Rust **CORRECTE** (32768 iter a 10^-20, verifie par debug log).
+- Shader perturbation **GPU cap 4096 iter** (`PERTURBATION_GPU_MAX_ITER` dans perturbationRenderer.ts).
+- Playwright utilise WebKit headless (pas Chrome/AMD) → shader perturbation ne compile pas.
+- **Verification requise dans le vrai browser** (Chrome + AMD Radeon) pour les promesses 1 & 2.
+- A 10^-14 : structure visible dans le vrai browser (verifie session precedente).
+- Si le vrai browser compile le shader perturbation a 4096 iter, 10^-20+ devrait fonctionner.
+- Si le cap 4096 est insuffisant, multi-frame perturbation (E2e) sera necessaire.
 
 ~~Problème résolu~~ : GPU perturbation render trop lent (1-5s bloquant) — **RESOLU par E2c** (771ms @8.8K iter).
 
