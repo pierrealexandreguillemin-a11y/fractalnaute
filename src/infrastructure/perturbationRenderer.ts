@@ -65,7 +65,7 @@ const PERTURBATION_GPU_MAX_ITER = 4096;
 /** Handle perturbation orbit result: GPU render → DS preview + upgrade loop. */
 export function handleOrbitResult(
   gpu: WebGLRenderer, orbitData: OrbitData,
-  canvas: HTMLCanvasElement, pool: WorkerPool | null, options: RenderOptions,
+  _canvas: HTMLCanvasElement, _pool: WorkerPool | null, options: RenderOptions,
   isStale: () => boolean
 ): void {
   // Cap shader iter to avoid AMD ANGLE loop limit, but orbit retains full data.
@@ -84,11 +84,12 @@ export function handleOrbitResult(
     options.onComplete?.(performance.now() - t0, 'gpu');
     return;
   }
+  // Don't render DS fallback at perturbation depths — DS precision is exhausted.
+  // Keep retrying GPU until shader compiles (up to 10s = ~600 frames).
   gpu.setVisible(false);
-  renderDsFallback(canvas, pool, gpu, options);
   let attempt = 0;
   const tryUpgrade = () => {
-    if (isStale() || attempt++ > 120) return;
+    if (isStale() || attempt++ > 600) return;
     if (gpu.render(perturbOpts)) {
       gpu.setVisible(true);
       options.onComplete?.(performance.now() - t0, 'gpu');
