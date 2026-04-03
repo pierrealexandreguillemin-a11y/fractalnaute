@@ -79,6 +79,9 @@ export interface BlaTextureState {
   height: number;
 }
 
+/** Iterations per batch frame. totalBatches = ceil(maxIter / MULTI_FRAME_BATCH_SIZE). */
+export const MULTI_FRAME_BATCH_SIZE = 256;
+
 /** Ping-pong FBO for multi-frame rendering (4× RGBA32F textures via MRT). */
 export interface MultiFrameFBO {
   fbo: WebGLFramebuffer;

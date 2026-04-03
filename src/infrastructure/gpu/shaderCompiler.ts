@@ -42,6 +42,7 @@ import {
   resolveClassicChunk, resolveStripeChunk,
   resolveDecompositionChunk, resolveOrbitTrapChunk, resolveNormalMapChunk,
 } from './shaders/multiFrame';
+import { MULTI_FRAME_BATCH_SIZE } from './rendererTypes';
 
 // ---- Supported shader sets --------------------------------------------------
 
@@ -204,7 +205,7 @@ export function assembleFragmentSource(
 
 // ---- Multi-frame batch/resolve assembly ------------------------------------
 
-const BATCH_DEFINE = '#define BATCH_SIZE 256';
+const BATCH_DEFINE = `#define BATCH_SIZE ${MULTI_FRAME_BATCH_SIZE}`;
 
 const MULTI_FRAME_BATCH_CHUNKS: Partial<Record<FractalType, string>> = {
   mandelbrot: mandelbrotDSBatchChunk,
@@ -237,6 +238,11 @@ function getBatchHeaderExtensions(fractal: FractalType): string[] {
  * Assemble a multi-frame batch fragment shader.
  * Renders BATCH_SIZE iterations per frame, writing state to 4 MRT outputs.
  * Pure function — no WebGL dependency, fully testable.
+ *
+ * @param _coloring - Intentionally unused. The batch shader always uses the real
+ *   accumulator (stripe avg, orbit trap, dz) regardless of coloring mode. Coloring
+ *   is applied in the resolve shader, not here.
+ * @param _interiorColoring - Intentionally unused, same reason as _coloring.
  */
 export function assembleMultiFrameBatchSource(
   fractal: FractalType,

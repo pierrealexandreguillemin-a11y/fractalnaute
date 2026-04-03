@@ -8,6 +8,7 @@
  * @see docs/superpowers/plans/2026-04-02-multiframe-ping-pong.md
  */
 
+import { MULTI_FRAME_BATCH_SIZE } from './rendererTypes';
 import type { MultiFrameFBO, CompiledRef, GPURenderOptions } from './rendererTypes';
 import type { FractalType, ColoringMode } from '../../domain/types';
 import { assembleMultiFrameBatchSource, assembleResolveSource } from './shaderCompiler';
@@ -87,8 +88,7 @@ export function destroyMultiFrameFBO(
 
 // ---- Shader compilation (module-level) --------------------------------------
 
-/** Iterations per batch frame. totalBatches = ceil(maxIter / BATCH_SIZE). */
-const BATCH_SIZE = 256;
+// MULTI_FRAME_BATCH_SIZE imported from rendererTypes.ts (single source of truth)
 
 /** Default bailout for non-stripe coloring modes. */
 const DEFAULT_BAILOUT_SQ = 4.0;
@@ -151,7 +151,7 @@ function enumerateUniforms(
 
 // ---- Render helpers (module-level) ------------------------------------------
 
-/** Draw one batch: read from readFBO, write BATCH_SIZE iterations into writeFBO. */
+/** Draw one batch: read from readFBO, write MULTI_FRAME_BATCH_SIZE iterations into writeFBO. */
 function renderBatch(
   gl: WebGL2RenderingContext,
   prog: CompiledRef,
@@ -382,7 +382,7 @@ export function createMultiFrameController(
       clearMrtFbo(gl, fbos.a!);
       clearMrtFbo(gl, fbos.b!);
 
-      const totalBatches = Math.ceil(options.maxIterations / BATCH_SIZE);
+      const totalBatches = Math.ceil(options.maxIterations / MULTI_FRAME_BATCH_SIZE);
       let idx = 0;
       let stale = false;
       const t0 = performance.now();
