@@ -85,19 +85,19 @@ Worktree : .worktrees/e2c-multiframe (à nettoyer)
 - [x] Build prod — `npm run build` pass
 - [x] 262 tests — `npm test` pass
 
-## NON vérifié — à faire en priorité
+## Vérifié (session 2026-04-03, Playwright)
 
-- [ ] **BurningShip deep zoom** — `http://localhost:3000/#f=burningship&re=-1.75&im=-0.02&s=0.00001`
-- [ ] **Stripe coloring deep zoom** — `http://localhost:3000/#re=0.3219&im=-0.0352&s=0.000006&c=stripe`
-- [ ] **OrbitTrap coloring** — `http://localhost:3000/#re=0.3219&im=-0.0352&s=0.000006&c=orbitTrap` (vérifie que trapDistSq init=1e20 fonctionne)
-- [ ] **Cancel mid-render** — naviguer deep zoom puis immédiatement naviguer ailleurs → pas de crash, pas de console error WebGL
+- [x] **BurningShip deep zoom** — `#f=burningship&re=-1.762&im=-0.028&s=0.008` — detail visible (antenne), 312x, 315ms CPU, iter 3567. Coords handoff originales (-1.75, -0.02) tombaient dans l'interieur (noir attendu).
+- [x] **Stripe coloring deep zoom** — `#re=0.3219&im=-0.0352&s=0.000006&c=stripe` — metal brosse, badge GPU+DS, iter 8882 (auto).
+- [x] **OrbitTrap coloring** — `#re=0.3219&im=-0.0352&s=0.000006&c=orbitTrap` — spirales turquoise, trapDistSq init=1e20 OK, badge GPU+DS, 989ms.
+- [x] **Cancel mid-render** — 3 cancel consecutifs (stripe→burningship→normalMap→mandelbrot), 0 erreur WebGL, 0 crash. Seule erreur console: CSP Speed Insights (dev only, connu).
 
-## 2 fixes code à faire
+## 2 fixes code — FAIT (session 2026-04-03)
 
-### Fix A : BATCH_SIZE en double
-`multiFrameRenderer.ts:91` définit `const BATCH_SIZE = 256` (JS) et `shaderCompiler.ts:207` définit `'#define BATCH_SIZE 256'` (GLSL string). Si l'un change sans l'autre → batches mal comptés. Extraire la constante 256 en un seul endroit, par exemple exporter depuis `multiFrameRenderer.ts` et l'utiliser dans `shaderCompiler.ts` : `` `#define BATCH_SIZE ${MULTI_FRAME_BATCH_SIZE}` ``.
+### Fix A : BATCH_SIZE partagé — FAIT
+`MULTI_FRAME_BATCH_SIZE` extrait dans `rendererTypes.ts` (single source of truth). Import dans `multiFrameRenderer.ts` et `shaderCompiler.ts`. Import circulaire detecte et corrige a l'audit ISO 25010.
 
-### Fix B : JSDoc manquant
+### Fix B : JSDoc — FAIT
 `shaderCompiler.ts:assembleMultiFrameBatchSource` a les params `_coloring` et `_interiorColoring` préfixés `_` (unused). C'est intentionnel : le batch shader utilise TOUJOURS l'accumulateur réel (pas noop) et le coloring est appliqué dans le resolve shader, pas le batch. Mais ça mérite un JSDoc explicite pour que personne ne "fixe" ce qui n'est pas un bug.
 
 ## Audits passés
