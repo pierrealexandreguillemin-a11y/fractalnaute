@@ -9,8 +9,18 @@
 
 import { PERTURBATION_THRESHOLD } from '../domain';
 
-/** ISO 25010 Performance: orbit computation timeout. */
-const ORBIT_TIMEOUT_MS = 10_000;
+/** ISO 25010 Performance: orbit computation timeout (base). Scales with zoom depth. */
+const ORBIT_TIMEOUT_BASE_MS = 10_000;
+
+/** Compute adaptive timeout: deeper zoom → higher precision → more time needed. */
+function orbitTimeoutMs(scaleStr: string): number {
+  const s = parseFloat(scaleStr);
+  if (!Number.isFinite(s) || s <= 0) return ORBIT_TIMEOUT_BASE_MS;
+  const depth = -Math.log10(s);            // e.g. 1e-30 → 30
+  if (depth <= 14) return ORBIT_TIMEOUT_BASE_MS;
+  // +5s per decade beyond 10^-14, capped at 120s
+  return Math.min(ORBIT_TIMEOUT_BASE_MS + (depth - 14) * 5_000, 120_000);
+}
 
 let orbitWorker: Worker | null = null;
 let controlBuffer: SharedArrayBuffer | null = null;
@@ -98,13 +108,14 @@ export function computeReferenceOrbit(
       return;
     }
 
+    const timeoutMs = orbitTimeoutMs(scaleStr);
     const timer = setTimeout(() => {
       // Don't call cancelOrbit() — it would reject with 'cancelled' before we can reject with 'timed out'.
       activeReject = null;
       if (controlView) Atomics.store(controlView, 0, 1);
       if (orbitWorker) { orbitWorker.terminate(); orbitWorker = null; }
-      reject(new Error(`Orbit computation timed out after ${ORBIT_TIMEOUT_MS}ms`));
-    }, ORBIT_TIMEOUT_MS);
+      reject(new Error(`Orbit computation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
 
     const cleanup = () => {
       activeReject = null;

@@ -11,7 +11,7 @@ import type { WebGLRenderer } from './gpu';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
 import { needsPerturbation, computeReferenceOrbit, cancelOrbit } from './wasmBridge';
-import { handleOrbitResult, cancelPerturbationRetry, renderDsFallback } from './perturbationRenderer';
+import { handleOrbitResult, cancelPerturbationRetry } from './perturbationRenderer';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -171,14 +171,16 @@ function renderPerturbation(
     const msg = String(err);
     console.warn('[perturbation] orbit failed:', msg);
     if (msg.includes('timed out')) {
-      options.onStatusMessage?.('Orbit computation timed out — using standard precision');
+      options.onStatusMessage?.('Orbit computation timed out — zoom depth too extreme for current iteration count');
     } else if (msg.includes('memory') || msg.includes('alloc')) {
       options.onStatusMessage?.('Not enough memory for this zoom depth — try reducing iterations');
     } else {
-      options.onStatusMessage?.('Deep zoom computation failed — using standard precision');
+      options.onStatusMessage?.('Deep zoom computation failed');
     }
+    // Don't fallback to DS at perturbation depths — DS precision is exhausted,
+    // producing garbled/black pixels. Keep the previous CSS-transformed image
+    // which is better UX than a black screen.
     gpuRenderer.setVisible(false);
-    renderDsFallback(canvas, pool, gpuRenderer, options);
   });
 
   return () => { stale = true; cancelOrbit(); cancelPerturbationRetry(); gpuRenderer.cancelPending(); };

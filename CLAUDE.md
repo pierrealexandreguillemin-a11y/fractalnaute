@@ -171,25 +171,37 @@ grep -r @tradeoff src/
    Iter auto-scaling: 128×log2(1/scale), cap 8192, only at scale<1e-6.
    Known limit: GPU perturbation render bloquant (1-5s). Fix: E2c ping-pong.
 
-### BROKEN PROMISES — audit trail (honnête, mis à jour 2026-04-01)
+### BROKEN PROMISES — audit trail (honnête, mis à jour 2026-04-03)
 
 | # | Promesse | Statut | Notes |
 |---|---|---|---|
-| 1 | "Depth breakthrough 10^-40: non-black pixels" | **PARTIEL** | Moteur OK (no crash, GPU+Perturbation). Iter auto-scaling livré. Coords URL f64 insuffisantes pour structure — zoom interactif requis. |
-| 2 | "Manual verification: Zoom 10^-60, 10^-100" | **PARTIEL** | Focus-point Decimal livré. Navigation interactif fonctionne. Coords URL limitées à f64. |
+| 1 | "Depth breakthrough 10^-40: non-black pixels" | **BUG** | 10^-14 fonctionne (screenshot). 10^-30+ : orbite Rust retourne mais rendu uniforme (pas de structure). Bug dans orbit.rs ArbFloat a haute precision — a debugger. |
+| 2 | "Manual verification: Zoom 10^-60, 10^-100" | **BLOQUE PAR #1** | Meme cause racine. Le timeout adaptatif est livre mais le bug orbite persiste. |
 | 3 | "Unlimited zoom depth (10^-60+)" | **LIVRÉ (moteur)** | Pipeline deep coords + perturbation + rescaling + BLA fonctionne à 10^-23+ vérifié. Pas de crash. |
 | 4 | "GPU render @256iter <10ms with BLA" | **LIVRÉ** | BLA toggle ?bla=0. Mesuré: ON=4853ms vs OFF=5331ms (9%). Faible gain car premier render = CPU fallback. |
 | 5 | "BLA pixel cross-validation" | **NON FAIT** | Nécessite coords extérieures haute-précision. |
 | 6 | "Overlap zone DS ≈ perturbation" | **LIVRÉ** | Vérifié visuellement (Playwright): même résultat aux mêmes coords. |
 | 7 | "Playwright benchmarks 3 profondeurs" | **LIVRÉ** | 5/5 tests formalisés (10^-8, 10^-12, 10^-14, 10^-40, interactif). |
-| 8 | "10^-80 malachite <50ms" | **NON TESTÉ** | Orbit ArbFloat fonctionne (cargo test), pas de test visuel. |
+| 8 | "10^-80 malachite <50ms" | **BLOQUE PAR #1** | Depend de SA (E2d) + fix orbit ArbFloat. |
 
-Problème ouvert : **GPU perturbation render trop lent** (1-5s bloquant).
-Solution identifiée : **ping-pong multi-frame (E2c)** — split render en batches 256 iter/frame.
+Problème ouvert : **Orbite Rust ArbFloat produit des donnees incorrectes a 10^-30+**.
+Symptome : rendu uniforme (tous pixels meme couleur) au lieu de structure fractale.
+Fonctionne parfaitement a 10^-14 (screenshot prouve). Bug localise dans `wasm/src/orbit.rs`.
+Coords ref haute-precision testees : ckormanyos/mandelbrot "Deep Dive #2" (40 digits).
 
-### Next (ordre par impact perf)
+~~Problème résolu~~ : GPU perturbation render trop lent (1-5s bloquant) — **RESOLU par E2c** (771ms @8.8K iter).
 
-Post-precision-ladder : orbite <1ms, GPU ~50ms = nouveau bottleneck.
+### Next — ordre logique (mis a jour 2026-04-03)
+
+| Priorite | Feature | Effort | Debloque |
+|----------|---------|--------|----------|
+| **P0** | Fix orbit ArbFloat 10^-30+ (bug #1) | debug Rust | Promesses 1, 2, 8 |
+| **P1** | F2 Histogram coloring | 1 sem | Banding → 0, qualite visuelle |
+| **P2** | E2d Series Approximation (SA) | 2-3 sem | Promesse 8 (10^-80 <50ms), deep zoom perf 10x |
+| **P3** | Verifier promesse 8 (post-SA) | 1h | 10^-80 malachite <50ms |
+| **P4** | Promesse 5 BLA cross-validation | qq heures | Coords ref externes |
+| **P5** | F3 Video export | 2 sem | Zoom animation MP4/WebM |
+| **P6** | F4 LLM-readable (SEO) | 1 sem | Discoverability |
 
 #### Phase C: Perturbation correctness — DONE (rebasing)
 
