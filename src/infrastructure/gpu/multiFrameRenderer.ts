@@ -264,7 +264,8 @@ function renderResolve(
   paletteTexture: WebGLTexture,
   interiorColoring: boolean,
   vao: WebGLVertexArrayObject | null,
-  rescaleS?: number
+  rescaleS?: number,
+  orbitCtx?: OrbitContext
 ): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -283,6 +284,18 @@ function renderResolve(
   if (rescaleS !== undefined) {
     const rescaleLoc = prog.uniformLocations.get('u_rescaleS');
     if (rescaleLoc) gl.uniform1f(rescaleLoc, rescaleS);
+  }
+
+  // Bind orbit texture for perturbation resolve (full dz = dO + delta'/S)
+  if (orbitCtx) {
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, orbitCtx.orbitTexture);
+    const orbLoc = prog.uniformLocations.get('u_orbitTexture');
+    if (orbLoc) gl.uniform1i(orbLoc, 5);
+    const lenLoc = prog.uniformLocations.get('u_orbitLength');
+    if (lenLoc) gl.uniform1i(lenLoc, orbitCtx.orbitData.length);
+    const sizLoc = prog.uniformLocations.get('u_orbitTexSize');
+    if (sizLoc) gl.uniform2f(sizLoc, orbitCtx.orbitTexWidth, orbitCtx.orbitTexHeight);
   }
 
   gl.bindVertexArray(vao);
@@ -513,7 +526,7 @@ function runRafLoop(
     const rd = idx % 2 === 0 ? fbos.a : fbos.b;
     const wr = idx % 2 === 0 ? fbos.b : fbos.a;
     renderBatch(gl, batchProg, rd, wr, options, vao, orbit);
-    renderResolve(gl, resolveProg, wr, paletteTexture, options.interiorColoring, vao, rescaleS);
+    renderResolve(gl, resolveProg, wr, paletteTexture, options.interiorColoring, vao, rescaleS, orbit);
     idx++;
     onBatchProgress?.(idx, totalBatches);
     rafId = requestAnimationFrame(step);
@@ -577,6 +590,8 @@ export function createMultiFrameController(
       if (fbos.a) { destroyMultiFrameFBO(gl, fbos.a); fbos.a = null; }
       if (fbos.b) { destroyMultiFrameFBO(gl, fbos.b); fbos.b = null; }
       destroyCaches(gl, batchCache, resolveCache);
+      if (orbitState.texture) { gl.deleteTexture(orbitState.texture); orbitState.texture = null; }
+      if (blaState.texture) { gl.deleteTexture(blaState.texture); blaState.texture = null; }
     }
   };
 }

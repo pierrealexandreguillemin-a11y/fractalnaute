@@ -16,6 +16,11 @@
  * @see shaders/index.ts for single-pass equivalents
  */
 
+import {
+  COLOR_CYCLE_PERIOD, ORBIT_TRAP_CYCLE,
+  NORMAL_MAP_LIGHT_ANGLE, INTERIOR_ATTENUATION
+} from '../../../domain/coloringModes';
+
 // ---- Shared GLSL string fragments (DRY: sonarjs/no-duplicate-string) --------
 
 const PRECISION_HEADER = `precision highp float;
@@ -725,6 +730,17 @@ uniform sampler2D u_stateHist;
 uniform sampler2D u_palette;
 uniform int u_interiorColoring;
 uniform float u_rescaleS;
+// Orbit texture for full dz = dO + (du,dv)/S (@mirror perturbation.ts:136)
+uniform sampler2D u_orbitTexture;
+uniform int u_orbitLength;
+uniform vec2 u_orbitTexSize;
+
+// @mirror perturbation.ts:21-26 — orbit lookup
+vec4 getOrbitData(int i) {
+  int x = i % int(u_orbitTexSize.x);
+  int y = i / int(u_orbitTexSize.x);
+  return texelFetch(u_orbitTexture, ivec2(x, y), 0);
+}
 
 out vec4 fragColor;
 `;
@@ -739,10 +755,17 @@ out vec4 fragColor;
  * IEEE 754-2019: NaN/Inf guard on z
  */
 export const perturbationResolvePreambleChunk = /* glsl */ `
-  // @mirror perturbation.ts — reconstruct z/dz from stored delta
+  // @mirror perturbation.ts:135-136 — reconstruct z/dz from stored delta + orbit
   z = sAcc.xy;                        // full position (stored by batch)
   float invS = 1.0 / u_rescaleS;
-  dz = sZ.zw * invS;                  // (du, dv) / S
+  // Full dz = dO_n + (du,dv)/S — orbit derivative + perturbation derivative
+  int refIter = int(sHist.w);
+  if (refIter >= 0 && refIter < u_orbitLength) {
+    vec4 orbData = getOrbitData(refIter);
+    dz = orbData.zw + sZ.zw * invS;   // @mirror perturbation.ts:136
+  } else {
+    dz = sZ.zw * invS;                // fallback: delta-only
+  }
 
   // IEEE 754-2019 NaN/Inf guard
   if (isnan(z.x) || isnan(z.y) || isinf(z.x) || isinf(z.y)) {
@@ -778,10 +801,12 @@ out vec4 fragColor;
  * Values imported from domain layer by the assembler (Task 4).
  * Provided as a raw string here; the assembler will prepend after the header.
  */
-export const RESOLVE_DEFINES = `#define COLOR_CYCLE_PERIOD 256.0
-#define ORBIT_TRAP_CYCLE 64.0
-#define NORMAL_MAP_LIGHT_ANGLE (-0.7854)
-#define INTERIOR_ATTENUATION 0.4`;
+export const RESOLVE_DEFINES = [
+  `#define COLOR_CYCLE_PERIOD ${COLOR_CYCLE_PERIOD}.0`,
+  `#define ORBIT_TRAP_CYCLE ${ORBIT_TRAP_CYCLE}.0`,
+  `#define NORMAL_MAP_LIGHT_ANGLE (${NORMAL_MAP_LIGHT_ANGLE})`,
+  `#define INTERIOR_ATTENUATION ${INTERIOR_ATTENUATION}`,
+].join('\n');
 
 /** Read final state from 4 textures — shared by all 5 resolve shaders. */
 const RESOLVE_READ_STATE = `  ivec2 fc = ivec2(gl_FragCoord.xy);
