@@ -66,7 +66,8 @@ const RESTORE_ACCUMULATOR = `  vec2 dz = pAcc.xy;
   float trapDistSq = pAcc.w;
   float sp1 = pHist.x;
   float sp2 = pHist.y;
-  float sp3 = pHist.z;`;
+  float sp3 = pHist.z;
+  float zz = 0.0;`;
 
 /**
  * @mirror shaders/index.ts:accumulatorRealChunk — updateAccumulator body.
@@ -74,7 +75,7 @@ const RESTORE_ACCUMULATOR = `  vec2 dz = pAcc.xy;
  */
 const ACCUMULATOR_UPDATE = `    // @mirror shaders/index.ts:accumulatorRealChunk
     sp3 = sp2; sp2 = sp1; sp1 = stripeSum;
-    float zz = z.x * z.x + z.y * z.y;
+    zz = z.x * z.x + z.y * z.y;
     if (zz > 0.0) stripeSum += z.x * z.y / zz;
     count++;
     if (zz < trapDistSq) trapDistSq = zz;`;
@@ -488,6 +489,7 @@ ${PASSTHROUGH_CHECK}
   float sp1 = pHist.x;
   float sp2 = pHist.y;
   float sp3 = pHist.z;
+  float zz = 0.0;
   int refIter = int(pHist.w);
 
   // @mirror shaders/doubleSingle.ts:screenToComplexDSChunk — c_pixel in DS
@@ -524,7 +526,7 @@ ${PASSTHROUGH_CHECK}
 
     // @mirror perturbation.ts:90-91 — z = Z + δ̃/S (full position)
     z = O + vec2(u, v) * invS;
-    float zz = z.x * z.x + z.y * z.y;
+    zz = z.x * z.x + z.y * z.y;
 
     // @mirror perturbation.ts:100-105 — escape test
     if (zz > u_bailoutSq) {
@@ -618,6 +620,7 @@ ${PASSTHROUGH_CHECK}
   float sp1 = pHist.x;
   float sp2 = pHist.y;
   float sp3 = pHist.z;
+  float zz = 0.0;
   int refIter = int(pHist.w);
 
   // @mirror perturbation.ts:156-158 — pixel IS z₀ for Julia (not c)
@@ -655,7 +658,7 @@ ${PASSTHROUGH_CHECK}
 
     // @mirror perturbation.ts:187-188 — z = Z + δ̃/S (full position)
     z = O + vec2(u, v) * invS;
-    float zz = z.x * z.x + z.y * z.y;
+    zz = z.x * z.x + z.y * z.y;
 
     // @mirror perturbation.ts:191-194 — escape test
     if (zz > u_bailoutSq) {
@@ -813,6 +816,7 @@ const RESOLVE_READ_STATE = `  ivec2 fc = ivec2(gl_FragCoord.xy);
   vec4 sZ    = texelFetch(u_stateZ,    fc, 0);
   vec4 sInfo = texelFetch(u_stateInfo,  fc, 0);
   vec4 sAcc  = texelFetch(u_stateAcc,  fc, 0);
+  vec4 sHist = texelFetch(u_stateHist, fc, 0);
 
   vec2 z          = sZ.xy;
   float smoothVal = sInfo.b;
