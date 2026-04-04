@@ -420,6 +420,163 @@ ${WRITE_CONTINUE}
 }
 `;
 
+// ---- Perturbation batch header & chunks ------------------------------------
+
+/**
+ * Perturbation batch header: orbit texture uniforms + getOrbitData lookup.
+ * Used as header extension for perturbation multi-frame batch shaders.
+ * @mirror perturbation.ts:10-18 — perturbationHeaderChunk (orbit uniforms)
+ * @mirror perturbation.ts:21-26 — orbitLookupChunk (getOrbitData)
+ */
+export const perturbationBatchHeaderChunk = /* glsl */ `
+uniform sampler2D u_orbitTexture;
+uniform int u_orbitLength;
+uniform vec2 u_orbitTexSize;
+uniform vec2 u_refPoint;
+uniform vec2 u_refPointLo;
+uniform float u_rescaleS;
+
+// @mirror perturbation.ts:21-26 — orbit texture lookup
+vec4 getOrbitData(int i) {
+  int texW = int(u_orbitTexSize.x);
+  return texelFetch(u_orbitTexture, ivec2(i % texW, i / texW), 0);
+}
+`;
+
+/**
+ * Glitch threshold for rebasing (Heiland-Allen criterion).
+ * @mirror perturbation.ts:33 — GLITCH_THRESHOLD
+ */
+const PERTURB_GLITCH_THRESHOLD = '1e-6';
+
+/**
+ * Mandelbrot perturbation batch shader (multi-frame ping-pong).
+ *
+ * State layout (different from DS batch):
+ *   T_Z    (loc=0): u (δ̃.re), v (δ̃.im), du (δ̃'.re), dv (δ̃'.im)
+ *   T_Info (loc=1): float(iter), float(escaped), smoothVal, float(count)
+ *   T_Acc  (loc=2): z.x, z.y, stripeSum, trapDistSq
+ *   T_Hist (loc=3): stripePrev1, stripePrev2, stripePrev3, float(refIter)
+ *
+ * Mathematical formulas (ISO 80000-2), rescaled (spec F1):
+ *   δ̃_{n+1} = 2·Z_n·δ̃_n + δ̃_n²/S + δ̃c
+ *   δ'_{n+1} = 2·(Z'_n·δ_n + z_n·δ'_n)
+ *   z_n = Z_n + δ̃_n/S
+ *   Rebasing: |z|² < G·|Z|² → δ̃ = z×S, refIter=0
+ *
+ * @mirror perturbation.ts:52-143 — mandelbrotPerturbationChunk
+ */
+export const mandelbrotPerturbationBatchChunk = /* glsl */ `
+${SMOOTH_ESCAPE_FN}
+
+void main() {
+${READ_PREV_STATE}
+${PASSTHROUGH_CHECK}
+
+  // Restore perturbation state from previous batch
+  float u = pZ.x;       // δ̃.re
+  float v = pZ.y;       // δ̃.im
+  float du = pZ.z;      // δ̃'.re
+  float dv = pZ.w;      // δ̃'.im
+  float stripeSum = pAcc.z;
+  float trapDistSq = pAcc.w;
+  float sp1 = pHist.x;
+  float sp2 = pHist.y;
+  float sp3 = pHist.z;
+  int refIter = int(pHist.w);
+
+  // @mirror shaders/doubleSingle.ts:screenToComplexDSChunk — c_pixel in DS
+  vec2 ds_cre, ds_cim;
+  screenToComplexDS(gl_FragCoord.xy, u_resolution, ds_cre, ds_cim);
+
+  // @mirror perturbation.ts:59-65 — δc = c_pixel - refPoint, δ̃c = δc × S
+  float invS = 1.0 / u_rescaleS;
+  float dc_re = (ds_cre.x - u_refPoint.x + (ds_cre.y - u_refPointLo.x)) * u_rescaleS;
+  float dc_im = (ds_cim.x - u_refPoint.y + (ds_cim.y - u_refPointLo.y)) * u_rescaleS;
+
+  // @mirror perturbation.ts:68-75 — init at first batch
+  if (prevIter == 0) {
+    u = dc_re;
+    v = dc_im;
+    du = u_rescaleS;
+    dv = 0.0;
+    refIter = 0;
+  }
+
+  vec2 z = vec2(0.0);
+  vec2 dz = vec2(du, dv);
+
+  for (int i = 0; i < BATCH_SIZE; i++) {
+    if (prevIter + i >= u_totalMaxIter) break;
+
+    // @mirror perturbation.ts:84 — orbit bounds check
+    if (refIter >= u_orbitLength) break;
+
+    // @mirror perturbation.ts:86-88 — orbit lookup
+    vec4 orbitData = getOrbitData(refIter);
+    vec2 O = orbitData.xy;   // Z_n (reference)
+    vec2 dO = orbitData.zw;  // Z'_n (reference derivative)
+
+    // @mirror perturbation.ts:90-91 — z = Z + δ̃/S (full position)
+    z = O + vec2(u, v) * invS;
+    float zz = z.x * z.x + z.y * z.y;
+
+    // @mirror perturbation.ts:100-105 — escape test
+    if (zz > u_bailoutSq) {
+      float smoothV = smoothEscape(prevIter + i, zz);
+      outZ = vec4(u, v, du, dv);
+      outInfo = vec4(float(prevIter + i + 1), 1.0, smoothV, float(count));
+      outAcc = vec4(z, stripeSum, trapDistSq);
+      outHist = vec4(sp1, sp2, sp3, float(refIter));
+      return;
+    }
+
+${makeNanInfGuard('z')}
+
+    // @mirror perturbation.ts:107-116 — rebasing (Zhuoran 2021)
+    float OO = O.x * O.x + O.y * O.y;
+    if (OO > 0.0 && zz < ${PERTURB_GLITCH_THRESHOLD} * OO) {
+      u = z.x * u_rescaleS;
+      v = z.y * u_rescaleS;
+      du = dz.x * u_rescaleS;
+      dv = dz.y * u_rescaleS;
+      refIter = 0;
+      // skip iteration update — continue with rebased state
+      continue;
+    }
+
+    // @mirror perturbation.ts:118-122 — δ' = 2·(Z'·δ + z·δ')
+    float temp_du = 2.0*(dO.x*u - dO.y*v + z.x*du - z.y*dv);
+    dv = 2.0*(dO.x*v + dO.y*u + z.x*dv + z.y*du);
+    du = temp_du;
+    dz = vec2(du, dv);
+
+    // @mirror perturbation.ts:124-127 — δ̃_{n+1} = 2·Z_n·δ̃_n + δ̃_n²/S + δ̃c
+    float temp_u = u*u*invS - v*v*invS + 2.0*(u*O.x - v*O.y) + dc_re;
+    v = 2.0*u*v*invS + 2.0*(v*O.x + u*O.y) + dc_im;
+    u = temp_u;
+
+    // @mirror perturbation.ts:129 — advance orbit index
+    refIter++;
+
+    // Recompute full z for accumulator (@mirror perturbation.ts:133-137)
+    if (refIter < u_orbitLength) {
+      vec4 nextOrbit = getOrbitData(refIter);
+      z = nextOrbit.xy + vec2(u, v) * invS;
+      dz = nextOrbit.zw + vec2(du, dv) * invS;
+    }
+
+${ACCUMULATOR_UPDATE}
+  }
+
+  // Continue: write perturbation state back for next batch
+  outZ = vec4(u, v, du, dv);
+  outInfo = vec4(float(prevIter + BATCH_SIZE), 0.0, 0.0, float(count));
+  outAcc = vec4(z, stripeSum, trapDistSq);
+  outHist = vec4(sp1, sp2, sp3, float(refIter));
+}
+`;
+
 // ---- Resolve GLSL chunks ----------------------------------------------------
 // Each resolve shader is a complete void main() that reads final iteration
 // state from 4 textures (batch output) and maps to a color via fragColor.
