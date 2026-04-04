@@ -187,7 +187,7 @@ grep -r @tradeoff src/
 Problème ouvert : **Perturbation GPU > 10^-14 — non verifiable en Playwright**.
 Diagnostic (2026-04-03, debugging systematique Phase 1-4) :
 - Orbite Rust **CORRECTE** (32768 iter a 10^-20, verifie par debug log).
-- Shader perturbation **GPU cap 4096 iter** (`PERTURBATION_GPU_MAX_ITER` dans perturbationRenderer.ts).
+- Shader perturbation **cap removed** — multi-frame ping-pong (256 iter/batch) replaces single-pass 4096 cap.
 - Playwright utilise WebKit headless (pas Chrome/AMD) → shader perturbation ne compile pas.
 - **Verification requise dans le vrai browser** (Chrome + AMD Radeon) pour les promesses 1 & 2.
 - A 10^-14 : structure visible dans le vrai browser (verifie session precedente).

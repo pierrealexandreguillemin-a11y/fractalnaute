@@ -11,7 +11,7 @@ import type { WebGLRenderer } from './gpu';
 import { renderWithPool } from './renderCoordinator';
 import { renderBand, buildMergedParams } from './renderBand';
 import { needsPerturbation, computeReferenceOrbit, cancelOrbit } from './wasmBridge';
-import { handleOrbitResult, cancelPerturbationRetry } from './perturbationRenderer';
+import { handleOrbitResult } from './perturbationRenderer';
 
 export interface RenderOptions {
   fractalType: FractalType;
@@ -125,12 +125,13 @@ function trySinglePass(
 
 /** Launch perturbation render (orbit + GPU). Returns cancel function. */
 function renderPerturbation(
-  canvas: HTMLCanvasElement, pool: WorkerPool | null,
+  canvas: HTMLCanvasElement, _pool: WorkerPool | null,
   gpuRenderer: WebGLRenderer, options: RenderOptions
 ): () => void {
   const refRe = options.zoomTargetRe ?? options.viewport.centerRe;
   const refIm = options.zoomTargetIm ?? options.viewport.centerIm;
   let stale = false;
+  let multiFrameCancel: (() => void) | null = null;
   const isStale = () => stale;
 
   // Auto-scale iterations for deep zoom
@@ -150,14 +151,16 @@ function renderPerturbation(
   // Don't render DS fallback at perturbation depths — DS precision is exhausted,
   // producing garbled pixels. CSS transform shows the previous (correct) image
   // stretched, which is better UX than garbled data.
-  options.onStatusMessage?.('Computing deep zoom orbit…');
+  options.onStatusMessage?.('Computing deep zoom orbit\u2026');
 
   computeReferenceOrbit(
     refReStr, refImStr,
     effectiveMaxIter, scaleStr, maxDc
   ).then(({ data, length, cancelled, blaData, blaNumLevels, blaLevelOffsets }) => {
-    options.onStatusMessage?.(null);
-    if (cancelled || stale) return;
+    if (cancelled || stale) {
+      options.onStatusMessage?.(null);
+      return;
+    }
     const orbitData: OrbitData = {
       data, length, refPointRe: refRe, refPointIm: refIm,
       blaData, blaNumLevels, blaLevelOffsets,
@@ -165,15 +168,15 @@ function renderPerturbation(
     };
     // Pass effectiveMaxIter to GPU render via options override
     const perturbOpts = { ...options, maxIterations: effectiveMaxIter };
-    handleOrbitResult(gpuRenderer, orbitData, canvas, pool, perturbOpts, isStale);
+    multiFrameCancel = handleOrbitResult(gpuRenderer, orbitData, perturbOpts, isStale);
   }).catch((err: unknown) => {
     if (stale) return;
     const msg = String(err);
     console.warn('[perturbation] orbit failed:', msg);
     if (msg.includes('timed out')) {
-      options.onStatusMessage?.('Orbit computation timed out — zoom depth too extreme for current iteration count');
+      options.onStatusMessage?.('Orbit computation timed out \u2014 zoom depth too extreme for current iteration count');
     } else if (msg.includes('memory') || msg.includes('alloc')) {
-      options.onStatusMessage?.('Not enough memory for this zoom depth — try reducing iterations');
+      options.onStatusMessage?.('Not enough memory for this zoom depth \u2014 try reducing iterations');
     } else {
       options.onStatusMessage?.('Deep zoom computation failed');
     }
@@ -183,7 +186,12 @@ function renderPerturbation(
     gpuRenderer.setVisible(false);
   });
 
-  return () => { stale = true; cancelOrbit(); cancelPerturbationRetry(); gpuRenderer.cancelPending(); };
+  return () => {
+    stale = true;
+    cancelOrbit();
+    multiFrameCancel?.();
+    gpuRenderer.cancelPending();
+  };
 }
 
 export function renderFractal(
