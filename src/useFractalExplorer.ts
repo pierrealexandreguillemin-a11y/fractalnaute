@@ -9,7 +9,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import type { ThemeName, FractalType } from './domain';
 import { useFractalState, useCanvasEvents, useUrlSync, parseHash } from './application';
 import type { InitialFractalConfig } from './application';
-import { useRenderer, cancelOrbit, needsPerturbation, getOrbitProgress } from './infrastructure';
+import { useRenderer, cancelOrbit, needsPerturbation, getOrbitProgress, findNearestNucleus } from './infrastructure';
 import type { PrecisionMode } from './domain';
 
 interface UseFractalExplorerOptions extends InitialFractalConfig {
@@ -41,6 +41,27 @@ function buildUrlState(state: {
     ssaa: state.ssaa,
     juliaRe: state.juliaParams.juliaRe ?? -0.7, juliaIm: state.juliaParams.juliaIm ?? 0.27015,
   };
+}
+
+/** Hook: F5 nucleus finder — snaps viewport center to nearest mini-Mandelbrot */
+function useNucleusFinder(
+  state: { fractalType: FractalType; viewport: { centerRe: number; centerIm: number } },
+  actions: { applyConfig: (c: InitialFractalConfig) => void; setStatusMessage: (m: string | null) => void }
+) {
+  return useCallback(() => {
+    if (state.fractalType !== 'mandelbrot') return;
+    actions.setStatusMessage('Searching for nucleus...');
+    findNearestNucleus(state.viewport.centerRe, state.viewport.centerIm)
+      .then(result => {
+        if (!result) { actions.setStatusMessage('No nucleus found'); return; }
+        actions.applyConfig({
+          centerRe: parseFloat(result.re), centerIm: parseFloat(result.im),
+          deepRe: result.re, deepIm: result.im,
+        });
+        actions.setStatusMessage(`Nucleus found (period ${result.period})`);
+      })
+      .catch(() => actions.setStatusMessage('Nucleus search failed'));
+  }, [state.viewport.centerRe, state.viewport.centerIm, state.fractalType, actions]);
 }
 
 export function useFractalExplorer(options: UseFractalExplorerOptions) {
@@ -78,6 +99,8 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- actions callbacks are stable (useCallback with [])
   }, []);
 
+  const handleFindNucleus = useNucleusFinder(state, actions);
+
   // Poll orbit progress via SAB while computing (ISO 9241-110: self-descriptiveness)
   useEffect(() => {
     if (!state.orbitComputing) return;
@@ -95,6 +118,7 @@ export function useFractalExplorer(options: UseFractalExplorerOptions) {
     canvasRef, viewport: state.viewport, fractalType: state.fractalType,
     isPickingJulia: state.isPickingJulia, actions,
     onJuliaPick: handleJuliaPick, onEscapeCancel: handleEscapeCancel,
+    onFindNucleus: handleFindNucleus,
   });
 
   const { exportImage } = useRenderer({

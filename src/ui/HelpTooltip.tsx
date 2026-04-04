@@ -21,6 +21,7 @@ export const HelpTooltip: React.FC = () => (
     <Kbd>Molette</Kbd> Zoom &nbsp;|&nbsp;
     <Kbd>Clic</Kbd> Centrer &nbsp;|&nbsp;
     <Kbd>Glisser</Kbd> Déplacer &nbsp;|&nbsp;
-    <Kbd>R</Kbd> Reset
+    <Kbd>R</Kbd> Reset &nbsp;|&nbsp;
+    <Kbd>N</Kbd> Nucleus
   </div>
 );
