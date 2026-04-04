@@ -22,6 +22,20 @@ import type { OrbitTextureState, BlaTextureState } from './rendererTypes';
 
 export type { GPURenderOptions, WebGLRenderer } from './rendererTypes';
 
+/** Build orbit context for perturbation, uploading textures to GPU. */
+function buildOrbit(
+  gl: WebGL2RenderingContext,
+  orbitState: OrbitTextureState, blaState: BlaTextureState,
+  options: GPURenderOptions
+): OrbitContext | false | undefined {
+  const precision = options.precision ?? 'doubleSingle';
+  if (precision !== 'perturbation' || !options.orbitData) return undefined;
+  const ctx = buildOrbitContext(gl, orbitState, options.orbitData);
+  if (!ctx) return false;
+  uploadBlaData(gl, blaState, options.orbitData);
+  return buildOrbitWithBla(ctx, blaState, options.orbitData);
+}
+
 /**
  * Create a WebGL 2 renderer with its own dedicated canvas overlay.
  * Returns null if the browser does not support WebGL 2.
@@ -68,13 +82,8 @@ export function createWebGLRenderer(
       const compiled = getOrCompile(gl, options.fractalType, options.coloringMode,
         options.maxIterations, options.interiorColoring, precision);
       if (!compiled) return false;
-      let orbit: OrbitContext | undefined;
-      if (precision === 'perturbation' && options.orbitData) {
-        const ctx = buildOrbitContext(gl, orbitState, options.orbitData);
-        if (!ctx) return false;
-        uploadBlaData(gl, blaState, options.orbitData);
-        orbit = buildOrbitWithBla(ctx, blaState, options.orbitData);
-      }
+      const orbit = buildOrbit(gl, orbitState, blaState, options);
+      if (orbit === false) return false;
 
       if (progressive.shouldUseProgressive(options.maxIterations)) {
         progressive.renderProgressive(compiled, options, emptyVAO, paletteTexture, orbit);
@@ -86,11 +95,13 @@ export function createWebGLRenderer(
 
     renderMultiFrame(options, onBatchProgress, onComplete) {
       if (contextLost || !multiFrame) return null;
-      return multiFrame.start(options, emptyVAO, paletteTexture, onBatchProgress, onComplete);
+      return multiFrame.start(
+        options, emptyVAO, paletteTexture,
+        onBatchProgress, onComplete, options.orbitData, options.precision
+      );
     },
 
     cancelPending(): void { progressive.cancelPending(); },
-
     updatePalette(name: PaletteName): void {
       currentPalette = name;
       if (!contextLost) updatePaletteTexture(gl, paletteTexture, name);
@@ -111,7 +122,6 @@ export function createWebGLRenderer(
       if (contextLost) return false;
       pollCompilation(gl); return hasCompiledProgram();
     },
-
     getCanvas(): HTMLCanvasElement { return gpuCanvas; }
   };
 }
