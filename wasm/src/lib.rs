@@ -7,6 +7,7 @@ mod arb;
 mod bla;
 mod control;
 mod dd;
+mod nucleus;
 mod orbit;
 mod precision;
 mod qd;
@@ -77,6 +78,40 @@ pub fn compute_reference_orbit(
     arr.set(&orbit_arr, header_len);
 
     Ok(arr)
+}
+
+/// Find the nucleus (center) of a mini-Mandelbrot at the given period.
+///
+/// Uses Newton's method with arbitrary-precision arithmetic.
+/// Returns a JS string `"re\nim"` with high-precision coordinates.
+///
+/// @see <https://mathr.co.uk/web/m-nucleus.html>
+///
+/// # Errors
+///
+/// Returns `JsValue` error if coordinate parsing fails.
+#[wasm_bindgen]
+pub fn find_nucleus(
+    c0_re: &str,
+    c0_im: &str,
+    period: u32,
+    precision_digits: u32,
+    newton_iters: u32,
+) -> Result<String, JsValue> {
+    let (re, im) = nucleus::find_nucleus(
+        c0_re, c0_im, period,
+        precision_digits as usize, newton_iters,
+    ).map_err(|e| JsValue::from_str(&e))?;
+    Ok(format!("{re}\n{im}"))
+}
+
+/// Estimate the dominant period at a location (f64 precision).
+///
+/// Returns the period as i32, or -1 if not found.
+#[wasm_bindgen]
+pub fn estimate_period(c_re: f64, c_im: f64, max_period: u32) -> i32 {
+    nucleus::estimate_period(c_re, c_im, max_period)
+        .map_or(-1, |p| p as i32)
 }
 
 /// Compute BLA table from reference orbit data.

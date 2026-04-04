@@ -1,5 +1,5 @@
 use std::f64::consts::LOG10_2;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 use dashu_float::DBig;
 
@@ -75,6 +75,21 @@ impl<'a> Mul<&'a ArbFloat> for ArbFloat {
     fn mul(self, rhs: &'a ArbFloat) -> ArbFloat {
         let digits = self.digits.max(rhs.digits);
         ArbFloat::truncated(&self.inner * &rhs.inner, digits)
+    }
+}
+
+impl<'a> Div<&'a ArbFloat> for &ArbFloat {
+    type Output = ArbFloat;
+    fn div(self, rhs: &'a ArbFloat) -> ArbFloat {
+        let digits = self.digits.max(rhs.digits);
+        ArbFloat::truncated(&self.inner / &rhs.inner, digits)
+    }
+}
+
+impl ArbFloat {
+    /// Format as decimal string with full precision.
+    pub fn to_string(&self) -> String {
+        format!("{}", self.inner)
     }
 }
 
