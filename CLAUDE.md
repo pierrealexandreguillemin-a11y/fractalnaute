@@ -244,9 +244,18 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 | # | Feature | Gain | Effort | Status | Priorité |
 |---|---|---|---|---|---|
 | ~~F1~~ | ~~Rescaling~~ | ~~Anti-artefacts~~ | ~~1 sem~~ | **DONE** | — |
+| F5 | **Nucleus finder** | Deep zoom coords | 2-3 jours | — | **P0** |
 | F2 | **Histogram coloring** | Banding → 0 | 1 sem | — | **P1** |
 | F3 | **Video export** | Zoom animation | 2 sem | — | P2 |
 | F4 | **LLM-readable (SEO)** | Discoverability | 1 sem | — | P3 |
+
+##### F5. Nucleus finder — P0 (bloque promesses 1 & 2)
+- Newton's method : c_{m+1} = c_m - F^p(0,c_m) / dF^p/dc(0,c_m)
+- Implementation Rust/WASM (dashu haute precision, meme infra que orbit)
+- estimatePeriod(c) + findNucleus(c0, period, precision_digits) → coords string
+- Permet de calculer des coords 50+ digits ciblant un mini-Mandelbrot a n'importe quelle profondeur
+- Ref: mathr.co.uk/web/m-nucleus.html, mandelbrot-numerics (Wikibooks)
+- Debloque : promesses 1 & 2 (10^-40+), auto-zoom vers profondeur arbitraire
 
 ##### ~~F1. Rescaling~~ — DONE
 - Static S = 2^k per frame. δ̃ = δ×S keeps float32 precise at any depth.

@@ -87,15 +87,17 @@
 | Feature | mandelbrot.page | deep-mandelbrot | Ambrose | fractals.top | mandelbrot.site | **Fractalnaute** |
 |---|---|---|---|---|---|---|
 | GPU rendering | Yes (2025) | WebGL | WebGL | WebGPU/GL | No | **WebGL 2** |
-| Perturbation | DD/QD | Jampary | BigFloat | No | No | **No (planned)** |
-| Series Approx | No | No | No | No | No | No |
-| Zoom depth | 10^-60+ | 10^-31 | 10^-238 | 10^-15 | 10^-15 | **10^-15 (DS)** |
+| Perturbation | DD/QD | Jampary | BigFloat | No | No | **Rust/WASM + GPU** |
+| Multi-frame GPU | No | Ping-pong | No | No | No | **Ping-pong (DS+perturb)** |
+| Series Approx | No | No | No | No | No | No (E2d planned) |
+| Nucleus finder | No | No | No | No | No | **Planned (F5)** |
+| Zoom depth | 10^-60+ | 10^-31 | 10^-238 | 10^-15 | 10^-15 | **10^-14 verified, no cap** |
 | Multi-fractal | No | No | No | Custom | No | **5 types** |
 | Coloring modes | Histogram | Cosine stripe | Basic | Basic | Basic | **5 modes** |
 | SSAA toggle | No | DE-adaptive | No | No | No | **Yes** |
 | Touch mobile | ? | No | No | ? | No | **Yes** |
-| URL sharing | Yes | No | No | ? | Yes | **Yes** |
-| Video export | Yes | No | No | No | No | No |
+| URL sharing | Yes | No | No | ? | Yes | **Yes (deep base64)** |
+| Video export | Yes | No | No | No | No | No (F3 planned) |
 | Progressive | Infinite | No | No | No | No | FBO preview |
 
 ## Secret Recipes
