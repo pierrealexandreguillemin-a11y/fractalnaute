@@ -708,6 +708,49 @@ ${ACCUMULATOR_UPDATE}
 }
 `;
 
+// ---- Perturbation resolve chunks --------------------------------------------
+
+/**
+ * Perturbation resolve header: same as resolveHeaderChunk + u_rescaleS uniform.
+ * Used by assembleMultiFramePerturbationResolveSource (DRY with DS resolve body).
+ */
+export const perturbationResolveHeaderChunk = /* glsl */ `#version 300 es
+precision highp float;
+precision highp int;
+
+uniform sampler2D u_stateZ;
+uniform sampler2D u_stateInfo;
+uniform sampler2D u_stateAcc;
+uniform sampler2D u_stateHist;
+uniform sampler2D u_palette;
+uniform int u_interiorColoring;
+uniform float u_rescaleS;
+
+out vec4 fragColor;
+`;
+
+/**
+ * Perturbation resolve preamble: override z/dz from delta state.
+ * The batch shader stores full z in sAcc.xy and rescaled delta (du,dv) in sZ.zw.
+ * This preamble REASSIGNS z/dz (already declared by RESOLVE_READ_STATE) before
+ * the coloring body reads them. Injected after `float trapDistSq = sAcc.w;`.
+ *
+ * @mirror perturbation.ts — reconstruct z/dz from stored delta
+ * IEEE 754-2019: NaN/Inf guard on z
+ */
+export const perturbationResolvePreambleChunk = /* glsl */ `
+  // @mirror perturbation.ts — reconstruct z/dz from stored delta
+  z = sAcc.xy;                        // full position (stored by batch)
+  float invS = 1.0 / u_rescaleS;
+  dz = sZ.zw * invS;                  // (du, dv) / S
+
+  // IEEE 754-2019 NaN/Inf guard
+  if (isnan(z.x) || isnan(z.y) || isinf(z.x) || isinf(z.y)) {
+    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+`;
+
 // ---- Resolve GLSL chunks ----------------------------------------------------
 // Each resolve shader is a complete void main() that reads final iteration
 // state from 4 textures (batch output) and maps to a color via fragColor.

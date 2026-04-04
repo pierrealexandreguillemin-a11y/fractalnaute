@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { assembleMultiFrameBatchSource, assembleResolveSource } from '../shaderCompiler';
+import {
+  assembleMultiFrameBatchSource, assembleResolveSource,
+  assembleMultiFramePerturbationBatchSource,
+  assembleMultiFramePerturbationResolveSource,
+} from '../shaderCompiler';
 import type { FractalType, ColoringMode } from '../../../domain/types';
 
 describe('multiFrameShader', () => {
@@ -52,4 +56,40 @@ describe('multiFrameShader', () => {
     const src = assembleResolveSource('stripe', false)!;
     expect(src).toContain('sin(t + vec3(');
   });
+
+  // ---- Perturbation multi-frame batch tests (10: 2 fractals × 5 colorings) ----
+
+  const PERTURB_FRACTALS: FractalType[] = ['mandelbrot', 'julia'];
+
+  for (const f of PERTURB_FRACTALS) {
+    for (const c of COLORINGS) {
+      it(`assembles perturbation batch shader for ${f} + ${c}`, () => {
+        const src = assembleMultiFramePerturbationBatchSource(f, c, false);
+        expect(src).not.toBeNull();
+        expect(src).toContain('#define BATCH_SIZE 256');
+        expect(src).toContain('layout(location = 0) out vec4 outZ');
+        expect(src).toContain('layout(location = 3) out vec4 outHist');
+        expect(src).toContain('u_rescaleS');
+        expect(src).toContain('getOrbitData');
+      });
+    }
+  }
+
+  // ---- Perturbation multi-frame resolve tests (10: 2 fractals × 5 colorings) --
+
+  for (const f of PERTURB_FRACTALS) {
+    for (const c of COLORINGS) {
+      it(`assembles perturbation resolve shader for ${f} + ${c}`, () => {
+        const src = assembleMultiFramePerturbationResolveSource(c, false);
+        expect(src).not.toBeNull();
+        expect(src).toContain('u_rescaleS');
+        // Preamble marker: reconstructs z/dz from delta state
+        expect(src).toContain('z = sAcc.xy');
+        expect(src).toContain('dz = sZ.zw * invS');
+        // IEEE 754-2019 NaN/Inf guard
+        expect(src).toContain('isnan(z.x)');
+        expect(src).toContain('out vec4 fragColor');
+      });
+    }
+  }
 });

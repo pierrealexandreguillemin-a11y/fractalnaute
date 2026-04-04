@@ -38,6 +38,9 @@ import {
   multiFrameJuliaHeaderChunk, multiFrameMultibrotHeaderChunk,
   mandelbrotDSBatchChunk, juliaBatchChunk,
   burningshipBatchChunk, tricornBatchChunk, multibrotBatchChunk,
+  perturbationBatchHeaderChunk,
+  mandelbrotPerturbationBatchChunk, juliaPerturbationBatchChunk,
+  perturbationResolveHeaderChunk, perturbationResolvePreambleChunk,
   resolveHeaderChunk, RESOLVE_DEFINES,
   resolveClassicChunk, resolveStripeChunk,
   resolveDecompositionChunk, resolveOrbitTrapChunk, resolveNormalMapChunk,
@@ -274,5 +277,69 @@ export function assembleResolveSource(
   if (!resolveMain) return null;
 
   return [resolveHeaderChunk, RESOLVE_DEFINES, resolveMain].join('\n');
+}
+
+// ---- Multi-frame perturbation batch/resolve assembly ------------------------
+
+const MULTI_FRAME_PERTURBATION_BATCH_CHUNKS: Partial<Record<FractalType, string>> = {
+  mandelbrot: mandelbrotPerturbationBatchChunk,
+  julia: juliaPerturbationBatchChunk,
+};
+
+/**
+ * Assemble a multi-frame perturbation batch fragment shader.
+ * Renders BATCH_SIZE iterations per frame using perturbation theory (δ̃ + rebasing).
+ * Pure function — no WebGL dependency, fully testable.
+ *
+ * Chunk order:
+ * 1. multiFrameBatchHeaderChunk (shared MRT header)
+ * 2. BATCH_DEFINE (#define BATCH_SIZE 256)
+ * 3. DS chunks (for screenToComplexDS): dsHeaderChunk, doubleSingleChunk, screenToComplexDSChunk
+ * 4. perturbationBatchHeaderChunk (orbit uniforms + getOrbitData)
+ * 5. Fractal-specific perturbation batch chunk
+ */
+export function assembleMultiFramePerturbationBatchSource(
+  fractal: FractalType,
+  _coloring: ColoringMode,
+  _interiorColoring: boolean
+): string | null {
+  const batchMain = MULTI_FRAME_PERTURBATION_BATCH_CHUNKS[fractal] ?? null;
+  if (!batchMain) return null;
+
+  return [
+    multiFrameBatchHeaderChunk,
+    BATCH_DEFINE,
+    dsHeaderChunk, doubleSingleChunk, screenToComplexDSChunk,
+    perturbationBatchHeaderChunk,
+    batchMain,
+  ].join('\n');
+}
+
+/** Injection anchor: last line of RESOLVE_READ_STATE in resolve chunks. */
+const RESOLVE_PREAMBLE_ANCHOR = 'float trapDistSq = sAcc.w;';
+
+/**
+ * Assemble a perturbation resolve fragment shader.
+ * DRY: reuses the SAME coloring body from MULTI_FRAME_RESOLVE_CHUNKS[coloring].
+ * Only the preamble differs: z/dz are reconstructed from perturbation delta state.
+ * The preamble is injected after RESOLVE_READ_STATE (which declares z/dz),
+ * overriding them with the correct perturbation sources.
+ *
+ * Pure function — no WebGL dependency, fully testable.
+ */
+export function assembleMultiFramePerturbationResolveSource(
+  coloring: ColoringMode,
+  _interiorColoring: boolean
+): string | null {
+  const resolveMain = MULTI_FRAME_RESOLVE_CHUNKS[coloring] ?? null;
+  if (!resolveMain) return null;
+
+  // Inject perturbation preamble after RESOLVE_READ_STATE
+  const injected = resolveMain.replace(
+    RESOLVE_PREAMBLE_ANCHOR,
+    RESOLVE_PREAMBLE_ANCHOR + '\n' + perturbationResolvePreambleChunk
+  );
+
+  return [perturbationResolveHeaderChunk, RESOLVE_DEFINES, injected].join('\n');
 }
 
