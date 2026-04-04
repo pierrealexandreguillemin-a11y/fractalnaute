@@ -256,3 +256,20 @@ See `docs/curation/README.md` for full evaluation with screenshots.
 | VRAM (1920×1080) | ~265 MB | 4 textures × 2 ping-pong × RGBA32F |
 | Programs compiled | 10 | 5 batch (1 per fractal) × 5 resolve (1 per coloring), lazy |
 | Combos supported | 25 | 5 fractals × 5 colorings, all multi-frame GPU |
+
+---
+
+## Multi-frame perturbation (E2e) — 2026-04-04
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Batch size | 256 iter/frame | Same as E2c, #define BATCH_SIZE |
+| Iteration cap | **None** | Was 4096 single-pass (AMD ANGLE limit). Multi-frame lifts cap entirely. |
+| Perturbation combos | 10 | 2 fractals (Mandelbrot+Julia) × 5 colorings |
+| Programs compiled | 12 | 2 batch + 5 resolve (perturbation) + existing DS programs, lazy |
+| BLA in multi-frame | Disabled | Incompatible with fixed batch sizes. Measured 9% gain — acceptable loss. |
+| Rebasing | Supported | Per-pixel refIter in T_Hist.w, reset on glitch detection |
+| DRY resolve | Yes | Shared preamble, 5 coloring bodies reused from DS resolve |
+| Orbit texture | TEXTURE4 | Avoids conflict with MRT state on TEXTURE0-3 |
+| VRAM overhead | ~0 | Same FBOs as E2c, orbit texture already allocated by single-pass path |
+| Visual verification | **Pending** | Playwright session expired. Requires real browser (Chrome+AMD) test. |

@@ -184,23 +184,17 @@ grep -r @tradeoff src/
 | 7 | "Playwright benchmarks 3 profondeurs" | **LIVRÉ** | 5/5 tests formalisés (10^-8, 10^-12, 10^-14, 10^-40, interactif). |
 | 8 | "10^-80 malachite <50ms" | **BLOQUE PAR #1** | Depend de SA (E2d) + fix orbit ArbFloat. |
 
-Problème ouvert : **Perturbation GPU > 10^-14 — non verifiable en Playwright**.
-Diagnostic (2026-04-03, debugging systematique Phase 1-4) :
-- Orbite Rust **CORRECTE** (32768 iter a 10^-20, verifie par debug log).
-- Shader perturbation **cap removed** — multi-frame ping-pong (256 iter/batch) replaces single-pass 4096 cap.
-- Playwright utilise WebKit headless (pas Chrome/AMD) → shader perturbation ne compile pas.
-- **Verification requise dans le vrai browser** (Chrome + AMD Radeon) pour les promesses 1 & 2.
-- A 10^-14 : structure visible dans le vrai browser (verifie session precedente).
-- Si le vrai browser compile le shader perturbation a 4096 iter, 10^-20+ devrait fonctionner.
-- Si le cap 4096 est insuffisant, multi-frame perturbation (E2e) sera necessaire.
+~~Problème résolu~~ : GPU perturbation render bloquant (1-5s) — **RESOLU par E2c** (771ms @8.8K iter).
+~~Problème résolu~~ : Perturbation GPU cap 4096 iter — **RESOLU par E2e** multi-frame perturbation (256 iter/batch, no cap).
 
-~~Problème résolu~~ : GPU perturbation render trop lent (1-5s bloquant) — **RESOLU par E2c** (771ms @8.8K iter).
+Problème ouvert : **Verification visuelle 10^-20+ requise dans le vrai browser** (Playwright = Chromium headless, shader perturbation y compile).
+Status : E2e code complet (282 tests, build OK), verification visuelle pending.
 
-### Next — ordre logique (mis a jour 2026-04-03)
+### Next — ordre logique (mis a jour 2026-04-04)
 
 | Priorite | Feature | Effort | Debloque |
 |----------|---------|--------|----------|
-| **P0** | Fix orbit ArbFloat 10^-30+ (bug #1) | debug Rust | Promesses 1, 2, 8 |
+| **NOW** | Verifier promesses 1 & 2 dans vrai browser | 10 min | Trust recovery |
 | **P1** | F2 Histogram coloring | 1 sem | Banding → 0, qualite visuelle |
 | **P2** | E2d Series Approximation (SA) | 2-3 sem | Promesse 8 (10^-80 <50ms), deep zoom perf 10x |
 | **P3** | Verifier promesse 8 (post-SA) | 1h | 10^-80 malachite <50ms |
@@ -218,8 +212,9 @@ Grid search inutile avec rebasing.
 
 | # | Feature | Impact | Effort | Status |
 |---|---|---|---|---|
-| ~~E2c~~ | ~~Ping-pong multi-frame~~ | **DONE** — 256 iter/batch, 4 MRT RGBA32F, GPU 771ms @8.8K iter (vs CPU 5380ms). 25 combos. | — | — |
-| E2d | **Series Approximation (SA)** | Skip iter pour TOUS pixels (10x) | 2-3 sem | After E2c |
+| ~~E2c~~ | ~~Ping-pong multi-frame (DS)~~ | **DONE** — 256 iter/batch, 4 MRT RGBA32F, GPU 771ms @8.8K iter (vs CPU 5380ms). 25 combos. | — | — |
+| ~~E2e~~ | ~~Ping-pong multi-frame (perturbation)~~ | **DONE** — 256 iter/batch, orbit texture, rebasing, no iter cap. 10 perturbation combos (2 fractals × 5 colorings). | — | — |
+| E2d | **Series Approximation (SA)** | Skip iter pour TOUS pixels (10x) | 2-3 sem | After E2e |
 
 ##### ~~E2c. Ping-pong multi-frame~~ — DONE
 256 iter/batch, 4 MRT RGBA32F state textures, ping-pong FBO swap.
