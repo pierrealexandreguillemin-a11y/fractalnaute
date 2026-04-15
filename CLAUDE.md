@@ -171,12 +171,12 @@ grep -r @tradeoff src/
    Iter auto-scaling: 128×log2(1/scale), cap 8192, only at scale<1e-6.
    Known limit: GPU perturbation render bloquant (1-5s). Fix: E2c ping-pong.
 
-### BROKEN PROMISES — audit trail (honnête, mis à jour 2026-04-03)
+### BROKEN PROMISES — audit trail (honnête, mis à jour 2026-04-04)
 
 | # | Promesse | Statut | Notes |
 |---|---|---|---|
-| 1 | "Depth breakthrough 10^-40: non-black pixels" | **BUG** | 10^-14 fonctionne (screenshot). 10^-30+ : orbite Rust retourne mais rendu uniforme (pas de structure). Bug dans orbit.rs ArbFloat a haute precision — a debugger. |
-| 2 | "Manual verification: Zoom 10^-60, 10^-100" | **BLOQUE PAR #1** | Meme cause racine. Le timeout adaptatif est livre mais le bug orbite persiste. |
+| 1 | "Depth breakthrough 10^-40: non-black pixels" | **PARTIEL** | Nucleus finder DONE (delivers 50-digit coords). Playwright: 10^4/10^6/10^8 structure visible. 10^14: perturbation activates, orbit computed, but renders uniform. Deep zoom visual verification still pending (coords precision or perturbation render issue). |
+| 2 | "Manual verification: Zoom 10^-60, 10^-100" | **BLOQUE** | Nucleus finder delivers coords, but perturbation render at 10^14+ produces uniform output. Need to debug orbit/render at extreme depth. |
 | 3 | "Unlimited zoom depth (10^-60+)" | **LIVRÉ (moteur)** | Pipeline deep coords + perturbation + rescaling + BLA fonctionne à 10^-23+ vérifié. Pas de crash. |
 | 4 | "GPU render @256iter <10ms with BLA" | **LIVRÉ** | BLA toggle ?bla=0. Mesuré: ON=4853ms vs OFF=5331ms (9%). Faible gain car premier render = CPU fallback. |
 | 5 | "BLA pixel cross-validation" | **NON FAIT** | Nécessite coords extérieures haute-précision. |
@@ -190,11 +190,11 @@ grep -r @tradeoff src/
 Problème ouvert : **Verification visuelle 10^-20+ requise dans le vrai browser** (Playwright = Chromium headless, shader perturbation y compile).
 Status : E2e code complet (282 tests, build OK), verification visuelle pending.
 
-### Next — ordre logique (mis a jour 2026-04-04)
+### Next — ordre logique (mis a jour 2026-04-04, post-F5)
 
 | Priorite | Feature | Effort | Debloque |
 |----------|---------|--------|----------|
-| **NOW** | Verifier promesses 1 & 2 dans vrai browser | 10 min | Trust recovery |
+| **NOW** | Debug perturbation render at 10^14+ (uniform output) | qq heures | Promesses 1 & 2, deep zoom visual proof |
 | **P1** | F2 Histogram coloring | 1 sem | Banding → 0, qualite visuelle |
 | **P2** | E2d Series Approximation (SA) | 2-3 sem | Promesse 8 (10^-80 <50ms), deep zoom perf 10x |
 | **P3** | Verifier promesse 8 (post-SA) | 1h | 10^-80 malachite <50ms |
@@ -244,18 +244,24 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 | # | Feature | Gain | Effort | Status | Priorité |
 |---|---|---|---|---|---|
 | ~~F1~~ | ~~Rescaling~~ | ~~Anti-artefacts~~ | ~~1 sem~~ | **DONE** | — |
-| F5 | **Nucleus finder** | Deep zoom coords | 2-3 jours | — | **P0** |
+| ~~F5~~ | ~~Nucleus finder~~ | ~~Deep zoom coords~~ | ~~2-3 jours~~ | **DONE** | — |
 | F2 | **Histogram coloring** | Banding → 0 | 1 sem | — | **P1** |
 | F3 | **Video export** | Zoom animation | 2 sem | — | P2 |
 | F4 | **LLM-readable (SEO)** | Discoverability | 1 sem | — | P3 |
 
-##### F5. Nucleus finder — P0 (bloque promesses 1 & 2)
-- Newton's method : c_{m+1} = c_m - F^p(0,c_m) / dF^p/dc(0,c_m)
-- Implementation Rust/WASM (dashu haute precision, meme infra que orbit)
-- estimatePeriod(c) + findNucleus(c0, period, precision_digits) → coords string
-- Permet de calculer des coords 50+ digits ciblant un mini-Mandelbrot a n'importe quelle profondeur
-- Ref: mathr.co.uk/web/m-nucleus.html, mandelbrot-numerics (Wikibooks)
-- Debloque : promesses 1 & 2 (10^-40+), auto-zoom vers profondeur arbitraire
+##### ~~F5. Nucleus finder~~ — DONE
+- Newton's method in Rust/WASM (dashu ArbFloat arbitrary precision, same infra as orbit).
+  estimate_period(f64) detects period via orbit cycle detection (epsilon 1e-6).
+  find_nucleus(c0_re, c0_im, period, precision_digits) returns 50-digit coords string.
+  N key shortcut (not F5 — browser intercepts F5). Mandelbrot only (z->z^2+c).
+  9 Rust tests (cargo test). WASM build includes both exports via wasm-bindgen.
+  JS bridge: src/infrastructure/nucleusFinder.ts (lazy WASM load, main thread).
+  UI: useNucleusFinder hook -> applyConfig(deepRe, deepIm). HelpTooltip shows "N Nucleus".
+  Limitation: estimate_period uses f64 — only finds periods at points INSIDE mini-Mandelbrots.
+  Points on boundary (Misiurewicz, seahorse valley) return "No nucleus found" — correct behavior.
+  Ref: mathr.co.uk/web/m-nucleus.html, mandelbrot-numerics (Wikibooks).
+  Deep zoom Playwright verification: 10^4/10^6/10^8 structure visible, 10^14 renders uniform
+  (coords precision issue — nucleus finder delivers coords but perturbation render needs debugging).
 
 ##### ~~F1. Rescaling~~ — DONE
 - Static S = 2^k per frame. δ̃ = δ×S keeps float32 precise at any depth.
@@ -323,7 +329,7 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 
 - Framework: vitest (`npm test`)
 - 228 unit tests (14 test files) for domain + infrastructure + application layers
-- 57 Rust cargo tests (DD/QD/ArbFloat/BLA/orbit/precision)
+- 66 Rust cargo tests (DD/QD/ArbFloat/BLA/orbit/precision/nucleus)
 - All pure functions, deterministic, <300ms total
 
 ## Deploy
@@ -331,3 +337,8 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 - **Target** : Vercel
 - **Headers** : COOP/COEP (SharedArrayBuffer), HSTS, CSP, X-Frame-Options
 - **Config** : `vercel.json` (prod), `next.config.ts` (dev)
+
+
+## Wiki
+
+Syntheses wiki : `C:\Dev\wiki\topics\game-dev\` et `C:\Dev\wiki\entities\fractalnaute.md`
