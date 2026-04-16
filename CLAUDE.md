@@ -342,3 +342,4 @@ Ref: mathr.co.uk, K.I. Martin SuperFractalThing paper, Wikibooks Fractals/pertur
 ## Wiki
 
 Syntheses wiki : `C:\Dev\wiki\topics\game-dev\` et `C:\Dev\wiki\entities\fractalnaute.md`
+Guide et outils de recherche : `C:\Dev\wiki\wiki-guide.md`
